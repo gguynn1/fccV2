@@ -5,3 +5,11 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Deadline-based fixtures for assignment, follow-up, completion, and escalation.
 - Tests that verify direct tone and clear accountability outputs.
+
+Technologies and integrations:
+- State: ChoresState stored in SQLite (state service) — active chores with assignee, deadline, and status; completed chores with history.
+- Deadlines: BullMQ delayed jobs for reminder-before-deadline and escalation-after-deadline via the scheduler service.
+- Escalation: High-accountability escalation profile — XState machine transitions from private thread reminder to family thread escalation.
+- Completion tracking: InputMethod-aware — completion can arrive as text reply ("done") or image evidence; matched to the active chore.
+- LLM tone shaping: Direct, operational tone injected into Claude API prompt — "clear language, clear deadlines, clear accountability."
+- No external integrations: All chore data is internally managed; no third-party task service.

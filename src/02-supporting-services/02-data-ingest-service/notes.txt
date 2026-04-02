@@ -1,8 +1,19 @@
 Required tools/dependencies:
-- Connector interfaces for inboxes, calendars, forwarded content, and future feeds.
+- Connector interfaces for inboxes, forwarded content, and future feeds.
 - Extraction and pre-classification logic that normalizes external data into queue items.
 - A queue producer for ingest-originated events.
 
 Recommended tools/dependencies:
-- Fixture corpora for emails, calendar changes, and forwarded images or messages.
+- Fixture corpora for emails, forwarded images or messages, and conversational input.
 - Parser validation for partial, noisy, or duplicate external inputs.
+
+Technologies and integrations:
+- Email monitoring: imapflow for IMAP idle/polling against monitored inboxes; extract sender, subject, and body into InboundEmailContent.
+- Email is the primary external data source: School communications, appointment confirmations, bill notifications, booking confirmations, photography inquiries, and financial alerts all enter via email parsing.
+- LLM extraction: Claude API pre-classifies topic and extracts structured data (dates, amounts, action items) from email content.
+- Forwarded content: Parsed from inbound transport messages — images downloaded from Twilio media URLs, text extracted and normalized.
+- Polling: node-cron or BullMQ repeatable jobs for periodic email polling at configured intervals (poll_interval_minutes).
+- Deduplication: Track watermarks (last-seen timestamps) per source in the state service to avoid re-processing.
+- Queue production: Normalized data → PendingQueueItem with source tagging (QueueItemSource.EmailMonitor, etc.) → enqueue via BullMQ.
+- No calendar sync connector: Calendar data enters via email parsing or conversational input; the system serves a local CalDAV endpoint outward rather than consuming an external calendar API.
+- Future feeds: Connector interface designed for extension — add new DataIngestSourceType variants and corresponding adapters without changing downstream logic.

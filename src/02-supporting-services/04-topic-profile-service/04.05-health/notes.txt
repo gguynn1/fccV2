@@ -5,3 +5,13 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Fixtures for appointment reminders, medication prompts, and post-visit note capture.
 - Tests that keep outputs attentive, specific, and privacy-respecting.
+
+Technologies and integrations:
+- State: HealthState stored in SQLite (state service) — medications, providers, appointments, and health profiles per entity.
+- Appointment reminders: BullMQ delayed jobs scheduled at reminder offsets via the scheduler service.
+- Post-visit follow-up: Scheduler enqueues a follow-up prompt after the appointment end time ("Any notes from today's visit?").
+- Medication reminders (optional): BullMQ repeatable jobs for daily medication prompts if configured.
+- Overdue check-up detection: Pure logic — compare last appointment date against recommended intervals; flag when overdue.
+- Privacy: Health data routes only to private threads; never surfaces in shared threads unless the participant explicitly shares.
+- No external health APIs: All data is manually entered — no EHR/EMR integration (avoids HIPAA complexity).
+- LLM tone shaping: Attentive, specific, caring tone injected into Claude API prompt.

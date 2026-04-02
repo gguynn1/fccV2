@@ -6,3 +6,9 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Decision-table tests for narrowest-thread selection.
 - Fixtures that separate immediate replies from later proactive follow-ups.
+
+Technologies and integrations:
+- Contract: TypeScript interface for the routing client — accepts entity IDs, topic, and whether the message is a response or proactive; returns a target thread ID.
+- Implementation: Pure logic over the identity config's thread membership data — no external calls.
+- Thread map: Static five-thread configuration; routing is deterministic given the audience.
+- Testing: Decision-table-style Vitest suites covering every entity-to-thread combination.

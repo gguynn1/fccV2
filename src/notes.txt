@@ -5,3 +5,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Scenario fixtures that exercise full end-to-end flows.
 - Shared validation helpers for configuration and state stores.
+
+Technologies and integrations:
+- Runtime: Node.js (LTS) with TypeScript (strict mode, ESM).
+- Schema validation: Zod for runtime type checking across config and state stores.
+- Configuration: dotenv for environment variables; static TypeScript objects for system config.
+- Testing: Vitest as the test runner; scenario fixtures boot from known state snapshots.
+- Logging: pino for structured JSON logging across all services.
+- Linting / formatting: ESLint + Prettier with shared config at the root.
+- Monorepo tooling: tsx for dev execution; tsup or unbuild for bundling if needed.

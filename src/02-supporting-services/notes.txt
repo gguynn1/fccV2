@@ -5,3 +5,9 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Contract tests that keep worker-to-service integrations stable.
 - Shared fixtures for state, timers, and queue items across supporting services.
+
+Technologies and integrations:
+- Shared infrastructure: Redis (BullMQ + counters), SQLite (state persistence) — both shared across supporting services.
+- Service contracts: TypeScript interfaces per service; the worker injects implementations at startup.
+- Inter-service rule: Supporting services never call each other directly and never reach back into the stack.
+- Testing: Vitest contract tests that verify each service's interface stays compatible with the worker's expectations.

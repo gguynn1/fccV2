@@ -6,3 +6,10 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Tests for approval, rejection, and expiration flows.
 - Reply-parsing fixtures for short confirmations such as yes, no, and structured choices.
+
+Technologies and integrations:
+- Contract: TypeScript interface for the confirmation client — accepts action type and originating context; returns pending/approved/rejected/expired status.
+- Pending store: SQLite row per pending confirmation with an expires_at column; or Redis key with TTL for auto-expiry.
+- Reply matching: Simple string matching for short replies ("yes", "no", "approve", "deny"); no LLM needed for confirmation parsing.
+- Expiry: BullMQ delayed job that fires at expires_at to mark the confirmation as expired and trigger the on_expiry action.
+- Testing: Vitest suites for each flow — approval, rejection, expiration, and re-issue after expiry.

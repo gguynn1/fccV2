@@ -5,3 +5,11 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Clock-controlled tests for each escalation path.
 - Fixtures that prove silence means different things by topic but never approval.
+
+Technologies and integrations:
+- State machine: XState (v5) for modeling escalation ladders — each accountability level (high, medium, low) is a separate machine definition with step-based states and timer-driven transitions.
+- Timer integration: BullMQ delayed jobs for follow-up deadlines — when an escalation step starts, a delayed job is scheduled for the next_action_at time.
+- Persistence: Active escalations stored in SQLite (state service) as ActiveEscalation records; machine state rehydrated on restart.
+- Broader-thread escalation: When the state machine transitions to EscalateToBroaderThread, the escalation service returns a new target thread and the worker re-routes.
+- Silence handling: Timer expiry without response triggers the next escalation step — silence is never interpreted as approval.
+- Testing: Vitest with XState's inspect API and fake timers; assert that each accountability path produces the correct step sequence.

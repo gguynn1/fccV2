@@ -9,3 +9,9 @@ Recommended tools/dependencies:
 - Keep terminology aligned with `src/types.ts` and the architecture rules.
 - Update diagrams and prose together so the flow stays accurate.
 - Example source payloads for inbox, calendar, and future integration flows.
+
+Technologies and integrations (documented, not runtime):
+- Monitored inbox: imapflow IMAP idle/polling → extract sender, subject, body → Claude API pre-classifies topic → PendingQueueItem → BullMQ.
+- Calendar data: Enters via email parsing (appointment confirmations, calendar invites) or conversational input — no external calendar API consumed. The system serves a local CalDAV endpoint outward.
+- Forwarded messages: Arrive via Twilio transport → parsed and re-queued with ingest source tagging.
+- Future integrations: Each new source implements the DataIngestSource interface and produces queue items — no changes to downstream dispatch.

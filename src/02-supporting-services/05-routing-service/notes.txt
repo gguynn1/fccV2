@@ -5,3 +5,11 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Decision-table tests for audience selection.
 - Fixtures for events that require both an immediate reply and a later proactive follow-up.
+
+Technologies and integrations:
+- Implementation: Pure TypeScript logic — no external services or databases needed.
+- Thread map: Static configuration of five threads with participant membership; sourced from the identity service config.
+- Routing algorithm: Deterministic narrowest-thread selection — given an audience set, find the smallest thread whose participants are a superset.
+- Response routing: If the item is a response, return the originating thread (no computation needed).
+- Proactive routing: If the item is proactive, compute the narrowest thread that contains all concerned entities.
+- Testing: Vitest decision-table suites covering every audience → thread combination, including pet-to-responsible-adult routing.

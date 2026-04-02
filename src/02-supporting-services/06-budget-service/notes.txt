@@ -5,3 +5,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Time-based simulations for quiet windows and high-volume days.
 - Metrics or traces that explain why outbound items were combined or delayed.
+
+Technologies and integrations:
+- Counters: Redis sorted sets keyed by person and thread — score is timestamp, enabling sliding-window count queries (ZRANGEBYSCORE).
+- Rate limiting: Redis INCR with TTL for per-person daily unprompted caps and per-thread hourly caps.
+- Collision detection: Query Redis for recent dispatched item timestamps in the target thread; enforce minimum gap between messages.
+- Batch window: Configurable batch_window_minutes from OutboundBudget config; items inside the window are held for the next digest.
+- Clock abstraction: Injected clock interface for deterministic testing of quiet windows and digest boundaries.
+- Shared Redis: Same Redis instance used by BullMQ (queue) and the scheduler — no additional infrastructure.
+- Testing: Vitest with fake timers and a mock Redis (ioredis-mock or in-memory Map) for budget logic assertions.

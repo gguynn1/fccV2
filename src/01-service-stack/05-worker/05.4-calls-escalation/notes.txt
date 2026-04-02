@@ -6,3 +6,10 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Clock-controlled tests for high, medium, and low accountability paths.
 - Fixtures that verify silence never counts as approval.
+
+Technologies and integrations:
+- Contract: TypeScript interface for the escalation client — accepts item ref, topic, and current escalation state; returns next step action and timing.
+- State machine: XState (v5) for modeling escalation ladders — states map to escalation steps, transitions fire on timer expiry or response receipt.
+- Timers: BullMQ delayed jobs for scheduling follow-up and broader-thread escalation deadlines.
+- Persistence: Escalation status stored in the state service (SQLite); active escalations survive restarts.
+- Testing: Vitest with fake timers and XState's inspect API for asserting state transitions.

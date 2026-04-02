@@ -5,3 +5,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Fixtures for short approval replies, structured choices, and expired confirmations.
 - Tests that verify protected actions never auto-execute.
+
+Technologies and integrations:
+- Pending store: SQLite table (state service) with columns for id, type, action, requested_by, thread, requested_at, expires_at, status, result.
+- Expiry mechanism: BullMQ delayed job scheduled at expires_at — when it fires, mark the confirmation as expired and execute the on_expiry policy (reissue or drop).
+- Reply parsing: Simple keyword matching for short replies ("yes", "no", "approve", "deny", positive/negative reactions); no LLM needed.
+- Structured choices: Support numbered or labeled options in the confirmation prompt; match reply to the option index or label text.
+- Gating: ConfirmationActionType enum defines which actions always require approval — the worker checks this before proceeding.
+- TTL alternative: Redis keys with TTL as a lighter-weight pending store if SQLite writes become a bottleneck (unlikely at this scale).
+- Testing: Vitest suites covering approval, rejection, expiration, re-issue, and the guarantee that protected actions never auto-execute.

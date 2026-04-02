@@ -9,3 +9,9 @@ Recommended tools/dependencies:
 - Keep terminology aligned with `src/types.ts` and the architecture rules.
 - Update diagrams and prose together so the flow stays accurate.
 - Checks that every documented source still lands in the same queue contract.
+
+Technologies and integrations (documented, not runtime):
+- Queue engine: BullMQ with Redis — single queue accepting items from transport/classifier pipeline, data ingest, and scheduler.
+- Consumer model: BullMQ worker with concurrency=1 — one item at a time, sequential processing.
+- Item contract: PendingQueueItem with source, entity, thread, topic, intent, timestamp — unified across all producers.
+- Failed items: BullMQ dead-letter queue for items that fail processing after configured retries.

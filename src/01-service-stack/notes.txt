@@ -5,3 +5,9 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Scenario runners that validate the full top-to-bottom pipeline.
 - Mocks for supporting-service calls while testing stack behavior.
+
+Technologies and integrations:
+- Service contracts: TypeScript interfaces and discriminated unions — no runtime coupling between services.
+- Dependency injection: Manual constructor injection so the worker can swap real vs mock service clients.
+- Scenario testing: Vitest with fixture-driven test suites that run a message through the full stack.
+- Tracing: OpenTelemetry spans across the pipeline so each step is observable (transport → identity → classifier → queue → worker → action router).

@@ -6,3 +6,15 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - State snapshots for scenario testing and replay.
 - Validation and migration helpers for long-lived stored data.
+
+Technologies and integrations:
+- Primary store: SQLite via better-sqlite3 — lightweight, zero-config, file-based persistence suitable for the system's data volume.
+- ORM option: Drizzle ORM with the SQLite driver for type-safe queries and schema migrations; or raw better-sqlite3 with hand-written SQL.
+- Schema management: Drizzle Kit for migration generation and application; or a simple versioned migration runner.
+- Complex state: JSON columns in SQLite for nested objects (topic records, thread history, escalation state) — query with SQLite's json_extract when needed.
+- Validation: Zod schemas mirroring the SystemState interface; validate on read/write boundaries to catch corruption early.
+- Bootstrapping: JSON fixture files that represent empty, active, and mid-scenario SystemState snapshots; loaded at startup or in tests.
+- Caching: Optional in-memory cache (Map or lru-cache) for hot-path reads like budget counters and thread history; write-through to SQLite.
+- Backup: Periodic SQLite .backup() call to a timestamped file for point-in-time recovery.
+- Alternative: Turso (libSQL) for distributed SQLite if the system ever needs multi-node deployment; same driver API, remote-capable.
+- Alternative: PostgreSQL via Drizzle ORM if data volume or concurrent access grows beyond SQLite's comfort zone.

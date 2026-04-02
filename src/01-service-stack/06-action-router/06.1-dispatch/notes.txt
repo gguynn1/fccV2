@@ -6,3 +6,10 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Immediate-priority test cases for urgent alerts and direct replies.
 - Delivery-status checks for dispatched messages.
+
+Technologies and integrations:
+- Send path: Twilio REST API (client.messages.create) for immediate SMS/MMS delivery to the target thread.
+- Validation: Zod schema check on the outbound payload (thread ID, content, participant) before calling Twilio.
+- Delivery tracking: Twilio statusCallback webhook to capture delivered/failed/undelivered status; update dispatched queue item.
+- Rate limiting: Twilio's built-in rate limits plus the budget service's per-thread hourly cap.
+- Testing: Vitest with a mock Twilio client that captures send calls; assert payload shape and thread targeting.

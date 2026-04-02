@@ -6,3 +6,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Scenario tests covering the fixed processing sequence end to end.
 - Decision tracing so worker outcomes can be inspected when behavior changes.
+
+Technologies and integrations:
+- Orchestration: Plain async/await sequential pipeline — each step calls a service client and feeds results to the next.
+- Service clients: TypeScript interfaces injected at construction; real implementations call supporting services, test doubles return fixtures.
+- Decision logging: pino structured logs capturing each step's input/output for auditability and debugging.
+- Tracing: OpenTelemetry spans per worker step so the full decision chain is visible in traces.
+- Error handling: Try/catch per step with dead-letter routing via BullMQ for items that fail processing.
+- Future option: Temporal.io or Inngest for durable workflow orchestration if steps need long-running retries or human-in-the-loop pauses.
+- Testing: Vitest scenario suites that inject mock service clients and assert the full decision sequence.

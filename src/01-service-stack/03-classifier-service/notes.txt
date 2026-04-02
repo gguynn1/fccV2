@@ -6,3 +6,14 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Evaluation fixtures for ambiguous messages, forwarded content, and one-word replies.
 - A repeatable classification benchmark set for regression checking.
+
+Technologies and integrations:
+- LLM provider: Anthropic Claude API (claude-sonnet or claude-haiku for speed/cost) for topic and intent classification.
+- LLM SDK: Vercel AI SDK (@ai-sdk/anthropic) for streaming and structured output; or direct Anthropic SDK.
+- Structured output: Zod schema → JSON mode so the LLM returns a validated TopicKey + intent + confidence.
+- Prompt management: Few-shot prompt templates stored as TypeScript constants; include recent thread context as system prompt.
+- Context window: Pass last N messages from the thread so short replies ("yes", "ok", "the blue one") resolve correctly.
+- Fallback: If LLM call fails or confidence is below threshold, queue item for manual review or default to a safe topic.
+- Cost control: Use the smallest model that meets accuracy targets; cache identical classification requests with a short TTL.
+- Evaluation: Vitest-based benchmark suite with labeled examples; track precision/recall per topic across prompt changes.
+- Alternative providers: OpenAI GPT-4o-mini, Google Gemini Flash, or Groq (Llama) as swap-in alternatives via Vercel AI SDK's provider abstraction.

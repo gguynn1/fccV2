@@ -5,3 +5,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Fixtures for expiring status entries and on-request snapshots.
 - Tests that keep updates brief, functional, and minimally proactive.
+
+Technologies and integrations:
+- State: FamilyStatusState stored in SQLite (state service) — status entries with entity, content, timestamp, and expiry.
+- Expiry mechanism: SQLite query filters on status_expiry — stale entries are excluded from snapshots; periodic cleanup job via BullMQ removes expired records.
+- On-request snapshots: When a participant asks "where is everyone?", query current (non-expired) status entries and compose a brief summary via Claude API.
+- Calendar-linked prompts: Cross-topic connection — if a calendar event suggests someone should be in transit, the assistant may ask for an ETA update.
+- Minimal proactivity: Almost entirely passive — records what people volunteer and surfaces it on request; rarely initiates.
+- LLM tone shaping: Brief, functional tone injected into Claude API prompt — "PARTICIPANT 1 will be home around 6."
+- No location services: All status data is manually provided via messages; no GPS, geofencing, or location API integration.

@@ -9,3 +9,9 @@ Recommended tools/dependencies:
 - Keep terminology aligned with `src/types.ts` and the architecture rules.
 - Update diagrams and prose together so the flow stays accurate.
 - Flow review against real queue-item fields and source tags.
+
+Technologies and integrations (documented, not runtime):
+- Phone → Transport: Twilio webhooks deliver inbound SMS/MMS events to a Fastify HTTP endpoint.
+- External → Ingest: imapflow (IMAP) for email monitoring; calendar data enters via email parsing or conversational input (no external calendar API).
+- Scheduler → Queue: BullMQ repeatable/delayed jobs fire and produce PendingQueueItem entries.
+- All three paths converge on the same BullMQ queue with source tagging (QueueItemSource).

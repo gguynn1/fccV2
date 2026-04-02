@@ -5,3 +5,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Fixtures for list merging, duplicate item handling, and section ordering.
 - Tests that keep responses brief and utilitarian.
+
+Technologies and integrations:
+- State: GroceryState stored in SQLite (state service) — current items by GrocerySection, purchased history.
+- List operations: Pure logic — add, remove, mark purchased, merge duplicates, group by section.
+- LLM parsing: Claude API for extracting item names and quantities from natural-language messages ("pick up milk and eggs").
+- Image parsing: Claude API vision for extracting items from images of handwritten lists or pantry photos.
+- Section classification: LLM or simple keyword mapping to assign items to GrocerySection (produce, dairy, meat, etc.).
+- Shopping day reminder (optional): BullMQ repeatable job on configured shopping day via the scheduler service.
+- No external integrations: All list data is internally managed; no third-party grocery service.

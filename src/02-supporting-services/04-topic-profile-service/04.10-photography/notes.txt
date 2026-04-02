@@ -5,3 +5,13 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Fixtures for new leads, stalled leads, and booking transitions.
 - Tests that separate client-facing draft tone from internal assistant guidance.
+
+Technologies and integrations:
+- State: PhotographyState stored in SQLite (state service) — photo leads with status, contact info, and pipeline stage.
+- Internal CRM schema: A simple, purpose-built lead-tracking schema owned by this topic — no external CRM service (no HoneyBook, Dubsado, or 17hats). Schema covers: lead contact, inquiry date, event details, pipeline stage, follow-up history, and booking status.
+- Lead ingestion: Data ingest service monitors a photography-specific inbox; Claude API extracts inquiry details (date, event type, budget) from incoming emails.
+- Draft composition: Claude API generates professional, warm client-facing draft replies; staged in PARTICIPANT 2's private thread for review and approval before sending.
+- Approval gating: Confirmation service gates all client-facing sends — nothing goes out without PARTICIPANT 2's explicit approval.
+- Stale lead detection: BullMQ delayed job fires after the configured follow_up_quiet_period; alerts PARTICIPANT 2 to follow up on quiet leads.
+- Pipeline tracking: Status transitions (inquiry → quote sent → booked → completed) tracked in PhotoLead records.
+- LLM tone shaping: Internal messages to PARTICIPANT 2 are organized and direct; drafted client messages are professional and warm.

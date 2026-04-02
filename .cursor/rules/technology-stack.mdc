@@ -1,0 +1,36 @@
+---
+description: Approved technology stack — what runs locally, what requires external services
+alwaysApply: true
+---
+
+# Technology Stack
+
+## External Dependencies (only two paid subscriptions)
+
+| Service                           | Purpose                                                                              |
+| --------------------------------- | ------------------------------------------------------------------------------------ |
+| Twilio Programmable Messaging API | All inbound/outbound SMS/MMS across all threads                                      |
+| Anthropic Claude API              | Classification, message composition, image parsing, email extraction, digest merging |
+
+Email (IMAP via imapflow) connects to existing family inboxes — no new subscription.
+
+## Local Infrastructure
+
+| Layer                     | Technology                                                                              |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| Runtime                   | Node.js (LTS) + TypeScript (strict, ESM)                                                |
+| Queue + scheduling        | BullMQ backed by Redis                                                                  |
+| Persistence               | SQLite via better-sqlite3 (or Drizzle ORM)                                              |
+| Calendar serving          | Local CalDAV endpoint — the system serves events outward; calendar apps subscribe to it |
+| Rate limiting / counters  | Redis (shared instance with BullMQ)                                                     |
+| Escalation state machines | XState v5                                                                               |
+| Validation                | Zod                                                                                     |
+| Logging                   | pino (structured JSON)                                                                  |
+| Testing                   | Vitest                                                                                  |
+
+## Boundaries
+
+- Do NOT add new external API subscriptions without explicit discussion.
+- Do NOT consume external calendar APIs — the system is the calendar source.
+- Redis is shared: BullMQ queue, scheduler jobs, and budget counters all use one instance.
+- SQLite is the single persistence layer for all state (topics, confirmations, escalation, thread history).

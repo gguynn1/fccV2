@@ -5,3 +5,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Fixtures for due-date reminders, missed work, and school-message summaries.
 - Tests for escalation from the child thread to a parent thread when needed.
+
+Technologies and integrations:
+- State: SchoolState stored in SQLite (state service) — assignments with status, due dates, and student records.
+- Due-date reminders: BullMQ delayed jobs scheduled at reminder offsets (e.g., 1 day before, morning of) via the scheduler service.
+- School input: Email parsing (data ingest service monitors school-related inboxes; Claude API extracts due dates, events, and action items) and manual/conversational input via messages.
+- No external school API: No LMS, Canvas, or Google Classroom integration — all school data enters through email or conversation.
+- Dual-audience routing: Student gets organized, encouraging nudges in their private thread; parents get concise summaries and action items in their private threads.
+- Escalation: Medium-accountability profile — overdue assignments escalate from PARTICIPANT 3's thread to a parent's thread after configured delay.
+- LLM tone shaping: Organized and encouraging for the student; concise and actionable for parents.

@@ -5,3 +5,15 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Fixtures for single-person, couple, and family events.
 - Conflict-detection tests for overlapping appointments and reschedules.
+
+Technologies and integrations:
+- CalDAV server: Local CalDAV endpoint (via sabre/dav-inspired Node.js implementation, or a library like caldav-adapter) that external calendar apps (Apple Calendar, Google Calendar, etc.) subscribe to.
+- The system is the calendar source — it serves events outward, not consuming an external calendar API.
+- iCal generation: ical-generator or ical.js for producing .ics feeds from CalendarState records.
+- iCal parsing: ical.js or node-ical for parsing .ics attachments from forwarded emails.
+- Calendar input: Events enter via conversational input (messages parsed by Claude API) or email parsing (data ingest service extracts appointment confirmations).
+- Date/time handling: date-fns or Temporal (stage 3) for timezone-aware date arithmetic, conflict detection, and reminder offset calculations.
+- Conflict detection: Compare event time ranges against existing CalendarState entries — pure logic, no external service needed.
+- Reminders: BullMQ delayed jobs scheduled at reminder offsets (e.g., 30 min before, 1 day before) via the scheduler service.
+- Follow-ups: Post-appointment follow-up enqueued via the scheduler after the event end time.
+- State: CalendarState stored in SQLite (state service) with CalendarEvent records; CalDAV endpoint reads from this store.

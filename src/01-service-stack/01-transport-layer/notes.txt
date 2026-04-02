@@ -6,3 +6,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Webhook or event-fixture tests that cover text, reactions, images, and forwarded content.
 - Retry and delivery-status instrumentation for outbound sends.
+
+Technologies and integrations:
+- Messaging platform: Twilio Programmable Messaging API — SMS/MMS for phone-native messaging across all five threads.
+- Inbound webhooks: Twilio webhook callbacks → Fastify (or Express) HTTP endpoint that normalizes inbound events.
+- Outbound delivery: Twilio REST API for sending; message status callbacks for delivery confirmation.
+- Image handling: Twilio MMS media URLs; download and normalize attachments before classification.
+- Reaction parsing: Twilio does not natively support reactions — infer from reply content (e.g., short affirmative/negative).
+- Webhook security: Twilio request signature validation middleware (twilio.validateRequest).
+- Alternative providers: Vonage (Nexmo), Bandwidth, or MessageBird if Twilio pricing or availability is a concern.

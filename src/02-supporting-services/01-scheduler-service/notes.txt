@@ -6,3 +6,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - A controllable clock for deterministic timer tests.
 - Fixtures that simulate morning, daytime, and evening behavior.
+
+Technologies and integrations:
+- Scheduled jobs: BullMQ repeatable jobs with cron expressions for morning digest, evening check-in, and recurring reminders.
+- Delayed jobs: BullMQ delayed jobs for one-off follow-ups and escalation deadlines (shared Redis with the queue).
+- Cron expressions: Standard cron syntax for daily rhythm — e.g., "0 7 * * *" for morning digest, "0 20 * * *" for evening check-in.
+- Queue production: When a scheduled event fires, the scheduler creates a PendingQueueItem and enqueues it via the queue's producer interface.
+- Clock abstraction: Inject a clock interface (Date provider) so Vitest can control time for digest-window and quiet-window tests.
+- Alternative: node-cron for simpler cron scheduling if BullMQ repeatable jobs are too heavyweight for the MVP.
+- Persistence: Digest delivery history stored in the state service (SQLite) via the DigestsState schema.

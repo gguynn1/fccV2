@@ -5,3 +5,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Numeric snapshot fixtures for due dates, balances, and savings milestones.
 - Tests that keep financial tone factual and opinion-free.
+
+Technologies and integrations:
+- State: FinancesState stored in SQLite (state service) — bills, expenses, savings goals with amounts, dates, and status.
+- Bill reminders: BullMQ delayed jobs scheduled N days before due_date via the scheduler service.
+- Savings milestones: Pure logic — compare current savings_contributions against goal target; surface when a threshold is crossed.
+- Financial input: Email parsing (data ingest service extracts bill notifications, payment confirmations, and financial alerts from monitored inboxes) and manual/conversational input via messages. No external bank API — no Plaid, no automated transaction feeds.
+- Confirmation gating: Financial actions (payments, transfers) require confirmation via the confirmation service before execution.
+- LLM tone shaping: Calm, factual, opinion-free tone injected into Claude API prompt — numbers and deadlines, no spending commentary.
+- Couple-only routing: Hardcoded audience constraint — finances never route to a child's thread.

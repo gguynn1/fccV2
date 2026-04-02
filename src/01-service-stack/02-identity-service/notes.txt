@@ -6,3 +6,10 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Fixtures covering private, couple, family, and pet-related lookups.
 - Caching around repeated identity resolution if lookups become frequent.
+
+Technologies and integrations:
+- Entity store: Static TypeScript configuration file — the entity set is small and fixed (two adults, one child, one pet).
+- Lookup: In-memory Map keyed by messaging identity for O(1) sender resolution.
+- Validation: Zod schemas for Entity, PetProfile, and DigestSchedule to catch config errors at boot.
+- Caching: Not needed initially (in-memory config is already fast); add lru-cache if resolution becomes a hot path.
+- No external identity provider required — all entities are pre-configured, not dynamically registered.

@@ -6,3 +6,10 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Time-based tests for morning digest, evening check-in, and daytime quiet behavior.
 - Batch-merging fixtures that verify multiple items combine cleanly.
+
+Technologies and integrations:
+- Delayed jobs: BullMQ delayed jobs with hold_until timestamps — items sit in Redis until the next digest window opens.
+- Batch aggregation: When the digest fires, query all held items for the target person/thread and merge into a single composed message.
+- LLM composition: Anthropic Claude API to compose multiple held items into one natural digest message (tone shaped by topic profiles).
+- Scheduler integration: BullMQ repeatable jobs for morning digest and evening check-in at configured times from the scheduler service.
+- Testing: Vitest with fake timers; assert that held items accumulate and merge correctly at digest boundaries.

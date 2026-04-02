@@ -6,3 +6,10 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Snapshot fixtures for booting the worker from mid-scenario state.
 - Write-audit logging for important state mutations.
+
+Technologies and integrations:
+- Contract: TypeScript interface for the state client — read/write methods per state slice (queue, topics, confirmations, escalation, etc.).
+- Persistence: SQLite via better-sqlite3 for durable state; JSON columns for complex nested objects (topic records, thread history).
+- Transactions: SQLite transactions to ensure atomic multi-table writes when the worker finalizes a decision.
+- Snapshots: JSON export/import of full SystemState for scenario bootstrapping and testing.
+- Audit: pino structured log entry for every state mutation — who, what, when, previous value.

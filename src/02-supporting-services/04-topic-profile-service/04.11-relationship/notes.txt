@@ -5,3 +5,13 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Quiet-window fixtures that prevent nudges during stressful or busy periods.
 - Tests that keep tone warm, brief, and never clinical.
+
+Technologies and integrations:
+- State: RelationshipState stored in SQLite (state service) — nudge history with type, delivery timestamp, and response tracking.
+- Prompt library: Curated TypeScript array of connection prompts, appreciation nudges, and conversation starters — grounded in IFS, emotionally focused therapy, and attachment research.
+- LLM composition: Claude API generates personalized, warm prompts using the library as seed material; system prompt enforces the non-clinical, brief tone.
+- Nudge scheduling: BullMQ delayed jobs with minimum_gap_between_nudges enforcement; scheduler checks budget and recent activity before enqueuing.
+- Quiet-window awareness: Budget service integration — nudges are suppressed during busy/stressful periods (detected via high activity in other topics).
+- Zero follow-up: Ignored nudges are never retried or escalated; the on_ignored policy is "disappear." The next nudge arrives on its own schedule with different content.
+- Couple-only routing: Hardcoded to the couple thread — never surfaces in any other thread.
+- No external integrations: All content is internally generated; no third-party relationship app or API.

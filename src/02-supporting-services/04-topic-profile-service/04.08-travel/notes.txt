@@ -5,3 +5,12 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Fixtures for family, couple, and solo trips.
 - Tests that verify countdown-driven reminders and travel-linked dependencies.
+
+Technologies and integrations:
+- State: TravelState stored in SQLite (state service) — trips with status, dates, checklists, and itinerary items.
+- Countdown reminders: BullMQ delayed jobs at configured offsets before departure (e.g., 1 week, 3 days, day-of) via the scheduler service.
+- Cross-topic orchestration: Travel triggers checklist items across other topics — calendar (block travel dates), pets (arrange boarding), finances (budget check), grocery (pre-trip/post-trip lists).
+- Checklist management: Pure logic — ChecklistItem records with status tracking; surfaced in digests as departure approaches.
+- Post-trip follow-up: Scheduler enqueues a follow-up after the return date for logging expenses, resolving open items.
+- Travel input: Email parsing (data ingest service extracts booking confirmations, flight details, and hotel reservations from monitored inboxes) and manual/conversational input via messages. No external flight tracking API — no FlightAware, no AeroAPI.
+- LLM tone shaping: Organized, anticipatory tone injected into Claude API prompt.

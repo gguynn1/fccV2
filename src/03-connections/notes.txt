@@ -9,3 +9,9 @@ Recommended tools/dependencies:
 - Keep terminology aligned with `src/types.ts` and the architecture rules.
 - Update diagrams and prose together so the flow stays accurate.
 - Quick consistency checks whenever a service contract or flow changes.
+
+Technologies and integrations (documented, not runtime):
+- This folder contains no code — it describes how services connect.
+- The connections it documents span: Twilio (transport), BullMQ/Redis (queue + scheduler), Anthropic Claude API (classifier + message composition), SQLite (state), and XState (escalation).
+- Documentation tooling: Markdown with inline ASCII diagrams; consider Mermaid for richer flow diagrams if ASCII becomes hard to maintain.
+- Consistency checking: A future lint script could parse service CLAUDE.md files and cross-reference connection diagrams for drift.

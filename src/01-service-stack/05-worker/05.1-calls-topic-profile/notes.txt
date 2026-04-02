@@ -6,3 +6,9 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Mocks for each topic profile so worker tests can isolate composition behavior.
 - Golden examples for how topic outputs change message tone and format.
+
+Technologies and integrations:
+- Contract: TypeScript interface for the topic profile client — accepts a TopicKey, returns tone/format/initiative/escalation config.
+- Implementation: Static TypeScript config objects (one per topic) — no external service call, just a lookup.
+- LLM prompt shaping: The returned profile feeds into the Claude API system prompt so generated messages match the topic's voice.
+- Testing: Vitest with snapshot assertions comparing profile-shaped outputs across all 12 topics.

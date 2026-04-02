@@ -9,3 +9,9 @@ Recommended tools/dependencies:
 - Keep terminology aligned with `src/types.ts` and the architecture rules.
 - Update diagrams and prose together so the flow stays accurate.
 - Examples that keep sender resolution and topic classification language in sync.
+
+Technologies and integrations (documented, not runtime):
+- Transport: Twilio webhook normalizes inbound SMS/MMS into InputRecognition types.
+- Identity: In-memory Map lookup — messaging identity → Entity with type, permissions, and thread memberships.
+- Classifier: Anthropic Claude API with few-shot prompts and recent thread context → TopicKey + intent classification.
+- Handoff: Classified item becomes a PendingQueueItem and is enqueued via BullMQ.

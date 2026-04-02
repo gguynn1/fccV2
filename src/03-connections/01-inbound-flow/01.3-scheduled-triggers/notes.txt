@@ -9,3 +9,9 @@ Recommended tools/dependencies:
 - Keep terminology aligned with `src/types.ts` and the architecture rules.
 - Update diagrams and prose together so the flow stays accurate.
 - Timeline reviews that keep daily-rhythm diagrams consistent with scheduler behavior.
+
+Technologies and integrations (documented, not runtime):
+- Scheduler engine: BullMQ repeatable jobs with cron expressions for recurring events (morning digest, evening check-in).
+- One-off timers: BullMQ delayed jobs for reminder deadlines, follow-up windows, and escalation step transitions.
+- Daily rhythm: Cron-based — morning digest (~7am), daytime quiet, evening check-in (~8pm), default silent.
+- Queue production: When a trigger fires, the scheduler creates a PendingQueueItem tagged as QueueItemSource.ScheduledTrigger and enqueues via BullMQ.

@@ -5,3 +5,11 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Fixtures for quote tracking, follow-up reminders, and completed vendor history.
 - Tests that keep outbound behavior minimal unless something is flagged pending.
+
+Technologies and integrations:
+- State: VendorsState stored in SQLite (state service) — vendor records with jobs, costs, status, and contact info.
+- Follow-up reminders: BullMQ delayed jobs when a vendor job is marked as awaiting_response — fire after a configured quiet period to remind the managing adult.
+- Historical queries: SQLite indexed by vendor name and job date so "who fixed the dishwasher last time?" resolves quickly.
+- Silent storage: Most vendor interactions are stored silently (Store path) — no proactive outbound unless a job is flagged pending.
+- LLM tone shaping: Businesslike, concise tone injected into Claude API prompt.
+- No external CRM: All vendor data is internally managed; no third-party CRM or contractor platform integration.

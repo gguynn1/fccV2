@@ -9,3 +9,11 @@ Recommended tools/dependencies:
 - Keep terminology aligned with `src/types.ts` and the architecture rules.
 - Update diagrams and prose together so the flow stays accurate.
 - Examples that stay aligned with phone-native messaging behaviors and thread rules.
+
+Technologies and integrations (documented, not runtime):
+- Inbound path: Twilio webhook → Fastify endpoint → normalize into InputRecognition types.
+- Text/structured choice: Parsed directly from SMS body.
+- Reactions: Inferred from short reply content (Twilio SMS does not support native reactions).
+- Images/attachments: Twilio MMS media URLs downloaded and passed to Claude API vision for content extraction.
+- Forwarded content: Parsed from message body; Claude API extracts structured details (appointment, vendor quote, etc.).
+- Silence detection: Timer-based — absence of reply within escalation window; handled by BullMQ delayed jobs.

@@ -6,3 +6,13 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Queue fixtures that mix human and system-generated events.
 - Tracing or metrics around enqueue, dequeue, and retry behavior.
+
+Technologies and integrations:
+- Queue engine: BullMQ — Redis-backed job queue for Node.js with built-in retry, backoff, and delayed jobs.
+- Backing store: Redis (v7+) as the shared data store for BullMQ; also used by scheduler and budget services.
+- Idempotency: nanoid for unique queue item IDs; BullMQ's jobId deduplication to prevent double-processing.
+- Serialization: Zod schemas for PendingQueueItem validation on enqueue; reject malformed items at the boundary.
+- Observability: BullMQ event listeners (completed, failed, stalled) piped to pino structured logs.
+- Dashboard: Bull Board (@bull-board/fastify) for dev/ops visibility into queue depth, failed jobs, and processing times.
+- Scaling: Single-consumer design (one item at a time) matches the worker model; BullMQ supports concurrency if needed later.
+- Alternative: For a lighter MVP, an in-process FIFO array with persistence to SQLite; graduate to BullMQ when Redis is available.

@@ -9,3 +9,10 @@ Recommended tools/dependencies:
 - Keep terminology aligned with `src/types.ts` and the architecture rules.
 - Update diagrams and prose together so the flow stays accurate.
 - Cross-checks against worker decision order whenever orchestration changes.
+
+Technologies and integrations (documented, not runtime):
+- Front of stack: Twilio webhook → in-memory identity lookup → Claude API classification.
+- Queue: BullMQ (Redis-backed) — single intake point for all sources.
+- Worker: Sequential async/await pipeline pulling one item at a time from BullMQ.
+- Service calls: TypeScript interface-based dependency injection — worker calls topic profile, routing, budget (Redis), escalation (XState + BullMQ), confirmation (SQLite + BullMQ), and state (SQLite).
+- Observability: OpenTelemetry spans across the full processing flow for tracing.

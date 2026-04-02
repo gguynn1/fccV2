@@ -5,3 +5,10 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Per-topic fixtures that prove behavior differences stay intentional.
 - A scenario matrix that checks profile outputs across all 12 topics.
+
+Technologies and integrations:
+- Profile storage: Static TypeScript configuration objects — one per topic, co-located with the topic's types.ts and CLAUDE.md.
+- Validation: Zod schemas for TopicConfig to catch misconfiguration at boot.
+- LLM prompt integration: Each profile feeds tone, format, and framework directives into the Claude API system prompt during message composition.
+- No external services: Profiles are pure configuration lookups — no database, no API calls.
+- Testing: Vitest snapshot tests that compare each topic's profile output; a matrix test asserts all 12 TopicKey values have a registered profile.

@@ -5,3 +5,11 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - A routing matrix that verifies the correct outcome for each priority level.
 - Decision logs that show why an item was sent, batched, or stored.
+
+Technologies and integrations:
+- Pattern: Strategy pattern — three handlers (DispatchHandler, HoldHandler, StoreHandler) selected by DispatchPriority.
+- Type safety: TypeScript discriminated unions for action outcomes so each branch is exhaustively checked.
+- Dispatch path: Calls transport layer (Twilio API) for immediate sends.
+- Hold path: Enqueues a delayed job in BullMQ with hold_until timestamp for the scheduler to pick up.
+- Store path: Writes directly to the state service (SQLite / state store) with no outbound side effect.
+- Logging: Structured decision log entry for every routed item — priority, target, reason.

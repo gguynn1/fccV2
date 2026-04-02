@@ -6,3 +6,10 @@ Required tools/dependencies:
 Recommended tools/dependencies:
 - Time-based simulations that exercise digest windows and message spacing.
 - Metrics around deferred, combined, and suppressed outbound items.
+
+Technologies and integrations:
+- Contract: TypeScript interface for the budget client — accepts target person/thread and proposed send; returns a DispatchPriority decision.
+- Counters: Redis sorted sets or hashes (shared Redis instance with BullMQ) for sliding-window send counts per person and per thread.
+- Collision detection: Query recent dispatched items from Redis to check for back-to-back stacking.
+- Clock abstraction: Inject a clock interface so tests can simulate quiet windows, digest boundaries, and high-volume days deterministically.
+- Testing: Vitest with fake timers (vi.useFakeTimers) for time-dependent budget logic.

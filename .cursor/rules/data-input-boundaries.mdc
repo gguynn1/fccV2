@@ -1,0 +1,30 @@
+---
+description: How external data enters the system — email parsing and conversation only, no third-party APIs
+alwaysApply: true
+---
+
+# Data Input Boundaries
+
+All external data enters through three doors: phone messages, email parsing, or scheduled triggers. Every door feeds the same queue.
+
+## Input Patterns by Domain
+
+| Domain      | Input method                         | Explicitly excluded                                   |
+| ----------- | ------------------------------------ | ----------------------------------------------------- |
+| Calendar    | Email parsing + conversational input | Google Calendar API, tsdav, any external calendar API |
+| School      | Email parsing + conversational input | Canvas, Google Classroom, any LMS API                 |
+| Finances    | Email parsing + conversational input | Plaid, any bank/financial API                         |
+| Travel      | Email parsing + conversational input | FlightAware, AeroAPI, any flight/booking API          |
+| Photography | Email parsing + conversational input | HoneyBook, Dubsado, 17hats, any external CRM          |
+
+## Photography CRM
+
+Photography lead tracking uses an internal CRM schema owned by the topic profile — not an external CRM service. The schema covers: lead contact, inquiry date, event details, pipeline stage, follow-up history, and booking status.
+
+## Calendar Serving
+
+The system serves a local CalDAV endpoint that calendar apps subscribe to. Calendar data enters via email parsing (appointment confirmations, .ics attachments) or conversational input — never by consuming an external calendar API.
+
+## Principle
+
+When considering a new data source, the answer is always: parse it from email, accept it via conversation, or build a local adapter that feeds the queue. Never add a paid third-party API without explicit discussion.
