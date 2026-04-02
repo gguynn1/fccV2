@@ -1,16 +1,21 @@
 Required tools/dependencies:
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
+- Local `types.ts` in this folder for scope-owned contracts.
 - Budget counters for recent sends, pending batch windows, and per-thread collision checks.
 - Priority decision outputs for send now, batch, or hold until the next digest.
 
 Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - Time-based simulations for quiet windows and high-volume days.
 - Metrics or traces that explain why outbound items were combined or delayed.
 
 Technologies and integrations:
-- Counters: Redis sorted sets keyed by person and thread — score is timestamp, enabling sliding-window count queries (ZRANGEBYSCORE).
-- Rate limiting: Redis INCR with TTL for per-person daily unprompted caps and per-thread hourly caps.
-- Collision detection: Query Redis for recent dispatched item timestamps in the target thread; enforce minimum gap between messages.
-- Batch window: Configurable batch_window_minutes from OutboundBudget config; items inside the window are held for the next digest.
-- Clock abstraction: Injected clock interface for deterministic testing of quiet windows and digest boundaries.
-- Shared Redis: Same Redis instance used by BullMQ (queue) and the scheduler — no additional infrastructure.
-- Testing: Vitest with fake timers and a mock Redis (ioredis-mock or in-memory Map) for budget logic assertions.
+- Budget counters should live in Redis shared with BullMQ (AOF persistence required — a crash without AOF resets all counters, risking duplicate sends on restart).
+- Budget decisions consume recent state/history and return typed immediate, batched, or silent outcomes.
+- Vitest fake timers are the best way to verify budget windows and message spacing.
+- Recovery after restart: if counters are lost despite AOF, the budget service should reconstruct from recently_dispatched records in SQLite to avoid over-sending.

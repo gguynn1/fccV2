@@ -1,16 +1,21 @@
 Required tools/dependencies:
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
+- Local `types.ts` in this folder for scope-owned contracts.
 - Pending confirmation storage keyed by thread, action, and expiry time.
 - Reply-matching logic for approvals, rejections, and expirations.
 
 Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - Fixtures for short approval replies, structured choices, and expired confirmations.
 - Tests that verify protected actions never auto-execute.
 
 Technologies and integrations:
-- Pending store: SQLite table (state service) with columns for id, type, action, requested_by, thread, requested_at, expires_at, status, result.
-- Expiry mechanism: BullMQ delayed job scheduled at expires_at — when it fires, mark the confirmation as expired and execute the on_expiry policy (reissue or drop).
-- Reply parsing: Simple keyword matching for short replies ("yes", "no", "approve", "deny", positive/negative reactions); no LLM needed.
-- Structured choices: Support numbered or labeled options in the confirmation prompt; match reply to the option index or label text.
-- Gating: ConfirmationActionType enum defines which actions always require approval — the worker checks this before proceeding.
-- TTL alternative: Redis keys with TTL as a lighter-weight pending store if SQLite writes become a bottleneck (unlikely at this scale).
-- Testing: Vitest suites covering approval, rejection, expiration, re-issue, and the guarantee that protected actions never auto-execute.
+- Confirmation records persist through the state service into SQLite.
+- Expiry handling pairs naturally with BullMQ delayed jobs and Redis-backed timers (AOF persistence required).
+- Vitest flow coverage is the best way to verify approval, rejection, and expiration rules.
+- Recovery after downtime: on startup, scan pending confirmations for any whose expires_at has passed during the outage — mark them expired and execute the on_expiry policy (notify user, offer reissue). Never auto-execute an expired confirmation.

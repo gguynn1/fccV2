@@ -11,7 +11,5 @@ Recommended tools/dependencies:
 - Examples that keep sender resolution and topic classification language in sync.
 
 Technologies and integrations (documented, not runtime):
-- Transport: Twilio webhook normalizes inbound SMS/MMS into InputRecognition types.
-- Identity: In-memory Map lookup — messaging identity → Entity with type, permissions, and thread memberships.
-- Classifier: Anthropic Claude API with few-shot prompts and recent thread context → TopicKey + intent classification.
-- Handoff: Classified item becomes a PendingQueueItem and is enqueued via BullMQ.
+- Document transport as Twilio input normalization, identity as typed sender resolution, and classification as Anthropic Claude API output validation.
+- Keep the described outputs aligned with shared enums in `src/types.ts`.

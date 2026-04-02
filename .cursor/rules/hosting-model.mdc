@@ -1,0 +1,58 @@
+---
+description: Local hosting on Mac Mini — ngrok tunnel, launchd services, resilience model
+alwaysApply: true
+---
+
+# Hosting Model
+
+## Deployment Target
+
+Mac Mini on a local network. Not cloud-hosted. Not remotely accessible except through the ngrok tunnel.
+
+## Three Supervised Processes
+
+All managed by launchd with `KeepAlive: true` (auto-start on boot, auto-restart on crash):
+
+1. **Redis** — queue, scheduling, rate-limiting counters (AOF persistence enabled)
+2. **ngrok** — tunnel from a static public URL to localhost:3000
+3. **Node.js app** — Fastify server handling webhooks, CalDAV, and the BullMQ worker
+
+If any process crashes, launchd restarts it automatically. No manual intervention required.
+
+## Network Model
+
+- **Inbound**: Internet → ngrok static subdomain → localhost:3000 (Twilio webhooks + CalDAV subscriptions)
+- **Outbound**: localhost → Twilio API, Anthropic Claude API, IMAP email servers
+
+## URL Stability
+
+ngrok paid plan provides a permanent static subdomain. The Twilio webhook URL is configured once and never changes. If ngrok restarts, the same subdomain reconnects automatically.
+
+## macOS Configuration
+
+- Energy Saver: "Prevent automatic sleeping when the display is off" — enabled.
+- Energy Saver: "Start up automatically after a power failure" — enabled. Machine reboots, launchd restarts all three processes.
+- Users & Groups: Automatic Login — so services start without manual login after reboot.
+
+## Persistence Requirements
+
+- Redis MUST run with `appendonly yes` (AOF) — a crash without AOF loses the queue, all scheduled jobs, and budget counters.
+- SQLite MUST run in WAL mode — crash-resilient, better concurrent read performance.
+- Backup: scheduled SQLite `.backup()` to NAS or encrypted cloud + Time Machine for full machine recovery.
+
+## Resilience Rules
+
+### Network Outage
+
+BullMQ retries with exponential backoff. Items queue locally until internet returns. IMAP reconnects automatically on restore.
+
+### Stale Catch-Up
+
+On startup after downtime, the app MUST check for stale items before processing. Anything past its relevance window is logged silently, never dispatched late. A morning digest at 2pm is adapted or skipped, not sent as-is.
+
+### Recovery After Downtime
+
+- **Escalation**: reconcile active escalations on startup — if a timer expired during downtime, advance to the next step rather than firing the missed step late.
+- **Confirmations**: scan pending confirmations for any whose `expires_at` has passed — mark them expired, execute the on_expiry policy (notify user, offer reissue). Never auto-execute an expired confirmation.
+- **Scheduler**: missed repeatable jobs fire on startup. The scheduler checks whether the window is still relevant before producing queue items.
+- **Budget counters**: if Redis counters are lost despite AOF, reconstruct from `recently_dispatched` records in SQLite to avoid duplicate sends.

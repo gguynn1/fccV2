@@ -11,7 +11,5 @@ Recommended tools/dependencies:
 - Timing examples that stay aligned with quiet-window and batching behavior.
 
 Technologies and integrations (documented, not runtime):
-- Hold mechanism: BullMQ delayed job with hold_until timestamp — item sits in Redis until the scheduler's digest window opens.
-- Batch aggregation: When the digest fires (BullMQ repeatable job), query all held items for the target person/thread and compose into one message.
-- Message composition: Claude API merges multiple held items into a single natural digest message, shaped by each item's topic profile.
-- Collision prevention: Budget service (Redis counters) ensures multiple messages are never stacked back to back.
+- Document held items as BullMQ scheduled work backed by shared Redis.
+- Keep batching language aligned with digest windows and quiet-window behavior.

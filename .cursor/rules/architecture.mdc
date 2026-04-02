@@ -28,3 +28,11 @@ Each numbered folder is a bounded service. A service owns its behavior, its type
 - Threads are defined by participants, not topics. Five threads total.
 - Responses stay in the thread they came from.
 - Proactive messages route to the narrowest appropriate thread.
+
+## Resilience Invariants
+
+- The system runs on a single local machine. It must handle downtime gracefully.
+- On startup after downtime, stale items are logged silently — never dispatched late.
+- Escalation timers and confirmation expiries that passed during an outage are reconciled on startup, not fired late.
+- Network failures retry with backoff. Items queue locally until connectivity returns. Nothing is dropped.
+- Redis AOF and SQLite WAL mode are required — a crash must not lose queue state or persistent data.

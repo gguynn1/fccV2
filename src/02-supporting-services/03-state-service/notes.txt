@@ -1,20 +1,24 @@
 Required tools/dependencies:
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
+- Local `types.ts` in this folder for scope-owned contracts.
 - Persistent configuration and state store adapters.
 - Schemas for topic records, queue state, confirmations, digests, and escalation status.
 - Bootstrapping support for empty, active, and mid-scenario system states.
 
 Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - State snapshots for scenario testing and replay.
 - Validation and migration helpers for long-lived stored data.
 
 Technologies and integrations:
-- Primary store: SQLite via better-sqlite3 — lightweight, zero-config, file-based persistence suitable for the system's data volume.
-- ORM option: Drizzle ORM with the SQLite driver for type-safe queries and schema migrations; or raw better-sqlite3 with hand-written SQL.
-- Schema management: Drizzle Kit for migration generation and application; or a simple versioned migration runner.
-- Complex state: JSON columns in SQLite for nested objects (topic records, thread history, escalation state) — query with SQLite's json_extract when needed.
-- Validation: Zod schemas mirroring the SystemState interface; validate on read/write boundaries to catch corruption early.
-- Bootstrapping: JSON fixture files that represent empty, active, and mid-scenario SystemState snapshots; loaded at startup or in tests.
-- Caching: Optional in-memory cache (Map or lru-cache) for hot-path reads like budget counters and thread history; write-through to SQLite.
-- Backup: Periodic SQLite .backup() call to a timestamped file for point-in-time recovery.
-- Alternative: Turso (libSQL) for distributed SQLite if the system ever needs multi-node deployment; same driver API, remote-capable.
-- Alternative: PostgreSQL via Drizzle ORM if data volume or concurrent access grows beyond SQLite's comfort zone.
+- Primary persistence: SQLite via better-sqlite3, with Drizzle ORM as the allowed query/migration layer if needed.
+- Zod validation should guard reads and writes for complex stored records.
+- The state service remains the single persistence boundary for topic state, confirmations, escalation, and thread history.
+- Backup: scheduled SQLite .backup() to a secondary location (NAS, encrypted cloud via restic). Time Machine covers the full machine.
+- WAL mode: SQLite should run in WAL (write-ahead logging) mode for crash resilience and better concurrent read performance.
+- Redis AOF: the queue and scheduling layer (BullMQ) also persists through Redis AOF — both stores must be included in backup strategy.

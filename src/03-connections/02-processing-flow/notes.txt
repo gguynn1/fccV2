@@ -11,8 +11,6 @@ Recommended tools/dependencies:
 - Cross-checks against worker decision order whenever orchestration changes.
 
 Technologies and integrations (documented, not runtime):
-- Front of stack: Twilio webhook → in-memory identity lookup → Claude API classification.
-- Queue: BullMQ (Redis-backed) — single intake point for all sources.
-- Worker: Sequential async/await pipeline pulling one item at a time from BullMQ.
-- Service calls: TypeScript interface-based dependency injection — worker calls topic profile, routing, budget (Redis), escalation (XState + BullMQ), confirmation (SQLite + BullMQ), and state (SQLite).
-- Observability: OpenTelemetry spans across the full processing flow for tracing.
+- This flow should describe Twilio (via ngrok) plus data-ingest inputs converging on BullMQ (Redis, AOF-persisted), then passing through the worker into transport, scheduler, or state.
+- Keep supporting-service references aligned with Anthropic Claude API usage, Redis-backed budget/scheduling, SQLite state, and XState escalation.
+- Document stale catch-up: after downtime, the worker checks item relevance before processing — stale items are logged silently.

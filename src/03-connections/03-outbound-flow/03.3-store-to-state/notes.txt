@@ -11,7 +11,5 @@ Recommended tools/dependencies:
 - Examples that distinguish silent storage from any outbound-visible action.
 
 Technologies and integrations (documented, not runtime):
-- Write mechanism: SQLite via better-sqlite3 — insert the record with no transport or scheduler side effect.
-- Record types: Completed task logs, vendor job history, pet care entries, family status updates — each stored in the owning topic's state table.
-- Retrieval: Records surfaced only on explicit request or when a digest explicitly includes them; SQLite indexed by topic + entity + timestamp.
-- No outbound: The store path produces zero messages — this is the "quiet" outcome of the action router.
+- Document silent storage as a state-service write into SQLite with no transport or scheduler side effect.
+- Keep examples focused on stored records that surface only when requested.

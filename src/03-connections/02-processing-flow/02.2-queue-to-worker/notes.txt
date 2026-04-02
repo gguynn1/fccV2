@@ -11,7 +11,6 @@ Recommended tools/dependencies:
 - Checks that every documented source still lands in the same queue contract.
 
 Technologies and integrations (documented, not runtime):
-- Queue engine: BullMQ with Redis — single queue accepting items from transport/classifier pipeline, data ingest, and scheduler.
-- Consumer model: BullMQ worker with concurrency=1 — one item at a time, sequential processing.
-- Item contract: PendingQueueItem with source, entity, thread, topic, intent, timestamp — unified across all producers.
-- Failed items: BullMQ dead-letter queue for items that fail processing after configured retries.
+- Document the queue as BullMQ backed by shared Redis (AOF persistence required — without it, a crash loses the queue).
+- Keep worker handoff language aligned with the single-funnel architecture boundary.
+- Document retry behavior: failed jobs use exponential backoff; dead-letter queue for exhausted retries.

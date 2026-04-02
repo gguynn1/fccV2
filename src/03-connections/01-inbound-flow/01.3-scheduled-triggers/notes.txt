@@ -11,7 +11,6 @@ Recommended tools/dependencies:
 - Timeline reviews that keep daily-rhythm diagrams consistent with scheduler behavior.
 
 Technologies and integrations (documented, not runtime):
-- Scheduler engine: BullMQ repeatable jobs with cron expressions for recurring events (morning digest, evening check-in).
-- One-off timers: BullMQ delayed jobs for reminder deadlines, follow-up windows, and escalation step transitions.
-- Daily rhythm: Cron-based — morning digest (~7am), daytime quiet, evening check-in (~8pm), default silent.
-- Queue production: When a trigger fires, the scheduler creates a PendingQueueItem tagged as QueueItemSource.ScheduledTrigger and enqueues via BullMQ.
+- Document scheduled triggers as BullMQ repeatable or delayed jobs feeding the queue (Redis AOF required for persistence across restarts).
+- Keep timing language aligned with the morning digest, daytime quiet, and evening check-in rhythm.
+- Document missed-window recovery: if the machine was down when a trigger should have fired, the scheduler checks relevance on startup — a morning digest at 2pm is adapted or skipped, not sent as-is.

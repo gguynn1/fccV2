@@ -11,8 +11,6 @@ Recommended tools/dependencies:
 - Examples that keep response-in-place and proactive-routing wording aligned.
 
 Technologies and integrations (documented, not runtime):
-- Send mechanism: Twilio Programmable Messaging API — client.messages.create with to/from/body fields.
-- Delivery confirmation: Twilio statusCallback webhook reports delivered/failed/undelivered status.
-- Response routing: Stays in originating thread — no routing computation needed.
-- Proactive routing: Narrowest-thread selection from the routing service's deterministic logic.
-- Rate protection: Twilio's built-in rate limits plus budget service's per-thread hourly cap (Redis counters).
+- Document dispatch as Twilio-powered immediate outbound delivery with status callbacks.
+- Keep response-in-place and proactive-routing wording aligned with the routing service rules.
+- Document network outage behavior: failed Twilio sends retry via BullMQ exponential backoff until internet returns.

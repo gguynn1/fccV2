@@ -1,17 +1,23 @@
 Required tools/dependencies:
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
+- Local `types.ts` in this folder for scope-owned contracts.
 - An orchestration layer that processes one queue item at a time.
 - Service client interfaces for topic profile, routing, budget, escalation, confirmation, and state.
 - Decision objects that capture topic, audience, priority, and final action.
 
 Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - Scenario tests covering the fixed processing sequence end to end.
 - Decision tracing so worker outcomes can be inspected when behavior changes.
 
 Technologies and integrations:
-- Orchestration: Plain async/await sequential pipeline — each step calls a service client and feeds results to the next.
-- Service clients: TypeScript interfaces injected at construction; real implementations call supporting services, test doubles return fixtures.
-- Decision logging: pino structured logs capturing each step's input/output for auditability and debugging.
-- Tracing: OpenTelemetry spans per worker step so the full decision chain is visible in traces.
-- Error handling: Try/catch per step with dead-letter routing via BullMQ for items that fail processing.
-- Future option: Temporal.io or Inngest for durable workflow orchestration if steps need long-running retries or human-in-the-loop pauses.
-- Testing: Vitest scenario suites that inject mock service clients and assert the full decision sequence.
+- The worker is a strict TypeScript orchestration layer over queue, supporting-service, and action-router contracts.
+- pino logging is the right fit for per-step decision traces and auditability.
+- Vitest scenario suites with mocked service clients are the clearest way to verify the decision sequence.
+- Stale catch-up: on startup after downtime, the worker must check each item's age and relevance before processing — items past their window (e.g., "pickup in 30 minutes" from 3 hours ago) are logged silently, never dispatched late.
+- Network outage: if a service call fails due to network (Claude API, Twilio), the item should be retried via BullMQ backoff, not dropped.

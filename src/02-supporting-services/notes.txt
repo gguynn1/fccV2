@@ -1,13 +1,20 @@
 Required tools/dependencies:
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
+- Local `types.ts` in this folder for scope-owned contracts.
 - Service interfaces that the worker or queue producers can call without cross-importing runtime logic.
 - Shared conventions for queue production, state access, and bounded ownership.
 
 Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - Contract tests that keep worker-to-service integrations stable.
 - Shared fixtures for state, timers, and queue items across supporting services.
 
 Technologies and integrations:
-- Shared infrastructure: Redis (BullMQ + counters), SQLite (state persistence) — both shared across supporting services.
-- Service contracts: TypeScript interfaces per service; the worker injects implementations at startup.
-- Inter-service rule: Supporting services never call each other directly and never reach back into the stack.
-- Testing: Vitest contract tests that verify each service's interface stays compatible with the worker's expectations.
+- These services center on BullMQ/Redis, SQLite, XState, Anthropic Claude API, and strict TypeScript interfaces.
+- Each service should stay bounded and callable through contracts rather than direct cross-service runtime imports.
+- Vitest contract tests are the best fit for keeping worker integrations stable.

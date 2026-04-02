@@ -19,8 +19,9 @@ Email (IMAP via imapflow) connects to existing family inboxes — no new subscri
 | Layer                     | Technology                                                                              |
 | ------------------------- | --------------------------------------------------------------------------------------- |
 | Runtime                   | Node.js (LTS) + TypeScript (strict, ESM)                                                |
-| Queue + scheduling        | BullMQ backed by Redis                                                                  |
-| Persistence               | SQLite via better-sqlite3 (or Drizzle ORM)                                              |
+| HTTP server               | Fastify — handles Twilio webhooks and CalDAV subscriptions on localhost:3000            |
+| Queue + scheduling        | BullMQ backed by Redis (AOF persistence required)                                       |
+| Persistence               | SQLite via better-sqlite3 (or Drizzle ORM) — WAL mode required                          |
 | Calendar serving          | Local CalDAV endpoint — the system serves events outward; calendar apps subscribe to it |
 | Rate limiting / counters  | Redis (shared instance with BullMQ)                                                     |
 | Escalation state machines | XState v5                                                                               |
@@ -28,9 +29,14 @@ Email (IMAP via imapflow) connects to existing family inboxes — no new subscri
 | Logging                   | pino (structured JSON)                                                                  |
 | Testing                   | Vitest                                                                                  |
 
+## Tunnel
+
+ngrok (paid plan, static subdomain) exposes the local Fastify server to the internet for Twilio webhooks and CalDAV subscriptions. See `hosting-model.mdc` for process supervision details.
+
 ## Boundaries
 
 - Do NOT add new external API subscriptions without explicit discussion.
 - Do NOT consume external calendar APIs — the system is the calendar source.
 - Redis is shared: BullMQ queue, scheduler jobs, and budget counters all use one instance.
+- Redis MUST run with AOF persistence — a crash without it loses the queue.
 - SQLite is the single persistence layer for all state (topics, confirmations, escalation, thread history).

@@ -11,7 +11,6 @@ Recommended tools/dependencies:
 - Quick consistency checks whenever a service contract or flow changes.
 
 Technologies and integrations (documented, not runtime):
-- This folder contains no code — it describes how services connect.
-- The connections it documents span: Twilio (transport), BullMQ/Redis (queue + scheduler), Anthropic Claude API (classifier + message composition), SQLite (state), and XState (escalation).
-- Documentation tooling: Markdown with inline ASCII diagrams; consider Mermaid for richer flow diagrams if ASCII becomes hard to maintain.
-- Consistency checking: A future lint script could parse service CLAUDE.md files and cross-reference connection diagrams for drift.
+- This folder documents connections among Twilio transport (via ngrok tunnel), Anthropic Claude API, BullMQ/Redis queueing (AOF-persisted), SQLite state, and XState escalation.
+- Hosting context: all connections assume a Mac Mini on a local network with ngrok exposing the Fastify server. Inbound arrives via tunnel; outbound goes direct.
+- Markdown plus inline ASCII diagrams are the intended documentation tools here.

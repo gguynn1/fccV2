@@ -1,15 +1,21 @@
 Required tools/dependencies:
-- Respect service boundaries: no direct runtime imports from sibling services.
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
 - State read/write contracts that run after the worker has made its decisions.
 - Stable persistence keys for topic records, confirmations, digests, and escalation status.
 
 Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - Snapshot fixtures for booting the worker from mid-scenario state.
 - Write-audit logging for important state mutations.
 
 Technologies and integrations:
-- Contract: TypeScript interface for the state client — read/write methods per state slice (queue, topics, confirmations, escalation, etc.).
-- Persistence: SQLite via better-sqlite3 for durable state; JSON columns for complex nested objects (topic records, thread history).
-- Transactions: SQLite transactions to ensure atomic multi-table writes when the worker finalizes a decision.
-- Snapshots: JSON export/import of full SystemState for scenario bootstrapping and testing.
-- Audit: pino structured log entry for every state mutation — who, what, when, previous value.
+- State writes ultimately land in SQLite through the state service.
+- Zod validation at read/write boundaries helps protect complex persisted records.
+- pino audit logs are useful for important state mutations.
+- SQLite WAL mode for crash resilience and concurrent read performance.
+- Backup: SQLite .backup() on a schedule; Redis AOF files included alongside. Time Machine for full machine recovery.

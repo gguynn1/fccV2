@@ -1,16 +1,20 @@
 Required tools/dependencies:
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
+- Local `types.ts` in this folder for scope-owned contracts.
 - Finance profile types for bills, expenses, savings goals, and milestone tracking.
 - Couple-thread-only audience assumptions and confirmation-gated financial actions.
 
 Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - Numeric snapshot fixtures for due dates, balances, and savings milestones.
 - Tests that keep financial tone factual and opinion-free.
 
 Technologies and integrations:
-- State: FinancesState stored in SQLite (state service) — bills, expenses, savings goals with amounts, dates, and status.
-- Bill reminders: BullMQ delayed jobs scheduled N days before due_date via the scheduler service.
-- Savings milestones: Pure logic — compare current savings_contributions against goal target; surface when a threshold is crossed.
-- Financial input: Email parsing (data ingest service extracts bill notifications, payment confirmations, and financial alerts from monitored inboxes) and manual/conversational input via messages. No external bank API — no Plaid, no automated transaction feeds.
-- Confirmation gating: Financial actions (payments, transfers) require confirmation via the confirmation service before execution.
-- LLM tone shaping: Calm, factual, opinion-free tone injected into Claude API prompt — numbers and deadlines, no spending commentary.
-- Couple-only routing: Hardcoded audience constraint — finances never route to a child's thread.
+- Financial records persist in SQLite through the state service.
+- Bill alerts and savings milestones can schedule through BullMQ/Redis timing infrastructure.
+- Inputs should come from email parsing or conversation rather than bank or financial APIs.

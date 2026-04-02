@@ -1,17 +1,20 @@
 Required tools/dependencies:
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
+- Local `types.ts` in this folder for scope-owned contracts.
 - Health profile types for appointments, medications, provider notes, and follow-up needs.
 - Private-thread assumptions and reminder timing for personal care flows.
 
 Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - Fixtures for appointment reminders, medication prompts, and post-visit note capture.
 - Tests that keep outputs attentive, specific, and privacy-respecting.
 
 Technologies and integrations:
-- State: HealthState stored in SQLite (state service) — medications, providers, appointments, and health profiles per entity.
-- Appointment reminders: BullMQ delayed jobs scheduled at reminder offsets via the scheduler service.
-- Post-visit follow-up: Scheduler enqueues a follow-up prompt after the appointment end time ("Any notes from today's visit?").
-- Medication reminders (optional): BullMQ repeatable jobs for daily medication prompts if configured.
-- Overdue check-up detection: Pure logic — compare last appointment date against recommended intervals; flag when overdue.
-- Privacy: Health data routes only to private threads; never surfaces in shared threads unless the participant explicitly shares.
-- No external health APIs: All data is manually entered — no EHR/EMR integration (avoids HIPAA complexity).
-- LLM tone shaping: Attentive, specific, caring tone injected into Claude API prompt.
+- Health records persist in SQLite through the state service.
+- BullMQ scheduling supports appointment and medication reminder timing.
+- Anthropic Claude API can help extract structured notes from messages or forwarded health documents.

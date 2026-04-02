@@ -1,15 +1,19 @@
 Required tools/dependencies:
-- Respect service boundaries: no direct runtime imports from sibling services.
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
 - Confirmation-service outputs for approval-gated actions and expiry handling.
 - Pending confirmation state tied to the originating thread and exact requested action.
 
 Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - Tests for approval, rejection, and expiration flows.
 - Reply-parsing fixtures for short confirmations such as yes, no, and structured choices.
 
 Technologies and integrations:
-- Contract: TypeScript interface for the confirmation client — accepts action type and originating context; returns pending/approved/rejected/expired status.
-- Pending store: SQLite row per pending confirmation with an expires_at column; or Redis key with TTL for auto-expiry.
-- Reply matching: Simple string matching for short replies ("yes", "no", "approve", "deny"); no LLM needed for confirmation parsing.
-- Expiry: BullMQ delayed job that fires at expires_at to mark the confirmation as expired and trigger the on_expiry action.
-- Testing: Vitest suites for each flow — approval, rejection, expiration, and re-issue after expiry.
+- Confirmation resolution depends on typed thread-scoped records persisted through the state service.
+- Expiry handling pairs naturally with BullMQ delayed jobs and Redis-backed timer state.
+- Vitest flow tests are the best way to prove protected actions never auto-execute.

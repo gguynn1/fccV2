@@ -1,15 +1,21 @@
 Required tools/dependencies:
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
+- Local `types.ts` in this folder for scope-owned contracts.
 - Escalation state-machine logic tied to accountability level and timer state.
 - Scheduler integration for follow-up deadlines and digest flags.
 
 Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - Clock-controlled tests for each escalation path.
 - Fixtures that prove silence means different things by topic but never approval.
 
 Technologies and integrations:
-- State machine: XState (v5) for modeling escalation ladders — each accountability level (high, medium, low) is a separate machine definition with step-based states and timer-driven transitions.
-- Timer integration: BullMQ delayed jobs for follow-up deadlines — when an escalation step starts, a delayed job is scheduled for the next_action_at time.
-- Persistence: Active escalations stored in SQLite (state service) as ActiveEscalation records; machine state rehydrated on restart.
-- Broader-thread escalation: When the state machine transitions to EscalateToBroaderThread, the escalation service returns a new target thread and the worker re-routes.
-- Silence handling: Timer expiry without response triggers the next escalation step — silence is never interpreted as approval.
-- Testing: Vitest with XState's inspect API and fake timers; assert that each accountability path produces the correct step sequence.
+- Escalation logic should be implemented with XState v5.
+- Timed escalation steps depend on BullMQ/Redis scheduling infrastructure (AOF persistence required).
+- Escalation progress persists through the state service into SQLite.
+- Recovery after downtime: on startup, reconcile active escalations — if a timer expired during downtime, advance to the next escalation step rather than firing the missed step late. Use the persisted next_action_at timestamp to determine what was missed.

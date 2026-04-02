@@ -11,7 +11,7 @@ Recommended tools/dependencies:
 - Flow review against real queue-item fields and source tags.
 
 Technologies and integrations (documented, not runtime):
-- Phone → Transport: Twilio webhooks deliver inbound SMS/MMS events to a Fastify HTTP endpoint.
-- External → Ingest: imapflow (IMAP) for email monitoring; calendar data enters via email parsing or conversational input (no external calendar API).
-- Scheduler → Queue: BullMQ repeatable/delayed jobs fire and produce PendingQueueItem entries.
-- All three paths converge on the same BullMQ queue with source tagging (QueueItemSource).
+- Inbound flow documentation should show three doors only: phone messages, email parsing, and scheduled triggers.
+- Phone messages arrive via Twilio webhook through the ngrok tunnel to Fastify on localhost:3000.
+- Email polling uses imapflow IMAP; reconnects automatically after network outage.
+- Scheduled triggers fire from BullMQ repeatable/delayed jobs (Redis AOF required for persistence across restarts).

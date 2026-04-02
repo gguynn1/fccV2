@@ -11,7 +11,5 @@ Recommended tools/dependencies:
 - Consistency checks between priority definitions and outbound diagrams.
 
 Technologies and integrations (documented, not runtime):
-- Dispatch → Transport: Twilio REST API (client.messages.create) for immediate SMS/MMS delivery.
-- Hold → Scheduler: BullMQ delayed job with hold_until timestamp; items aggregate until the next digest window fires.
-- Store → State: SQLite write via better-sqlite3; no outbound side effect.
-- Strategy selection: DispatchPriority discriminated union selects the handler — pure TypeScript pattern matching.
+- Document outbound paths as Twilio dispatch, BullMQ hold/scheduling, and SQLite state storage.
+- Keep dispatch/hold/store language aligned with action-router types and budget decisions.

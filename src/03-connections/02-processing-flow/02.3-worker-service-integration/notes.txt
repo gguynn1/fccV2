@@ -11,10 +11,5 @@ Recommended tools/dependencies:
 - A quick service-call checklist when worker orchestration or dependencies change.
 
 Technologies and integrations (documented, not runtime):
-- Topic Profile: Static TypeScript config lookup — no external call; feeds Claude API prompt shaping.
-- Routing: Pure logic over identity config thread map — no external call.
-- Budget: Redis sliding-window counters (sorted sets/hashes) on the shared BullMQ Redis instance.
-- Escalation: XState state machines with BullMQ delayed job timers; active state persisted in SQLite.
-- Confirmation: SQLite pending records with BullMQ delayed expiry jobs; simple string matching for replies.
-- State: SQLite via better-sqlite3 for all persistent reads/writes after decisions are made.
-- All service calls use TypeScript interfaces — implementations are injected into the worker at construction.
+- Document worker integrations across topic profiles, routing, budget, escalation, confirmation, and state without implying direct service-to-service runtime imports.
+- Keep the documented stack aligned with Anthropic Claude API, Redis/BullMQ, SQLite, and XState.
