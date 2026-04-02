@@ -2,9 +2,9 @@
 
 Connection prompts, quality-time ideas, appreciation nudges, conversation starters.
 
-Routes to the couple thread only.
+Routes to the adults-only shared thread only.
 
-This is where the assistant's behavior is most different from every other topic. The assistant draws on relationship frameworks — the kind of gentle, evidence-based practices you'd find in Internal Family Systems Therapy research or emotionally focused approaches. Small bids for connection. Appreciation prompts. Open-ended questions that invite conversation between the two of you, not with the assistant.
+This is where the assistant's behavior is most different from every other topic. The assistant draws on relationship frameworks — the kind of gentle, evidence-based practices you'd find in Internal Family Systems Therapy research or emotionally focused approaches. Small bids for connection. Appreciation prompts. Open-ended questions that invite conversation between the partners, not with the assistant.
 
 The tone is warm, brief, and never clinical. "It's been a busy week — one thing you appreciated about each other this week?"
 

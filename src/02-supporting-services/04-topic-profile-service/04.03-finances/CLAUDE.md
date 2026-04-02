@@ -2,7 +2,7 @@
 
 Bills, expenses, savings goals, milestones, financial overview.
 
-Routes to the couple thread exclusively — never to a child's thread.
+Routes to the adults-only shared thread exclusively — never to a child entity's thread.
 
 The assistant is calm, factual, and neutral here. It reports numbers, surfaces deadlines, and tracks progress without offering opinions on spending. "Mortgage is due in 3 days. Emergency fund is at 74% of goal."
 

@@ -12,17 +12,15 @@ Outbound messages flow up
 
 ## Threads
 
-Threads are defined by participants, not topics. A private thread is one person plus the assistant. A shared thread is multiple people plus the assistant. The system never creates threads per topic — it routes topics into the correct participant-based thread.
+Threads are defined by participants, not topics. A private thread is one entity plus the assistant. A shared thread is multiple entities plus the assistant. The system never creates threads per topic — it routes topics into the correct participant-based thread.
 
-There are five threads total:
+Thread count and membership are defined in the system configuration. Two categories:
 
-- PARTICIPANT 1 + Assistant (private) — personal health, personal reminders, daily digest, drafts under review, anything that's just for PARTICIPANT 1.
-- PARTICIPANT 2 + Assistant (private) — photography business, morning check-in, digest, drafts, anything that's just for PARTICIPANT 2.
-- PARTICIPANT 3 + Assistant (private) — chore reminders directed at them, school nudges, individual tasks.
-- PARTICIPANT 2 + PARTICIPANT 1 + Assistant (couple) — finances, relationship, date night, couple-level calendar coordination, anything that concerns both adults but not the children.
-- PARTICIPANT 2 + PARTICIPANT 1 + PARTICIPANT 3 + Assistant (family) — household chores, grocery list, travel planning, pet care discussions, general family coordination.
+**Private threads** — one per entity that has a messaging identity. Used for personal topics, daily digests, drafts under review, and anything that concerns only that entity.
 
-All interaction happens inside these threads. The assistant figures out what topic is being discussed and applies the right behavior internally. Every message the assistant sends goes to exactly one of these five places based on who needs the information.
+**Shared threads** — declared subsets of entities based on relationship topology. Used for topics that concern all members of the group — shared coordination, finances, household logistics, or any topic where multiple people need the same information.
+
+All interaction happens inside these threads. The assistant figures out what topic is being discussed and applies the right behavior internally. Every message the assistant sends goes to exactly one thread based on who needs the information.
 
 ## Input Recognition
 

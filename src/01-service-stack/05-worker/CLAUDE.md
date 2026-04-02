@@ -71,10 +71,9 @@ STEP 1 — What topic is this?
          |
          v
 STEP 2 — Who does it concern?
-         One adult ---------> their private thread
-         One child ---------> their private thread
-         The couple --------> couple thread
-         The whole family --> family thread
+         One entity --------> their private thread
+         Multiple entities -> narrowest shared thread
+                              that includes all of them
          A pet -------------> responsible adult's thread
          |
          v

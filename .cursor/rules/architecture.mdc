@@ -25,7 +25,7 @@ Each numbered folder is a bounded service. A service owns its behavior, its type
 ## Messaging Invariants
 
 - One shared messaging identity, no name, no app — phone-native texting only.
-- Threads are defined by participants, not topics. Five threads total.
+- Threads are defined by participants, not topics. Thread count and membership are defined in the system configuration.
 - Responses stay in the thread they came from.
 - Proactive messages route to the narrowest appropriate thread.
 
