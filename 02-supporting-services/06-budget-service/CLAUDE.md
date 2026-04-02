@@ -28,3 +28,7 @@ Every outbound message is one of three priority levels:
 **Batched** — important but not urgent. Collected and delivered at natural touchpoints: morning digest, evening check-in, or next quiet window.
 
 **Silent** — tracked internally, surfaced only when asked. Completed task logs, vendor history, pet care records, general status entries.
+
+## Collision Avoidance
+
+Before dispatching any outbound message, the worker checks what else is pending or recently sent for the same person or thread. If multiple items would stack up, it batches them into one combined message. If someone has already received several messages today, non-urgent items hold until tomorrow's digest. The goal is that no one ever feels bombarded.

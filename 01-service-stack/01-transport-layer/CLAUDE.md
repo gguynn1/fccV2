@@ -16,13 +16,13 @@ Threads are defined by participants, not topics. A private thread is one person 
 
 There are five threads total:
 
-- PARTICIPANT 1 + Assistant (private)
-- PARTICIPANT 2 + Assistant (private)
-- PARTICIPANT 3 + Assistant (private)
-- PARTICIPANT 2 + PARTICIPANT 1 + Assistant (couple)
-- PARTICIPANT 2 + PARTICIPANT 1 + PARTICIPANT 3 + Assistant (family)
+- PARTICIPANT 1 + Assistant (private) — personal health, personal reminders, daily digest, drafts under review, anything that's just for PARTICIPANT 1.
+- PARTICIPANT 2 + Assistant (private) — photography business, morning check-in, digest, drafts, anything that's just for PARTICIPANT 2.
+- PARTICIPANT 3 + Assistant (private) — chore reminders directed at them, school nudges, individual tasks.
+- PARTICIPANT 2 + PARTICIPANT 1 + Assistant (couple) — finances, relationship, date night, couple-level calendar coordination, anything that concerns both adults but not the children.
+- PARTICIPANT 2 + PARTICIPANT 1 + PARTICIPANT 3 + Assistant (family) — household chores, grocery list, travel planning, pet care discussions, general family coordination.
 
-All interaction happens inside these threads. The assistant figures out what topic is being discussed and applies the right behavior internally.
+All interaction happens inside these threads. The assistant figures out what topic is being discussed and applies the right behavior internally. Every message the assistant sends goes to exactly one of these five places based on who needs the information.
 
 ## Input Recognition
 

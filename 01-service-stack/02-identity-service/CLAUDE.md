@@ -17,7 +17,9 @@ Three entity types:
 
 **Child** — has a phone number, has a private thread, can complete tasks and ask questions but cannot approve financial actions or change system rules. PARTICIPANT 3 is a child.
 
-**Pet** — no phone number, no thread. A tracked entity with a profile (species, vet, medications, care schedule). Information about pets surfaces in the threads of responsible adults. PET is a pet.
+**Pet** — no phone number, no thread. A tracked entity with a profile (species, vet, medications, care schedule). Information about pets surfaces in the threads of responsible adults. A pet never receives a message, but the system knows as much about PET's care history as it knows about anyone's calendar. PET is a pet.
+
+Every entity has an identity record the system maintains: name, type, permissions, phone number if applicable, and which threads they belong to.
 
 ## Entity to Thread Mapping
 
