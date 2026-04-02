@@ -1,20 +1,4 @@
-import type { EscalationLevel } from "../../02-supporting-services/07-escalation-service/types.js";
-import type { GrocerySection } from "../../02-supporting-services/04-topic-profile-service/04.04-grocery/types.js";
-
-export enum TopicKey {
-  Calendar = "calendar",
-  Chores = "chores",
-  Finances = "finances",
-  Grocery = "grocery",
-  Health = "health",
-  Pets = "pets",
-  School = "school",
-  Travel = "travel",
-  Vendors = "vendors",
-  Photography = "photography",
-  Relationship = "relationship",
-  FamilyStatus = "family_status",
-}
+import type { EscalationLevel, GrocerySection, TopicKey } from "../../types.js";
 
 export interface TopicRouting {
   [key: string]: string | boolean | string[];

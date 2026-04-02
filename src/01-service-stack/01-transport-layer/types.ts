@@ -1,8 +1,3 @@
-export enum InputMethod {
-  Text = "text",
-  Image = "image",
-}
-
 export interface InputRecognition {
   text: { description: string };
   structured_choice: { description: string; formats: string[] };

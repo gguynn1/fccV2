@@ -1,4 +1,4 @@
-import type { InputMethod } from "../../../01-service-stack/01-transport-layer/types.js";
+import type { InputMethod } from "../../../types.js";
 
 export enum ChoreStatus {
   Overdue = "overdue",

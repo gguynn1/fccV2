@@ -1,11 +1,4 @@
-import type { TopicKey } from "../../01-service-stack/03-classifier-service/types.js";
-
-export enum EscalationLevel {
-  High = "high",
-  Medium = "medium",
-  Low = "low",
-  None = "none",
-}
+import type { TopicKey, EscalationLevel } from "../../types.js";
 
 export enum EscalationStepAction {
   ReminderSent = "reminder_sent",

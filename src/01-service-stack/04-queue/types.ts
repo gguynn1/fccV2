@@ -1,4 +1,4 @@
-import type { TopicKey } from "../03-classifier-service/types.js";
+import type { TopicKey } from "../../types.js";
 import type { DispatchPriority } from "../06-action-router/types.js";
 
 export enum QueueItemType {

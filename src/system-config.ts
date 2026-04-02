@@ -5,15 +5,20 @@ import {
   ThreadType,
   EscalationLevel,
   TopicKey,
-  DispatchPriority,
   GrocerySection,
   ConfirmationActionType,
   DataIngestSourceType,
   WorkerAction,
   WorkerService,
-} from "./types.js";
+} from "./index.js";
 
 export const systemConfig: SystemConfig = {
+  metadata: {
+    snapshot_time: new Date("2026-04-02T17:05:00-07:00"),
+    description:
+      "Static system definition — entities, threads, topics, behavior profiles, dispatch rules, escalation paths, and all configuration that governs how the system operates.",
+  },
+
   system: {
     timezone: "America/Denver",
     locale: "en-US",
@@ -67,11 +72,7 @@ export const systemConfig: SystemConfig = {
       type: EntityType.Child,
       name: "PARTICIPANT 3",
       messaging_identity: "+15551000003",
-      permissions: [
-        Permission.CompleteTasks,
-        Permission.AddItems,
-        Permission.AskQuestions,
-      ],
+      permissions: [Permission.CompleteTasks, Permission.AddItems, Permission.AskQuestions],
       digest: {
         morning: "07:30",
         evening: null,
@@ -113,22 +114,19 @@ export const systemConfig: SystemConfig = {
       id: "participant_3_private",
       type: ThreadType.Private,
       participants: ["participant_3"],
-      description:
-        "PARTICIPANT 3's thread. Chore reminders, school nudges, tasks.",
+      description: "PARTICIPANT 3's thread. Chore reminders, school nudges, tasks.",
     },
     {
       id: "couple",
       type: ThreadType.Shared,
       participants: ["participant_1", "participant_2"],
-      description:
-        "Couple thread. Finances, relationship, couple-level coordination.",
+      description: "Couple thread. Finances, relationship, couple-level coordination.",
     },
     {
       id: "family",
       type: ThreadType.Shared,
       participants: ["participant_1", "participant_2", "participant_3"],
-      description:
-        "Family thread. Chores, grocery, travel, pets, general household.",
+      description: "Family thread. Chores, grocery, travel, pets, general household.",
     },
   ],
 
@@ -143,10 +141,8 @@ export const systemConfig: SystemConfig = {
       },
       behavior: {
         tone: "precise and logistical",
-        format:
-          "structured confirmation with date, time, location, participants",
-        initiative:
-          "event-driven: remind before, follow up after, alert on conflicts",
+        format: "structured confirmation with date, time, location, participants",
+        initiative: "event-driven: remind before, follow up after, alert on conflicts",
       },
       escalation: EscalationLevel.Medium,
       proactive: {
@@ -158,8 +154,7 @@ export const systemConfig: SystemConfig = {
 
     chores: {
       label: "Chores",
-      description:
-        "Task assignment, completion tracking, follow-up, escalation.",
+      description: "Task assignment, completion tracking, follow-up, escalation.",
       routing: {
         assigned_task: "private thread of assigned person",
         escalation: "family",
@@ -182,8 +177,7 @@ export const systemConfig: SystemConfig = {
 
     finances: {
       label: "Finances",
-      description:
-        "Bills, expenses, savings goals, milestones, financial overview.",
+      description: "Bills, expenses, savings goals, milestones, financial overview.",
       routing: {
         default: "couple",
         never: ["participant_3_private", "family"],
@@ -205,8 +199,7 @@ export const systemConfig: SystemConfig = {
 
     grocery: {
       label: "Grocery",
-      description:
-        "Shared household list. Add, organize, read back, mark purchased.",
+      description: "Shared household list. Add, organize, read back, mark purchased.",
       routing: {
         default: "family",
         response: "same thread as request",
@@ -214,8 +207,7 @@ export const systemConfig: SystemConfig = {
       behavior: {
         tone: "utilitarian, minimal commentary",
         format: "organized list by section, concise confirmations",
-        initiative:
-          "low: maintain list, read back when asked, optional pre-shopping-day reminder",
+        initiative: "low: maintain list, read back when asked, optional pre-shopping-day reminder",
       },
       escalation: EscalationLevel.None,
       sections: [
@@ -231,16 +223,14 @@ export const systemConfig: SystemConfig = {
 
     health: {
       label: "Health",
-      description:
-        "Appointments, medications, wellness notes, provider info, follow-ups.",
+      description: "Appointments, medications, wellness notes, provider info, follow-ups.",
       routing: {
         default: "private thread of the person involved",
         never_share_across_people: true,
       },
       behavior: {
         tone: "attentive and specific",
-        format:
-          "structured: appointments, medications, provider notes, follow-up items",
+        format: "structured: appointments, medications, provider notes, follow-up items",
         initiative:
           "care-driven: remind before appointments, follow up after visits, medication reminders, overdue check-up flags",
       },
@@ -255,8 +245,7 @@ export const systemConfig: SystemConfig = {
 
     pets: {
       label: "Pets",
-      description:
-        "Care logs, vet visits, medications, grooming, boarding, travel prep.",
+      description: "Care logs, vet visits, medications, grooming, boarding, travel prep.",
       routing: {
         default: "responsible adult's private thread",
         shared_awareness: "family",
@@ -272,8 +261,7 @@ export const systemConfig: SystemConfig = {
 
     school: {
       label: "School",
-      description:
-        "Assignments, deadlines, school communications, academic tracking.",
+      description: "Assignments, deadlines, school communications, academic tracking.",
       routing: {
         student_tasks: "participant_3_private",
         parent_awareness: "relevant parent's private thread",
@@ -297,8 +285,7 @@ export const systemConfig: SystemConfig = {
 
     travel: {
       label: "Travel",
-      description:
-        "Trip planning, checklists, itineraries, reminders, cross-topic logistics.",
+      description: "Trip planning, checklists, itineraries, reminders, cross-topic logistics.",
       routing: {
         family_trip: "family",
         couple_trip: "couple",
@@ -321,8 +308,7 @@ export const systemConfig: SystemConfig = {
 
     vendors: {
       label: "Vendors",
-      description:
-        "Contractor and service provider tracking. History, cost, follow-up.",
+      description: "Contractor and service provider tracking. History, cost, follow-up.",
       routing: {
         default: "managing adult's private thread",
       },
@@ -337,16 +323,14 @@ export const systemConfig: SystemConfig = {
 
     photography: {
       label: "Photography",
-      description:
-        "Lead tracking, inquiry management, draft replies, booking status.",
+      description: "Lead tracking, inquiry management, draft replies, booking status.",
       routing: {
         default: "participant_2_private",
       },
       behavior: {
         tone_internal: "professional and organized, business assistant",
         tone_client_drafts: "professional and warm, client-facing",
-        format:
-          "pipeline: new leads, follow-up timing, draft replies, booking status",
+        format: "pipeline: new leads, follow-up timing, draft replies, booking status",
         initiative:
           "pipeline-driven: new lead alerts, follow-up reminders after quiet period, draft replies for approval",
       },
@@ -365,8 +349,7 @@ export const systemConfig: SystemConfig = {
       },
       behavior: {
         tone: "warm, brief, never clinical",
-        format:
-          "open-ended prompts, suggestions, appreciation exercises, conversation starters",
+        format: "open-ended prompts, suggestions, appreciation exercises, conversation starters",
         initiative:
           "softest of any topic: occasional nudges during quiet windows, never during busy or stressful periods, easy to ignore",
         framework:
@@ -409,8 +392,7 @@ export const systemConfig: SystemConfig = {
         ],
       },
       batched: {
-        description:
-          "Important but not urgent. Hold for next digest or quiet window.",
+        description: "Important but not urgent. Hold for next digest or quiet window.",
         examples: [
           "chore reminder for later today",
           "savings update",
@@ -420,12 +402,7 @@ export const systemConfig: SystemConfig = {
       },
       silent: {
         description: "Tracked internally. Surface only when asked.",
-        examples: [
-          "completed task log",
-          "vendor history",
-          "pet care log",
-          "general status entry",
-        ],
+        examples: ["completed task log", "vendor history", "pet care log", "general status entry"],
       },
     },
 
@@ -467,8 +444,7 @@ export const systemConfig: SystemConfig = {
         "Natural language interpreted in context of the thread and most recent topic discussed.",
     },
     structured_choice: {
-      description:
-        "Numbered options or yes/no. Reply with a number, letter, or yes/no to select.",
+      description: "Numbered options or yes/no. Reply with a number, letter, or yes/no to select.",
       formats: ["1/2/3", "a/b/c", "yes/no"],
     },
     reaction: {
@@ -476,8 +452,7 @@ export const systemConfig: SystemConfig = {
       negative: "reject or decline",
     },
     image: {
-      description:
-        "Extract visible information. Ask one clarifying question if intent is unclear.",
+      description: "Extract visible information. Ask one clarifying question if intent is unclear.",
       examples: {
         receipt_photo: "log as expense after confirmation",
         school_image: "extract and track after confirmation",
@@ -544,8 +519,7 @@ export const systemConfig: SystemConfig = {
       },
     },
     evening_checkin: {
-      description:
-        "Brief check-in if anything is still open. Otherwise, nothing.",
+      description: "Brief check-in if anything is still open. Otherwise, nothing.",
       times: {
         participant_1: "20:00",
         participant_2: "20:00",
@@ -572,22 +546,19 @@ export const systemConfig: SystemConfig = {
       {
         step: 3,
         action: WorkerAction.DetermineActionType,
-        description:
-          "Is this a response, a proactive message, or internal storage?",
+        description: "Is this a response, a proactive message, or internal storage?",
       },
       {
         step: 4,
         action: WorkerAction.CheckOutboundBudget,
         service: WorkerService.Budget,
-        description:
-          "Check if sending is within budget limits. If not, hold or batch.",
+        description: "Check if sending is within budget limits. If not, hold or batch.",
       },
       {
         step: 5,
         action: WorkerAction.CheckEscalation,
         service: WorkerService.Escalation,
-        description:
-          "Determine if this item requires escalation based on topic profile.",
+        description: "Determine if this item requires escalation based on topic profile.",
       },
       {
         step: 6,
@@ -619,12 +590,7 @@ export const systemConfig: SystemConfig = {
     },
     medium: {
       label: "Medium Accountability",
-      applies_to: [
-        TopicKey.School,
-        TopicKey.Health,
-        TopicKey.Calendar,
-        TopicKey.Travel,
-      ],
+      applies_to: [TopicKey.School, TopicKey.Health, TopicKey.Calendar, TopicKey.Travel],
       steps: [
         "message to responsible person",
         "one follow-up reminder",
@@ -649,8 +615,7 @@ export const systemConfig: SystemConfig = {
   },
 
   scenario_testing: {
-    description:
-      "Every scenario has five parts. Used for design validation and model refinement.",
+    description: "Every scenario has five parts. Used for design validation and model refinement.",
     parts: [
       "trigger — what initiates the scenario",
       "expected_dispatch — what gets sent, to whom, when, how",

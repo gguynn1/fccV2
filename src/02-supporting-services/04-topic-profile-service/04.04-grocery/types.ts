@@ -1,12 +1,4 @@
-export enum GrocerySection {
-  Produce = "produce",
-  Dairy = "dairy",
-  Meat = "meat",
-  Pantry = "pantry",
-  Frozen = "frozen",
-  Household = "household",
-  Other = "other",
-}
+import type { GrocerySection } from "../../../types.js";
 
 export interface GroceryItem {
   id: string;

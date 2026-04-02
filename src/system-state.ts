@@ -24,13 +24,13 @@ import {
   ConfirmationResult,
   EscalationStepAction,
   HealthProviderType,
-} from "./types.js";
+} from "./index.js";
 
 export const systemState: SystemState = {
   metadata: {
     snapshot_time: new Date("2026-04-02T17:05:00-07:00"),
     description:
-      "Current state of all tracked items, pending actions, and active records.",
+      "Runtime snapshot — all tracked items, pending queue entries, active escalations, and per-topic records as they exist at a point in time.",
   },
 
   queue: {
@@ -41,8 +41,7 @@ export const systemState: SystemState = {
         type: QueueItemType.Outbound,
         topic: TopicKey.Health,
         concerning: ["participant_1"],
-        content:
-          "Post-appointment follow-up: any notes from today's dentist visit?",
+        content: "Post-appointment follow-up: any notes from today's dentist visit?",
         priority: DispatchPriority.Batched,
         target_thread: "participant_1_private",
         created_at: new Date("2026-04-02T14:00:00-07:00"),
@@ -638,10 +637,7 @@ export const systemState: SystemState = {
           },
         ],
         budget_link: "savings_001",
-        notes: [
-          "PARTICIPANT 3 wants to try surfing lessons",
-          "Check if hotel has airport shuttle",
-        ],
+        notes: ["PARTICIPANT 3 wants to try surfing lessons", "Check if hotel has airport shuttle"],
       },
     ],
   },
@@ -795,8 +791,7 @@ export const systemState: SystemState = {
         {
           id: "msg_102",
           from: "participant_1",
-          content:
-            "Thanks. Can you mark the internet bill as paid? I just did it",
+          content: "Thanks. Can you mark the internet bill as paid? I just did it",
           at: new Date("2026-04-02T09:15:00-07:00"),
           topic_context: "finances",
         },
@@ -946,8 +941,7 @@ export const systemState: SystemState = {
         {
           id: "msg_502",
           from: "assistant",
-          content:
-            "Got it. I've assigned trash to PARTICIPANT 3 with a 5pm deadline.",
+          content: "Got it. I've assigned trash to PARTICIPANT 3 with a 5pm deadline.",
           at: new Date("2026-04-02T08:00:10-07:00"),
           topic_context: "chores",
           state_ref: "chore_001",
@@ -962,8 +956,7 @@ export const systemState: SystemState = {
         {
           id: "msg_504",
           from: "assistant",
-          content:
-            "Added. Unload dishwasher assigned to PARTICIPANT 3, due tomorrow by 10am.",
+          content: "Added. Unload dishwasher assigned to PARTICIPANT 3, due tomorrow by 10am.",
           at: new Date("2026-04-02T08:00:20-07:00"),
           topic_context: "chores",
           state_ref: "chore_002",
@@ -1092,9 +1085,7 @@ export const systemState: SystemState = {
           participant_2: {
             delivered_at: new Date("2026-04-01T20:00:00-07:00"),
             thread: "participant_2_private",
-            included: [
-              "Photography draft reply for Mark and Dana ready for review",
-            ],
+            included: ["Photography draft reply for Mark and Dana ready for review"],
           },
         },
       },

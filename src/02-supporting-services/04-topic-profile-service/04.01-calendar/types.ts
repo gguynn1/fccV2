@@ -1,4 +1,4 @@
-import type { TopicKey } from "../../../01-service-stack/03-classifier-service/types.js";
+import type { TopicKey } from "../../../types.js";
 
 export enum CalendarEventStatus {
   Completed = "completed",
