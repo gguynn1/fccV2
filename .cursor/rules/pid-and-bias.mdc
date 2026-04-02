@@ -1,0 +1,38 @@
+---
+description: PID anonymization and platform-neutral language — always enforced
+alwaysApply: true
+---
+
+# PID and Bias Boundaries
+
+## Personally Identifiable Data
+
+Real names and identifiers MUST be anonymized everywhere — code, config, state, documentation.
+
+| Real     | Anonymized                      |
+| -------- | ------------------------------- |
+| Garrett  | PARTICIPANT 1 / `participant_1` |
+| Sasha    | PARTICIPANT 2 / `participant_2` |
+| Harrison | PARTICIPANT 3 / `participant_3` |
+| Tucker   | PET / `pet`                     |
+
+Use `PARTICIPANT N` in documentation (CLAUDE.md). Use `participant_n` in code and data files.
+
+If you encounter a new real name, flag it — do not guess the substitution.
+
+## Platform-Neutral Language
+
+The system describes capabilities, not specific products or brands.
+
+| Avoid                   | Use instead                           |
+| ----------------------- | ------------------------------------- |
+| iPhone                  | PHONE                                 |
+| thumbs up / thumbs down | positive reaction / negative reaction |
+| text messages           | phone-native messages                 |
+| phone number            | messaging identity                    |
+| screenshot              | image                                 |
+| JSON files              | configuration store / state store     |
+
+## Why
+
+These boundaries exist so the system design remains portable, unbiased, and safe to share. Every piece of content — documentation, types, data — must pass through these filters.

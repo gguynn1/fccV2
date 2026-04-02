@@ -1,0 +1,36 @@
+---
+description: ESM and TypeScript import conventions
+globs: "**/*.ts"
+alwaysApply: false
+---
+
+# Module Conventions
+
+## ESM
+
+This project uses ECMAScript Modules (`"type": "module"`). `verbatimModuleSyntax` is enabled.
+
+- All relative imports MUST use `.js` extensions.
+- Type-only imports MUST use `import type`.
+
+```typescript
+// ✅ Correct
+import { TopicKey } from "../../types.js";
+import type { SystemConfig } from "./index.js";
+
+// ❌ Missing extension
+import { TopicKey } from "../../types";
+
+// ❌ Non-type import used only as a type
+import { SystemConfig } from "./index.js";
+```
+
+## Data Files
+
+- `system-config.ts` — Static system definition (what governs behavior). Imports from `./index.js`.
+- `system-state.ts` — Runtime snapshot (what exists at a point in time). Imports from `./index.js`.
+- Both use runtime enum values (`TopicKey.Calendar`, not `"calendar"`).
+
+## Enums Over String Literals
+
+All classified values use their enum. Never use raw strings where an enum exists.

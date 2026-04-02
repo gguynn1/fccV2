@@ -1,0 +1,25 @@
+---
+description: Type file ownership — shared enums, barrel structure, no circular dependencies
+globs: "**/types.ts"
+alwaysApply: false
+---
+
+# Type Boundaries
+
+## File Roles
+
+| File               | Role                                                                      |
+| ------------------ | ------------------------------------------------------------------------- |
+| `src/types.ts`     | Shared vocabulary enums only. Pure definitions, zero imports.             |
+| `src/index.ts`     | Barrel re-exports + aggregate interfaces (SystemConfig, ScenarioTesting). |
+| Service `types.ts` | Types owned by that service.                                              |
+| Parent `types.ts`  | Barrel re-exports only (`export * from`).                                 |
+
+## Rules
+
+- Every `types.ts` MUST have a sibling `CLAUDE.md`. No orphaned type files.
+- Shared enums (`TopicKey`, `EscalationLevel`, `GrocerySection`, `InputMethod`) live in `src/types.ts` because no single service owns them.
+- If an enum is used across the 01↔02 boundary, it belongs in `src/types.ts` — not in a leaf service.
+- Leaf types import shared enums via `import type` from `src/types.ts` (relative path).
+- The one legitimate cross-tree import: state-service (02) imports `QueueState` from queue (01), because state aggregates everything.
+- `import-x/no-cycle` is enforced by ESLint at `maxDepth: 50`. Circular dependencies are build errors.

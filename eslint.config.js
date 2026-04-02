@@ -1,8 +1,11 @@
 import eslint from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import eslintConfigPrettier from "eslint-config-prettier";
+import { flatConfigs } from "eslint-plugin-import-x";
+import unusedImports from "eslint-plugin-unused-imports";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: ["dist/**", "node_modules/**", "eslint.config.js", "prettier.config.js"],
   },
@@ -10,6 +13,11 @@ export default tseslint.config(
   ...tseslint.configs.recommendedTypeChecked,
   {
     files: ["**/*.ts"],
+    plugins: {
+      ...flatConfigs.recommended.plugins,
+      "unused-imports": unusedImports,
+    },
+    settings: flatConfigs.typescript.settings,
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -17,13 +25,31 @@ export default tseslint.config(
       },
     },
     rules: {
+      ...flatConfigs.recommended.rules,
+      ...flatConfigs.typescript.rules,
       "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": [
+      "@typescript-eslint/no-unused-vars": "off",
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
         "error",
         {
           argsIgnorePattern: "^_",
           caughtErrorsIgnorePattern: "^_",
           varsIgnorePattern: "^_",
+        },
+      ],
+      "@typescript-eslint/consistent-type-imports": [
+        "error",
+        {
+          prefer: "type-imports",
+          fixStyle: "separate-type-imports",
+        },
+      ],
+      "import-x/no-cycle": [
+        "error",
+        {
+          maxDepth: 50,
+          ignoreExternal: true,
         },
       ],
     },

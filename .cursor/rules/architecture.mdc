@@ -1,0 +1,30 @@
+---
+description: System architecture — bounded services, data flow, and core invariants
+alwaysApply: true
+---
+
+# Architecture Boundaries
+
+Three roots under `src/`:
+
+- `01-service-stack/` — Core pipeline. Messages flow top-to-bottom: Transport → Identity → Classifier → Queue → Worker → Action Router.
+- `02-supporting-services/` — Called by the Worker or feed the Queue. Never call each other. Never reach back into the stack.
+- `03-connections/` — Documentation only. Describes how services interact. No code lives here.
+
+## Bounded Services
+
+Each numbered folder is a bounded service. A service owns its behavior, its types, and its documentation. Services never directly import runtime code from another service — the Worker orchestrates all cross-service coordination.
+
+## Data Flow Invariants
+
+- All inbound data enters through the Queue — human messages, scheduled events, external data. No exceptions.
+- The Worker pulls one item at a time, calls supporting services, then hands the result to the Action Router.
+- Action Router decides: Dispatch (send now via Transport), Hold (batch via Scheduler), or Store (save via State).
+- Adding a new data source feeds the Queue. It never requires changes to dispatch logic.
+
+## Messaging Invariants
+
+- One shared messaging identity, no name, no app — phone-native texting only.
+- Threads are defined by participants, not topics. Five threads total.
+- Responses stay in the thread they came from.
+- Proactive messages route to the narrowest appropriate thread.
