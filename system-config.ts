@@ -1,4 +1,17 @@
-import { SystemConfig } from "./system-config-types";
+import {
+  type SystemConfig,
+  EntityType,
+  Permission,
+  ThreadType,
+  EscalationLevel,
+  TopicKey,
+  DispatchPriority,
+  GrocerySection,
+  ConfirmationActionType,
+  DataIngestSourceType,
+  WorkerAction,
+  WorkerService,
+} from "./system-config-types.js";
 
 export const systemConfig: SystemConfig = {
   system: {
@@ -17,15 +30,15 @@ export const systemConfig: SystemConfig = {
   entities: [
     {
       id: "participant_1",
-      type: "adult",
+      type: EntityType.Adult,
       name: "PARTICIPANT 1",
       messaging_identity: "+15551000001",
       permissions: [
-        "approve_financial",
-        "approve_sends",
-        "modify_system",
-        "assign_tasks",
-        "view_all_topics",
+        Permission.ApproveFinancial,
+        Permission.ApproveSends,
+        Permission.ModifySystem,
+        Permission.AssignTasks,
+        Permission.ViewAllTopics,
       ],
       digest: {
         morning: "07:00",
@@ -34,15 +47,15 @@ export const systemConfig: SystemConfig = {
     },
     {
       id: "participant_2",
-      type: "adult",
+      type: EntityType.Adult,
       name: "PARTICIPANT 2",
       messaging_identity: "+15551000002",
       permissions: [
-        "approve_financial",
-        "approve_sends",
-        "modify_system",
-        "assign_tasks",
-        "view_all_topics",
+        Permission.ApproveFinancial,
+        Permission.ApproveSends,
+        Permission.ModifySystem,
+        Permission.AssignTasks,
+        Permission.ViewAllTopics,
       ],
       digest: {
         morning: "07:00",
@@ -51,10 +64,14 @@ export const systemConfig: SystemConfig = {
     },
     {
       id: "participant_3",
-      type: "child",
+      type: EntityType.Child,
       name: "PARTICIPANT 3",
       messaging_identity: "+15551000003",
-      permissions: ["complete_tasks", "add_items", "ask_questions"],
+      permissions: [
+        Permission.CompleteTasks,
+        Permission.AddItems,
+        Permission.AskQuestions,
+      ],
       digest: {
         morning: "07:30",
         evening: null,
@@ -62,7 +79,7 @@ export const systemConfig: SystemConfig = {
     },
     {
       id: "pet_1",
-      type: "pet",
+      type: EntityType.Pet,
       name: "PET",
       messaging_identity: null,
       permissions: [],
@@ -80,35 +97,35 @@ export const systemConfig: SystemConfig = {
   threads: [
     {
       id: "participant_1_private",
-      type: "private",
+      type: ThreadType.Private,
       participants: ["participant_1"],
       description:
         "PARTICIPANT 1's private thread with the assistant. Health, personal reminders, digests, drafts, review space.",
     },
     {
       id: "participant_2_private",
-      type: "private",
+      type: ThreadType.Private,
       participants: ["participant_2"],
       description:
         "PARTICIPANT 2's private thread. Photography, morning check-in, digests, drafts, review space.",
     },
     {
       id: "participant_3_private",
-      type: "private",
+      type: ThreadType.Private,
       participants: ["participant_3"],
       description:
         "PARTICIPANT 3's thread. Chore reminders, school nudges, tasks.",
     },
     {
       id: "couple",
-      type: "shared",
+      type: ThreadType.Shared,
       participants: ["participant_1", "participant_2"],
       description:
         "Couple thread. Finances, relationship, couple-level coordination.",
     },
     {
       id: "family",
-      type: "shared",
+      type: ThreadType.Shared,
       participants: ["participant_1", "participant_2", "participant_3"],
       description:
         "Family thread. Chores, grocery, travel, pets, general household.",
@@ -131,7 +148,7 @@ export const systemConfig: SystemConfig = {
         initiative:
           "event-driven: remind before, follow up after, alert on conflicts",
       },
-      escalation: "medium",
+      escalation: EscalationLevel.Medium,
       proactive: {
         reminder_before: "24h",
         follow_up_after: "2h",
@@ -154,7 +171,7 @@ export const systemConfig: SystemConfig = {
         initiative:
           "structured: remind at assignment, follow up before deadline, escalate after deadline",
       },
-      escalation: "high",
+      escalation: EscalationLevel.High,
       escalation_ladder: {
         first_reminder: "at assignment",
         follow_up: "1h before deadline",
@@ -176,7 +193,7 @@ export const systemConfig: SystemConfig = {
         format: "numbers, deadlines, progress snapshots",
         initiative: "deadline-driven for bills, milestone-driven for savings",
       },
-      escalation: "high",
+      escalation: EscalationLevel.High,
       escalation_ladder: {
         first_reminder: "3d before due",
         follow_up: "1d before due",
@@ -200,15 +217,15 @@ export const systemConfig: SystemConfig = {
         initiative:
           "low: maintain list, read back when asked, optional pre-shopping-day reminder",
       },
-      escalation: "none",
+      escalation: EscalationLevel.None,
       sections: [
-        "produce",
-        "dairy",
-        "meat",
-        "pantry",
-        "frozen",
-        "household",
-        "other",
+        GrocerySection.Produce,
+        GrocerySection.Dairy,
+        GrocerySection.Meat,
+        GrocerySection.Pantry,
+        GrocerySection.Frozen,
+        GrocerySection.Household,
+        GrocerySection.Other,
       ],
     },
 
@@ -227,7 +244,7 @@ export const systemConfig: SystemConfig = {
         initiative:
           "care-driven: remind before appointments, follow up after visits, medication reminders, overdue check-up flags",
       },
-      escalation: "medium",
+      escalation: EscalationLevel.Medium,
       proactive: {
         appointment_reminder: "24h",
         post_visit_follow_up: "2h",
@@ -250,7 +267,7 @@ export const systemConfig: SystemConfig = {
         initiative:
           "gentle: periodic reminders for overdue care, pre-travel checklists, medication tracking",
       },
-      escalation: "low",
+      escalation: EscalationLevel.Low,
     },
 
     school: {
@@ -269,7 +286,7 @@ export const systemConfig: SystemConfig = {
         initiative:
           "deadline-driven: reminders as due dates approach, summaries of school comms, overdue flags",
       },
-      escalation: "medium",
+      escalation: EscalationLevel.Medium,
       escalation_ladder: {
         first_reminder: "2d before due",
         follow_up: "1d before due",
@@ -293,8 +310,13 @@ export const systemConfig: SystemConfig = {
         initiative:
           "countdown-driven: prep reminders before departure, checklist progress, post-trip follow-up",
       },
-      escalation: "medium",
-      cross_topic_connections: ["calendar", "pets", "finances", "grocery"],
+      escalation: EscalationLevel.Medium,
+      cross_topic_connections: [
+        TopicKey.Calendar,
+        TopicKey.Pets,
+        TopicKey.Finances,
+        TopicKey.Grocery,
+      ],
     },
 
     vendors: {
@@ -310,7 +332,7 @@ export const systemConfig: SystemConfig = {
         initiative:
           "follow-up-driven: remind when a vendor hasn't responded within expected window",
       },
-      escalation: "none",
+      escalation: EscalationLevel.None,
     },
 
     photography: {
@@ -328,7 +350,7 @@ export const systemConfig: SystemConfig = {
         initiative:
           "pipeline-driven: new lead alerts, follow-up reminders after quiet period, draft replies for approval",
       },
-      escalation: "none",
+      escalation: EscalationLevel.None,
       confirmation_required_for_sends: true,
       follow_up_quiet_period: "48h",
     },
@@ -350,7 +372,7 @@ export const systemConfig: SystemConfig = {
         framework:
           "draws on Internal Family Systems Therapy, emotionally focused approaches, attachment-based connection prompts — small bids, not therapy",
       },
-      escalation: "low",
+      escalation: EscalationLevel.Low,
       on_ignored:
         "quietly disappear, try again in a few days with something different, never follow up, never guilt",
       minimum_gap_between_nudges: "5d",
@@ -370,7 +392,7 @@ export const systemConfig: SystemConfig = {
         initiative:
           "minimal: may ask for ETA if calendar suggests transit, otherwise records what is volunteered",
       },
-      escalation: "low",
+      escalation: EscalationLevel.Low,
       status_expiry: "6h",
     },
   },
@@ -430,9 +452,9 @@ export const systemConfig: SystemConfig = {
 
   confirmation_gates: {
     always_require_approval: [
-      "sending_on_behalf",
-      "financial_action",
-      "system_change",
+      ConfirmationActionType.SendingOnBehalf,
+      ConfirmationActionType.FinancialAction,
+      ConfirmationActionType.SystemChange,
     ],
     expiry_minutes: 5,
     on_expiry:
@@ -476,7 +498,7 @@ export const systemConfig: SystemConfig = {
     sources: [
       {
         id: "email_monitor",
-        type: "email",
+        type: DataIngestSourceType.Email,
         description: "Watch configured inboxes. Extract, classify, queue.",
         active: false,
         config: {
@@ -486,7 +508,7 @@ export const systemConfig: SystemConfig = {
       },
       {
         id: "calendar_sync",
-        type: "calendar",
+        type: DataIngestSourceType.Calendar,
         description: "Detect calendar changes. Queue as calendar topic items.",
         active: false,
         config: {
@@ -496,7 +518,7 @@ export const systemConfig: SystemConfig = {
       },
       {
         id: "forwarded_messages",
-        type: "forwarded",
+        type: DataIngestSourceType.Forwarded,
         description:
           "Family member forwards a text or email to the assistant's messaging identity. Parse, classify, queue.",
         active: true,
@@ -537,47 +559,47 @@ export const systemConfig: SystemConfig = {
     processing_sequence: [
       {
         step: 1,
-        action: "classify_topic",
-        service: "classifier",
+        action: WorkerAction.ClassifyTopic,
+        service: WorkerService.Classifier,
         description: "Determine which of the 12 topics this item belongs to.",
       },
       {
         step: 2,
-        action: "identify_entities",
-        service: "identity",
+        action: WorkerAction.IdentifyEntities,
+        service: WorkerService.Identity,
         description: "Identify which people or pets are involved.",
       },
       {
         step: 3,
-        action: "determine_action_type",
+        action: WorkerAction.DetermineActionType,
         description:
           "Is this a response, a proactive message, or internal storage?",
       },
       {
         step: 4,
-        action: "check_outbound_budget",
-        service: "budget",
+        action: WorkerAction.CheckOutboundBudget,
+        service: WorkerService.Budget,
         description:
           "Check if sending is within budget limits. If not, hold or batch.",
       },
       {
         step: 5,
-        action: "check_escalation",
-        service: "escalation",
+        action: WorkerAction.CheckEscalation,
+        service: WorkerService.Escalation,
         description:
           "Determine if this item requires escalation based on topic profile.",
       },
       {
         step: 6,
-        action: "apply_behavior_profile",
-        service: "topic_profile",
+        action: WorkerAction.ApplyBehaviorProfile,
+        service: WorkerService.TopicProfile,
         description:
           "Apply tone, format, initiative style, and framework from the topic's behavior profile.",
       },
       {
         step: 7,
-        action: "route_and_dispatch",
-        service: "routing",
+        action: WorkerAction.RouteAndDispatch,
+        service: WorkerService.Routing,
         description:
           "Determine target thread, then dispatch (immediate), hold (batched), or store (silent).",
       },
@@ -587,7 +609,7 @@ export const systemConfig: SystemConfig = {
   escalation_profiles: {
     high: {
       label: "High Accountability",
-      applies_to: ["chores", "finances"],
+      applies_to: [TopicKey.Chores, TopicKey.Finances],
       steps: [
         "message to responsible person in private thread",
         "follow-up reminder after configured window",
@@ -597,7 +619,12 @@ export const systemConfig: SystemConfig = {
     },
     medium: {
       label: "Medium Accountability",
-      applies_to: ["school", "health", "calendar", "travel"],
+      applies_to: [
+        TopicKey.School,
+        TopicKey.Health,
+        TopicKey.Calendar,
+        TopicKey.Travel,
+      ],
       steps: [
         "message to responsible person",
         "one follow-up reminder",
@@ -606,7 +633,7 @@ export const systemConfig: SystemConfig = {
     },
     low: {
       label: "Low Accountability",
-      applies_to: ["relationship", "pets", "family_status"],
+      applies_to: [TopicKey.Relationship, TopicKey.Pets, TopicKey.FamilyStatus],
       steps: [
         "send once",
         "if ignored, quietly disappear",
@@ -616,7 +643,7 @@ export const systemConfig: SystemConfig = {
     },
     none: {
       label: "No Escalation",
-      applies_to: ["grocery", "vendors", "photography"],
+      applies_to: [TopicKey.Grocery, TopicKey.Vendors, TopicKey.Photography],
       steps: ["send once or store silently", "no follow-up"],
     },
   },

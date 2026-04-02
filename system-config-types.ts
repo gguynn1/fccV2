@@ -1,30 +1,93 @@
-export type EntityType = "adult" | "child" | "pet";
+export enum EntityType {
+  Adult = "adult",
+  Child = "child",
+  Pet = "pet",
+}
 
-export type Permission =
-  | "approve_financial"
-  | "approve_sends"
-  | "modify_system"
-  | "assign_tasks"
-  | "view_all_topics"
-  | "complete_tasks"
-  | "add_items"
-  | "ask_questions";
+export enum ThreadType {
+  Private = "private",
+  Shared = "shared",
+}
 
-export type EscalationLevel = "high" | "medium" | "low" | "none";
+export enum Permission {
+  ApproveFinancial = "approve_financial",
+  ApproveSends = "approve_sends",
+  ModifySystem = "modify_system",
+  AssignTasks = "assign_tasks",
+  ViewAllTopics = "view_all_topics",
+  CompleteTasks = "complete_tasks",
+  AddItems = "add_items",
+  AskQuestions = "ask_questions",
+}
 
-export type TopicKey =
-  | "calendar"
-  | "chores"
-  | "finances"
-  | "grocery"
-  | "health"
-  | "pets"
-  | "school"
-  | "travel"
-  | "vendors"
-  | "photography"
-  | "relationship"
-  | "family_status";
+export enum TopicKey {
+  Calendar = "calendar",
+  Chores = "chores",
+  Finances = "finances",
+  Grocery = "grocery",
+  Health = "health",
+  Pets = "pets",
+  School = "school",
+  Travel = "travel",
+  Vendors = "vendors",
+  Photography = "photography",
+  Relationship = "relationship",
+  FamilyStatus = "family_status",
+}
+
+export enum EscalationLevel {
+  High = "high",
+  Medium = "medium",
+  Low = "low",
+  None = "none",
+}
+
+export enum DispatchPriority {
+  Immediate = "immediate",
+  Batched = "batched",
+  Silent = "silent",
+}
+
+export enum GrocerySection {
+  Produce = "produce",
+  Dairy = "dairy",
+  Meat = "meat",
+  Pantry = "pantry",
+  Frozen = "frozen",
+  Household = "household",
+  Other = "other",
+}
+
+export enum ConfirmationActionType {
+  SendingOnBehalf = "sending_on_behalf",
+  FinancialAction = "financial_action",
+  SystemChange = "system_change",
+}
+
+export enum DataIngestSourceType {
+  Email = "email",
+  Calendar = "calendar",
+  Forwarded = "forwarded",
+}
+
+export enum WorkerAction {
+  ClassifyTopic = "classify_topic",
+  IdentifyEntities = "identify_entities",
+  DetermineActionType = "determine_action_type",
+  CheckOutboundBudget = "check_outbound_budget",
+  CheckEscalation = "check_escalation",
+  ApplyBehaviorProfile = "apply_behavior_profile",
+  RouteAndDispatch = "route_and_dispatch",
+}
+
+export enum WorkerService {
+  Classifier = "classifier",
+  Identity = "identity",
+  Budget = "budget",
+  Escalation = "escalation",
+  TopicProfile = "topic_profile",
+  Routing = "routing",
+}
 
 export interface PetProfile {
   species: string;
@@ -52,7 +115,7 @@ export interface Entity {
 
 export interface Thread {
   id: string;
-  type: "private" | "shared";
+  type: ThreadType;
   participants: string[];
   description: string;
 }
@@ -74,7 +137,7 @@ export interface TopicConfig {
   proactive?: Record<string, string | boolean>;
   escalation_ladder?: Record<string, string | boolean | null>;
   confirmation_required?: boolean;
-  sections?: string[];
+  sections?: GrocerySection[];
   cross_topic_connections?: TopicKey[];
   confirmation_required_for_sends?: boolean;
   follow_up_quiet_period?: string;
@@ -96,18 +159,14 @@ export interface OutboundBudget {
 }
 
 export interface DispatchConfig {
-  priority_levels: {
-    immediate: PriorityLevel;
-    batched: PriorityLevel;
-    silent: PriorityLevel;
-  };
+  priority_levels: Record<DispatchPriority, PriorityLevel>;
   outbound_budget: OutboundBudget;
   routing_rules: Record<string, string>;
   collision_avoidance: { description: string };
 }
 
 export interface ConfirmationGates {
-  always_require_approval: string[];
+  always_require_approval: ConfirmationActionType[];
   expiry_minutes: number;
   on_expiry: string;
 }
@@ -134,7 +193,7 @@ export interface DataIngestSourceConfig {
 
 export interface DataIngestSource {
   id: string;
-  type: string;
+  type: DataIngestSourceType;
   description: string;
   active: boolean;
   config?: DataIngestSourceConfig;
@@ -158,8 +217,8 @@ export interface DailyRhythm {
 
 export interface WorkerStep {
   step: number;
-  action: string;
-  service?: string;
+  action: WorkerAction;
+  service?: WorkerService;
   description: string;
 }
 
@@ -171,13 +230,6 @@ export interface EscalationProfile {
   label: string;
   applies_to: TopicKey[];
   steps: string[];
-}
-
-export interface EscalationProfiles {
-  high: EscalationProfile;
-  medium: EscalationProfile;
-  low: EscalationProfile;
-  none: EscalationProfile;
 }
 
 export interface ScenarioTesting {
@@ -205,6 +257,6 @@ export interface SystemConfig {
   data_ingest: DataIngestConfig;
   daily_rhythm: DailyRhythm;
   worker: WorkerConfig;
-  escalation_profiles: EscalationProfiles;
+  escalation_profiles: Record<EscalationLevel, EscalationProfile>;
   scenario_testing: ScenarioTesting;
 }
