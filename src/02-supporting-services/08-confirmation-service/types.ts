@@ -5,6 +5,8 @@ export enum ConfirmationActionType {
 }
 
 export enum ConfirmationResult {
+  Approved = "approved",
+  Rejected = "rejected",
   Expired = "expired",
   NotYetApproved = "not_yet_approved",
 }

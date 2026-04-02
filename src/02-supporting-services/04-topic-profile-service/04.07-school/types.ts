@@ -3,6 +3,8 @@ import type { InputMethod } from "../../../types.js";
 export enum AssignmentStatus {
   NotStarted = "not_started",
   InProgress = "in_progress",
+  Completed = "completed",
+  Late = "late",
 }
 
 export interface Assignment {

@@ -562,13 +562,20 @@ export const systemConfig: SystemConfig = {
       },
       {
         step: 6,
+        action: WorkerAction.CheckConfirmation,
+        service: WorkerService.Confirmation,
+        description:
+          "Does this action require approval? Is there a pending confirmation to resolve?",
+      },
+      {
+        step: 7,
         action: WorkerAction.ApplyBehaviorProfile,
         service: WorkerService.TopicProfile,
         description:
           "Apply tone, format, initiative style, and framework from the topic's behavior profile.",
       },
       {
-        step: 7,
+        step: 8,
         action: WorkerAction.RouteAndDispatch,
         service: WorkerService.Routing,
         description:

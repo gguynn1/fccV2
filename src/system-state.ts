@@ -109,7 +109,7 @@ export const systemState: SystemState = {
         messages: [
           {
             id: "q_000a",
-            topic: "calendar",
+            topic: TopicKey.Calendar,
             at: new Date("2026-04-02T08:00:00-07:00"),
             included_in: "morning_digest",
           },
@@ -139,12 +139,12 @@ export const systemState: SystemState = {
           },
           {
             id: "q_000b",
-            topic: "chores",
+            topic: TopicKey.Chores,
             at: new Date("2026-04-02T15:00:00-07:00"),
           },
           {
             id: "q_001",
-            topic: "chores",
+            topic: TopicKey.Chores,
             at: new Date("2026-04-02T17:01:00-07:00"),
           },
         ],

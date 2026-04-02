@@ -2,15 +2,26 @@ import type { InputMethod } from "../../../types.js";
 
 export enum BillStatus {
   Upcoming = "upcoming",
+  Paid = "paid",
+  Overdue = "overdue",
+  Cancelled = "cancelled",
 }
 
 export enum RecurringInterval {
+  Weekly = "weekly",
+  Biweekly = "biweekly",
   Monthly = "monthly",
+  Quarterly = "quarterly",
+  Annual = "annual",
+  OneTime = "one_time",
 }
 
 export enum PaceStatus {
+  Ahead = "ahead",
   OnTrack = "on_track",
   Steady = "steady",
+  Behind = "behind",
+  AtRisk = "at_risk",
 }
 
 export interface Bill {

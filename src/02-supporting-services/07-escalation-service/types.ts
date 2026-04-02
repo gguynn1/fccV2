@@ -4,6 +4,8 @@ export enum EscalationStepAction {
   ReminderSent = "reminder_sent",
   FollowUpSent = "follow_up_sent",
   EscalateToBroaderThread = "escalate_to_broader_thread",
+  FlaggedInDigest = "flagged_in_digest",
+  Resolved = "resolved",
 }
 
 export interface EscalationProfile {

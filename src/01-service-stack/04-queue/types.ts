@@ -7,12 +7,20 @@ export enum QueueItemType {
 }
 
 export enum QueueItemSource {
-  ScheduledTrigger = "scheduled_trigger",
+  HumanMessage = "human_message",
+  Reaction = "reaction",
+  ForwardedMessage = "forwarded_message",
+  ImageAttachment = "image_attachment",
   EmailMonitor = "email_monitor",
+  CalendarSync = "calendar_sync",
+  ScheduledTrigger = "scheduled_trigger",
 }
 
 export enum QueuePendingStatus {
   PendingClassification = "pending_classification",
+  PendingProcessing = "pending_processing",
+  Processing = "processing",
+  Failed = "failed",
 }
 
 export interface InboundEmailContent {

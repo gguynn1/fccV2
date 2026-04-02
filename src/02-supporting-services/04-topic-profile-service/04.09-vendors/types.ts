@@ -1,6 +1,10 @@
 export enum VendorJobStatus {
-  Completed = "completed",
   WaitingForQuote = "waiting_for_quote",
+  Quoted = "quoted",
+  Scheduled = "scheduled",
+  InProgress = "in_progress",
+  Completed = "completed",
+  Cancelled = "cancelled",
 }
 
 export interface VendorJob {

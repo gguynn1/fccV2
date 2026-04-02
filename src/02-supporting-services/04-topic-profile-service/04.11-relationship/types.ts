@@ -2,6 +2,8 @@ export enum NudgeType {
   AppreciationPrompt = "appreciation_prompt",
   DateNightSuggestion = "date_night_suggestion",
   ConversationStarter = "conversation_starter",
+  ConnectionPrompt = "connection_prompt",
+  GratitudeExercise = "gratitude_exercise",
 }
 
 export interface NudgeHistoryEntry {

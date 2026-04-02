@@ -55,9 +55,10 @@ THE WORKER
     2  identify the entities
     3  determine the action type
     4  check the outbound budget
-    5  apply the topic behavior profile
-    6  route to the correct thread
-    7  dispatch or hold
+    5  check escalation
+    6  check confirmation
+    7  apply the topic behavior profile
+    8  route and dispatch
           |
           |
      _____|_____

@@ -1,6 +1,10 @@
 export enum HealthProviderType {
-  Dentist = "dentist",
   Primary = "primary",
+  Dentist = "dentist",
+  Specialist = "specialist",
+  Optometrist = "optometrist",
+  Therapist = "therapist",
+  Urgent = "urgent",
 }
 
 export interface Medication {

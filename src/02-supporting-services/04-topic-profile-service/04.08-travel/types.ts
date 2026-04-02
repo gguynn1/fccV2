@@ -1,10 +1,15 @@
 export enum TripStatus {
   Planning = "planning",
+  Active = "active",
+  Completed = "completed",
+  Cancelled = "cancelled",
 }
 
 export enum ChecklistItemStatus {
-  Done = "done",
   NotStarted = "not_started",
+  InProgress = "in_progress",
+  Done = "done",
+  Skipped = "skipped",
 }
 
 export interface ChecklistItem {

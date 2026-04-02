@@ -1,6 +1,10 @@
+import type { TopicKey } from "../../types.js";
+
+export type BudgetTopicKey = TopicKey | "digest";
+
 export interface BudgetMessage {
   id: string;
-  topic: string;
+  topic: BudgetTopicKey;
   at: Date;
   included_in?: string;
 }

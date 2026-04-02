@@ -1,9 +1,11 @@
 import type { TopicKey } from "../../../types.js";
 
 export enum CalendarEventStatus {
-  Completed = "completed",
-  Upcoming = "upcoming",
   Planning = "planning",
+  Upcoming = "upcoming",
+  Completed = "completed",
+  Cancelled = "cancelled",
+  Rescheduled = "rescheduled",
 }
 
 export interface CalendarEvent {

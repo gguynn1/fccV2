@@ -27,7 +27,8 @@ SCHEDULER ----------------------------+
 1. Classify the topic
 2. Identify the entities involved
 3. Determine the action type (response, proactive outbound, or silent storage)
-4. Check the outbound budget (what else has been sent to this person or thread recently)
-5. Apply the topic's behavior profile (tone, format, initiative style)
-6. Route to the correct thread
-7. Dispatch, hold for batching, or store silently
+4. Check the outbound budget (priority, collision avoidance, batching)
+5. Check escalation (is this a follow-up? what step? should we escalate?)
+6. Check confirmation (does this action require approval?)
+7. Apply the topic's behavior profile (tone, format, initiative style)
+8. Route and dispatch (target thread, then dispatch, hold, or store)

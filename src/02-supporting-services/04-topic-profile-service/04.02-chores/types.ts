@@ -1,8 +1,10 @@
 import type { InputMethod } from "../../../types.js";
 
 export enum ChoreStatus {
-  Overdue = "overdue",
   Pending = "pending",
+  Overdue = "overdue",
+  Completed = "completed",
+  Cancelled = "cancelled",
 }
 
 export enum ChoreEventType {
@@ -10,6 +12,9 @@ export enum ChoreEventType {
   ReminderSent = "reminder_sent",
   DeadlinePassed = "deadline_passed",
   FollowUpSent = "follow_up_sent",
+  Completed = "completed",
+  EscalatedToBroaderThread = "escalated_to_broader_thread",
+  Cancelled = "cancelled",
 }
 
 export interface ChoreHistoryEntry {

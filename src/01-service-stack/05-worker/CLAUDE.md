@@ -41,10 +41,11 @@ The worker pulls one item at a time and runs it through a fixed sequence:
 1. Classify the topic
 2. Identify the entities involved
 3. Determine the action type (response, proactive outbound, or silent storage)
-4. Check the outbound budget (what else has been sent to this person or thread recently)
-5. Apply the topic's behavior profile (tone, format, initiative style)
-6. Route to the correct thread
-7. Dispatch, hold for batching, or store silently
+4. Check the outbound budget (priority, collision avoidance, batching)
+5. Check escalation (is this a follow-up? what step? should we escalate?)
+6. Check confirmation (does this action require approval?)
+7. Apply the topic's behavior profile (tone, format, initiative style)
+8. Route and dispatch (target thread, then dispatch, hold, or store)
 
 ## Decision Flow
 
@@ -85,25 +86,36 @@ STEP 3 — Is this a response or proactive?
                                the audience
          |
          v
-STEP 4 — What priority?
+STEP 4 — Check outbound budget
+         What priority?
          Immediate ----------> send now, skip batching
          Batched ------------> hold for next digest
                                or quiet window
          Silent -------------> store only, no send
-         |
-         v
-STEP 5 — Collision check
-         Nothing else pending --> dispatch
+
+         Collision check
+         Nothing else pending --> proceed
          Other items queued
          for same person -------> batch into one
                                   message or space
-                                  them out — never
-                                  stack multiple
-                                  messages back
-                                  to back
+                                  them out
          |
          v
-STEP 6 — Apply the topic behavior profile
+STEP 5 — Check escalation
+         Is this a follow-up?
+         What step are we on?
+         Should we escalate
+         to a broader thread?
+         |
+         v
+STEP 6 — Check confirmation
+         Does this action require
+         approval before executing?
+         Is there a pending
+         confirmation to resolve?
+         |
+         v
+STEP 7 — Apply the topic behavior profile
          Tone ---------> direct, warm, factual,
                           professional, gentle
          Format -------> list, snapshot, prompt,
@@ -113,7 +125,9 @@ STEP 6 — Apply the topic behavior profile
                           alert, soft suggestion
          |
          v
-STEP 7 — Dispatch the message to the thread
-         or hold it for later
-         or store it silently
+STEP 8 — Route and dispatch
+         Determine the target thread
+         then dispatch immediately,
+         hold for later,
+         or store silently
 ```

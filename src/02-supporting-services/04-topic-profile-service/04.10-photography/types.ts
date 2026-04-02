@@ -1,6 +1,10 @@
 export enum PhotoLeadStatus {
-  AwaitingReply = "awaiting_reply",
   New = "new",
+  AwaitingReply = "awaiting_reply",
+  InConversation = "in_conversation",
+  Booked = "booked",
+  Declined = "declined",
+  Archived = "archived",
 }
 
 export interface PhotoLead {
