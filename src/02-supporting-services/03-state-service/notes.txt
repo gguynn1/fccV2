@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Persistent configuration and state store adapters.
+- Schemas for topic records, queue state, confirmations, digests, and escalation status.
+- Bootstrapping support for empty, active, and mid-scenario system states.
+
+Recommended tools/dependencies:
+- State snapshots for scenario testing and replay.
+- Validation and migration helpers for long-lived stored data.

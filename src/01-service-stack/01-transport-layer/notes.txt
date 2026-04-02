@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- A phone-native messaging adapter interface for inbound and outbound traffic.
+- Thread and participant mapping for the five allowed threads.
+- Attachment, forwarded-content, and reaction normalization before items move downstream.
+
+Recommended tools/dependencies:
+- Webhook or event-fixture tests that cover text, reactions, images, and forwarded content.
+- Retry and delivery-status instrumentation for outbound sends.

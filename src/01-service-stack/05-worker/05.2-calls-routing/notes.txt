@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Respect service boundaries: no direct runtime imports from sibling services.
+- Routing-service outputs that distinguish response-in-place from proactive routing.
+- Entity-to-thread mapping rules for private, couple, family, and pet cases.
+
+Recommended tools/dependencies:
+- Decision-table tests for narrowest-thread selection.
+- Fixtures that separate immediate replies from later proactive follow-ups.

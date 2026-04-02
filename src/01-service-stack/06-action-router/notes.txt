@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Action-router result types for dispatch, hold, and store outcomes.
+- Adapters from final worker decisions into transport, scheduler, or state actions.
+
+Recommended tools/dependencies:
+- A routing matrix that verifies the correct outcome for each priority level.
+- Decision logs that show why an item was sent, batched, or stored.

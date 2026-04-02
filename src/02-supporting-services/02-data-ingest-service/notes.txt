@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Connector interfaces for inboxes, calendars, forwarded content, and future feeds.
+- Extraction and pre-classification logic that normalizes external data into queue items.
+- A queue producer for ingest-originated events.
+
+Recommended tools/dependencies:
+- Fixture corpora for emails, calendar changes, and forwarded images or messages.
+- Parser validation for partial, noisy, or duplicate external inputs.

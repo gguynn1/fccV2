@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- A scheduler or timer abstraction for digests, reminders, follow-ups, and escalation deadlines.
+- Queue item producer logic for scheduler-originated events.
+- Daily-rhythm configuration for quiet windows and natural touchpoints.
+
+Recommended tools/dependencies:
+- A controllable clock for deterministic timer tests.
+- Fixtures that simulate morning, daytime, and evening behavior.

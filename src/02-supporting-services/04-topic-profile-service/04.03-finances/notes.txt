@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Finance profile types for bills, expenses, savings goals, and milestone tracking.
+- Couple-thread-only audience assumptions and confirmation-gated financial actions.
+
+Recommended tools/dependencies:
+- Numeric snapshot fixtures for due dates, balances, and savings milestones.
+- Tests that keep financial tone factual and opinion-free.

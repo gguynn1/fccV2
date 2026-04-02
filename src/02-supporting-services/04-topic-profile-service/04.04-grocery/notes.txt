@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Grocery list item types and section/grouping support.
+- Low-initiative behavior that prioritizes add, organize, read back, and mark purchased flows.
+
+Recommended tools/dependencies:
+- Fixtures for list merging, duplicate item handling, and section ordering.
+- Tests that keep responses brief and utilitarian.

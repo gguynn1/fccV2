@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Topic profile definitions for tone, format, initiative style, escalation level, and any framework grounding.
+- Stable topic-owned type contracts so each topic can evolve without leaking ownership elsewhere.
+
+Recommended tools/dependencies:
+- Per-topic fixtures that prove behavior differences stay intentional.
+- A scenario matrix that checks profile outputs across all 12 topics.

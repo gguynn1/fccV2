@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Routing rules for same-thread responses and narrowest-thread proactive sends.
+- Thread-map data covering private, couple, family, and pet-related cases.
+
+Recommended tools/dependencies:
+- Decision-table tests for audience selection.
+- Fixtures for events that require both an immediate reply and a later proactive follow-up.

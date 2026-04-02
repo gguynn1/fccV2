@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Relationship prompt types for appreciation, connection, and conversation starters.
+- Evidence-based prompt libraries plus strict no-escalation and easy-to-ignore behavior.
+
+Recommended tools/dependencies:
+- Quiet-window fixtures that prevent nudges during stressful or busy periods.
+- Tests that keep tone warm, brief, and never clinical.

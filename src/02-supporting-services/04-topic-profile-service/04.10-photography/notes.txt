@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Photography lead-pipeline types for inquiries, draft replies, booking status, and quiet-period follow-up.
+- Approval-gated drafting support before anything is sent on behalf of PARTICIPANT 2.
+
+Recommended tools/dependencies:
+- Fixtures for new leads, stalled leads, and booking transitions.
+- Tests that separate client-facing draft tone from internal assistant guidance.

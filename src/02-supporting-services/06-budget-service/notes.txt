@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Budget counters for recent sends, pending batch windows, and per-thread collision checks.
+- Priority decision outputs for send now, batch, or hold until the next digest.
+
+Recommended tools/dependencies:
+- Time-based simulations for quiet windows and high-volume days.
+- Metrics or traces that explain why outbound items were combined or delayed.

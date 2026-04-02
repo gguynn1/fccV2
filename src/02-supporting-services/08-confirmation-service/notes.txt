@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Pending confirmation storage keyed by thread, action, and expiry time.
+- Reply-matching logic for approvals, rejections, and expirations.
+
+Recommended tools/dependencies:
+- Fixtures for short approval replies, structured choices, and expired confirmations.
+- Tests that verify protected actions never auto-execute.

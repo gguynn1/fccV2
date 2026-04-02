@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Respect service boundaries: no direct runtime imports from sibling services.
+- Transport-layer handoff contracts for immediate outbound delivery.
+- Target-thread and payload validation before sending.
+
+Recommended tools/dependencies:
+- Immediate-priority test cases for urgent alerts and direct replies.
+- Delivery-status checks for dispatched messages.

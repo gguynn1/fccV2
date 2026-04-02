@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Escalation state-machine logic tied to accountability level and timer state.
+- Scheduler integration for follow-up deadlines and digest flags.
+
+Recommended tools/dependencies:
+- Clock-controlled tests for each escalation path.
+- Fixtures that prove silence means different things by topic but never approval.

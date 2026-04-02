@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- An orchestration layer that processes one queue item at a time.
+- Service client interfaces for topic profile, routing, budget, escalation, confirmation, and state.
+- Decision objects that capture topic, audience, priority, and final action.
+
+Recommended tools/dependencies:
+- Scenario tests covering the fixed processing sequence end to end.
+- Decision tracing so worker outcomes can be inspected when behavior changes.

@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Stack-level contracts for transport, identity, classification, queueing, worker orchestration, and routing outcomes.
+- Queue item and action result shapes that can move cleanly between services.
+
+Recommended tools/dependencies:
+- Scenario runners that validate the full top-to-bottom pipeline.
+- Mocks for supporting-service calls while testing stack behavior.

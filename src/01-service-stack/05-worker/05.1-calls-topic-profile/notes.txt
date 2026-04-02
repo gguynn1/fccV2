@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Respect service boundaries: no direct runtime imports from sibling services.
+- The topic profile contract that returns tone, format, initiative style, escalation level, and framework grounding.
+- Topic-specific response-shaping data before any outbound content is finalized.
+
+Recommended tools/dependencies:
+- Mocks for each topic profile so worker tests can isolate composition behavior.
+- Golden examples for how topic outputs change message tone and format.

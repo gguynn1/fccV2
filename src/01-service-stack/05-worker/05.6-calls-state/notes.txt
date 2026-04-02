@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Respect service boundaries: no direct runtime imports from sibling services.
+- State read/write contracts that run after the worker has made its decisions.
+- Stable persistence keys for topic records, confirmations, digests, and escalation status.
+
+Recommended tools/dependencies:
+- Snapshot fixtures for booting the worker from mid-scenario state.
+- Write-audit logging for important state mutations.

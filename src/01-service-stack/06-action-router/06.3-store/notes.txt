@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Respect service boundaries: no direct runtime imports from sibling services.
+- State-service write contracts for silent outcomes.
+- Persistent record shapes for logs that should not trigger outbound messages.
+
+Recommended tools/dependencies:
+- Fixtures for silent records such as vendor history, pet care logs, and status entries.
+- Queries that surface stored data only when explicitly requested.

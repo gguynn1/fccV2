@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- A single queue item schema shared by human input, ingest events, and scheduled triggers.
+- Timestamping, source tagging, and idempotency safeguards for inbound items.
+- Producer and consumer interfaces that keep queue ownership clear.
+
+Recommended tools/dependencies:
+- Queue fixtures that mix human and system-generated events.
+- Tracing or metrics around enqueue, dequeue, and retry behavior.

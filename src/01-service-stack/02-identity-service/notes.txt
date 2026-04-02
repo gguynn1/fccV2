@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Entity registry data for adults, child, and pet records.
+- Permission and thread-membership lookups for routing and approval decisions.
+- Stable sender-to-entity resolution before classification runs.
+
+Recommended tools/dependencies:
+- Fixtures covering private, couple, family, and pet-related lookups.
+- Caching around repeated identity resolution if lookups become frequent.

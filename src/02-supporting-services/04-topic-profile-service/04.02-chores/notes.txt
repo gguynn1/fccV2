@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Chore profile types for assignee, deadline, completion state, and escalation behavior.
+- High-accountability timing rules that support reminders and broader-thread escalation.
+
+Recommended tools/dependencies:
+- Deadline-based fixtures for assignment, follow-up, completion, and escalation.
+- Tests that verify direct tone and clear accountability outputs.

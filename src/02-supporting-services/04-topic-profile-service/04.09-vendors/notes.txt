@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Vendor record types for contact, cost, stage, and pending follow-up status.
+- Private-thread ownership for the adult managing the vendor relationship.
+
+Recommended tools/dependencies:
+- Fixtures for quote tracking, follow-up reminders, and completed vendor history.
+- Tests that keep outbound behavior minimal unless something is flagged pending.

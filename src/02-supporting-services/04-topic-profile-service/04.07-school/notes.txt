@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- School profile types for assignments, due dates, school communications, and parent awareness.
+- Audience rules that distinguish student-facing nudges from parent-facing summaries.
+
+Recommended tools/dependencies:
+- Fixtures for due-date reminders, missed work, and school-message summaries.
+- Tests for escalation from the child thread to a parent thread when needed.

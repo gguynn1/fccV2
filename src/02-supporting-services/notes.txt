@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Service interfaces that the worker or queue producers can call without cross-importing runtime logic.
+- Shared conventions for queue production, state access, and bounded ownership.
+
+Recommended tools/dependencies:
+- Contract tests that keep worker-to-service integrations stable.
+- Shared fixtures for state, timers, and queue items across supporting services.

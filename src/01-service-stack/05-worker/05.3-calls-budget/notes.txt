@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Respect service boundaries: no direct runtime imports from sibling services.
+- Budget-service outputs for immediate, batched, and silent priority decisions.
+- Collision-check data for recent sends, pending batched items, and quiet windows.
+
+Recommended tools/dependencies:
+- Time-based simulations that exercise digest windows and message spacing.
+- Metrics around deferred, combined, and suppressed outbound items.

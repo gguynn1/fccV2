@@ -1,0 +1,11 @@
+Required tools/dependencies:
+- Markdown editing and preview.
+- ASCII flow diagrams kept aligned with the referenced services.
+- No runtime dependencies in this folder; it is documentation-only.
+- References to transport-layer input handling for text, reactions, images, and forwarded content.
+
+Recommended tools/dependencies:
+- Cross-check wording against the linked service `CLAUDE.md` files.
+- Keep terminology aligned with `src/types.ts` and the architecture rules.
+- Update diagrams and prose together so the flow stays accurate.
+- Examples that stay aligned with phone-native messaging behaviors and thread rules.

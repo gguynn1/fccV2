@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Health profile types for appointments, medications, provider notes, and follow-up needs.
+- Private-thread assumptions and reminder timing for personal care flows.
+
+Recommended tools/dependencies:
+- Fixtures for appointment reminders, medication prompts, and post-visit note capture.
+- Tests that keep outputs attentive, specific, and privacy-respecting.

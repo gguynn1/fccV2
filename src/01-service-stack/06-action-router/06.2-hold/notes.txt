@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Respect service boundaries: no direct runtime imports from sibling services.
+- Scheduler handoff contracts for batched items.
+- Digest-window and quiet-window timing data for held outbound messages.
+
+Recommended tools/dependencies:
+- Time-based tests for morning digest, evening check-in, and daytime quiet behavior.
+- Batch-merging fixtures that verify multiple items combine cleanly.

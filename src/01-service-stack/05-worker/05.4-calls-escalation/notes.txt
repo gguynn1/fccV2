@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Respect service boundaries: no direct runtime imports from sibling services.
+- Escalation-step outputs tied to topic accountability levels.
+- Timing data for follow-ups, broader-thread escalation, and digest flags.
+
+Recommended tools/dependencies:
+- Clock-controlled tests for high, medium, and low accountability paths.
+- Fixtures that verify silence never counts as approval.

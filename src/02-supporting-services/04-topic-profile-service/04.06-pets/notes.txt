@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Pet-care profile types for vet visits, medications, grooming, boarding, and shared awareness.
+- Responsible-adult mapping so care reminders reach the right thread.
+
+Recommended tools/dependencies:
+- Fixtures for overdue care, travel prep, and medication tracking.
+- Tests that keep tone warm, practical, and non-escalatory.

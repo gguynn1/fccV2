@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Calendar-specific profile types for appointments, reschedules, conflict checks, and follow-ups.
+- Date and time normalization that can support reminders and conflict detection.
+
+Recommended tools/dependencies:
+- Fixtures for single-person, couple, and family events.
+- Conflict-detection tests for overlapping appointments and reschedules.

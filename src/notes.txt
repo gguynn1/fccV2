@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Root configuration and state stores such as `system-config.ts` and `system-state.ts`.
+- Scenario-friendly bootstrapping so the whole system can start from a known state.
+
+Recommended tools/dependencies:
+- Scenario fixtures that exercise full end-to-end flows.
+- Shared validation helpers for configuration and state stores.

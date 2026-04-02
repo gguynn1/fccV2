@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Family-status snapshot types for ETA, location, and freshness/expiry windows.
+- Audience selection rules so status updates surface in the narrowest relevant thread.
+
+Recommended tools/dependencies:
+- Fixtures for expiring status entries and on-request snapshots.
+- Tests that keep updates brief, functional, and minimally proactive.

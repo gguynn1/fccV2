@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Topic and intent classification logic that reads content plus recent thread context.
+- Access to recent conversation history so short replies can be interpreted in context.
+- TopicKey-driven outputs that downstream services can trust.
+
+Recommended tools/dependencies:
+- Evaluation fixtures for ambiguous messages, forwarded content, and one-word replies.
+- A repeatable classification benchmark set for regression checking.

@@ -1,0 +1,8 @@
+Required tools/dependencies:
+- Respect service boundaries: no direct runtime imports from sibling services.
+- Confirmation-service outputs for approval-gated actions and expiry handling.
+- Pending confirmation state tied to the originating thread and exact requested action.
+
+Recommended tools/dependencies:
+- Tests for approval, rejection, and expiration flows.
+- Reply-parsing fixtures for short confirmations such as yes, no, and structured choices.

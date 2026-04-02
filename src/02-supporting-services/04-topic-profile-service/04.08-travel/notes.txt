@@ -1,0 +1,7 @@
+Required tools/dependencies:
+- Travel profile types for itineraries, checklists, countdown reminders, and post-trip follow-up.
+- Cross-topic links to calendar, pets, finances, and grocery concerns.
+
+Recommended tools/dependencies:
+- Fixtures for family, couple, and solo trips.
+- Tests that verify countdown-driven reminders and travel-linked dependencies.
