@@ -1,38 +1,56 @@
 {
+  "system": {
+    "timezone": "America/Denver",
+    "locale": "en-US",
+    "version": "0.1.0"
+  },
+
   "assistant": {
-    "phone": "+15551000000",
+    "messaging_identity": "+15551000000",
     "name": null,
-    "description": "Family coordination assistant. No name. One phone number. Identified as a contact in each family member's phone."
+    "description": "Family coordination assistant. No name. One messaging identity. Identified as a contact in each family member's phone."
   },
 
   "entities": [
     {
-      "id": "garrett",
+      "id": "participant_1",
       "type": "adult",
-      "name": "Garrett",
-      "phone": "+15551000001",
-      "permissions": ["approve_financial", "approve_sends", "modify_system", "assign_tasks", "view_all_topics"],
+      "name": "PARTICIPANT 1",
+      "messaging_identity": "+15551000001",
+      "permissions": [
+        "approve_financial",
+        "approve_sends",
+        "modify_system",
+        "assign_tasks",
+        "view_all_topics"
+      ],
       "digest": {
         "morning": "07:00",
         "evening": "20:00"
       }
     },
     {
-      "id": "sasha",
+      "id": "participant_2",
       "type": "adult",
-      "name": "Sasha",
-      "phone": "+15551000002",
-      "permissions": ["approve_financial", "approve_sends", "modify_system", "assign_tasks", "view_all_topics"],
+      "name": "PARTICIPANT 2",
+      "messaging_identity": "+15551000002",
+      "permissions": [
+        "approve_financial",
+        "approve_sends",
+        "modify_system",
+        "assign_tasks",
+        "view_all_topics"
+      ],
       "digest": {
         "morning": "07:00",
         "evening": "20:00"
       }
     },
     {
-      "id": "harrison",
+      "id": "participant_3",
       "type": "child",
-      "name": "Harrison",
-      "phone": "+15551000003",
+      "name": "PARTICIPANT 3",
+      "messaging_identity": "+15551000003",
       "permissions": ["complete_tasks", "add_items", "ask_questions"],
       "digest": {
         "morning": "07:30",
@@ -40,10 +58,10 @@
       }
     },
     {
-      "id": "tucker",
+      "id": "pet_1",
       "type": "pet",
-      "name": "Tucker",
-      "phone": null,
+      "name": "PET",
+      "messaging_identity": null,
       "permissions": [],
       "profile": {
         "species": "dog",
@@ -52,39 +70,39 @@
         "medications": [],
         "care_schedule": []
       },
-      "routes_to": ["garrett", "sasha"]
+      "routes_to": ["participant_1", "participant_2"]
     }
   ],
 
   "threads": [
     {
-      "id": "garrett_private",
+      "id": "participant_1_private",
       "type": "private",
-      "participants": ["garrett"],
-      "description": "Garrett's private thread with the assistant. Health, personal reminders, digests, drafts, review space."
+      "participants": ["participant_1"],
+      "description": "PARTICIPANT 1's private thread with the assistant. Health, personal reminders, digests, drafts, review space."
     },
     {
-      "id": "sasha_private",
+      "id": "participant_2_private",
       "type": "private",
-      "participants": ["sasha"],
-      "description": "Sasha's private thread. Photography, morning check-in, digests, drafts, review space."
+      "participants": ["participant_2"],
+      "description": "PARTICIPANT 2's private thread. Photography, morning check-in, digests, drafts, review space."
     },
     {
-      "id": "harrison_private",
+      "id": "participant_3_private",
       "type": "private",
-      "participants": ["harrison"],
-      "description": "Harrison's thread. Chore reminders, school nudges, his tasks."
+      "participants": ["participant_3"],
+      "description": "PARTICIPANT 3's thread. Chore reminders, school nudges, tasks."
     },
     {
       "id": "couple",
       "type": "shared",
-      "participants": ["sasha", "garrett"],
+      "participants": ["participant_1", "participant_2"],
       "description": "Couple thread. Finances, relationship, couple-level coordination."
     },
     {
       "id": "family",
       "type": "shared",
-      "participants": ["sasha", "garrett", "harrison"],
+      "participants": ["participant_1", "participant_2", "participant_3"],
       "description": "Family thread. Chores, grocery, travel, pets, general household."
     }
   ],
@@ -138,7 +156,7 @@
       "description": "Bills, expenses, savings goals, milestones, financial overview.",
       "routing": {
         "default": "couple",
-        "never": ["harrison_private", "family"]
+        "never": ["participant_3_private", "family"]
       },
       "behavior": {
         "tone": "calm, factual, neutral",
@@ -168,7 +186,15 @@
         "initiative": "low: maintain list, read back when asked, optional pre-shopping-day reminder"
       },
       "escalation": "none",
-      "sections": ["produce", "dairy", "meat", "pantry", "frozen", "household", "other"]
+      "sections": [
+        "produce",
+        "dairy",
+        "meat",
+        "pantry",
+        "frozen",
+        "household",
+        "other"
+      ]
     },
 
     "health": {
@@ -211,7 +237,7 @@
       "label": "School",
       "description": "Assignments, deadlines, school communications, academic tracking.",
       "routing": {
-        "student_tasks": "harrison_private",
+        "student_tasks": "participant_3_private",
         "parent_awareness": "relevant parent's private thread",
         "escalation": "parent's private thread"
       },
@@ -265,7 +291,7 @@
       "label": "Photography",
       "description": "Lead tracking, inquiry management, draft replies, booking status.",
       "routing": {
-        "default": "sasha_private"
+        "default": "participant_2_private"
       },
       "behavior": {
         "tone_internal": "professional and organized, business assistant",
@@ -283,15 +309,15 @@
       "description": "Connection prompts, quality-time ideas, appreciation nudges, conversation starters.",
       "routing": {
         "default": "couple",
-        "never": ["harrison_private", "family"]
+        "never": ["participant_3_private", "family"]
       },
       "behavior": {
         "tone": "warm, brief, never clinical",
         "format": "open-ended prompts, suggestions, appreciation exercises, conversation starters",
         "initiative": "softest of any topic: occasional nudges during quiet windows, never during busy or stressful periods, easy to ignore",
-        "framework": "draws on Gottman, emotionally focused approaches, attachment-based connection prompts — small bids, not therapy"
+        "framework": "draws on Internal Family Systems Therapy, emotionally focused approaches, attachment-based connection prompts — small bids, not therapy"
       },
-      "escalation": "none",
+      "escalation": "low",
       "on_ignored": "quietly disappear, try again in a few days with something different, never follow up, never guilt",
       "minimum_gap_between_nudges": "5d"
     },
@@ -309,7 +335,7 @@
         "format": "current snapshot, concise, old entries expire",
         "initiative": "minimal: may ask for ETA if calendar suggests transit, otherwise records what is volunteered"
       },
-      "escalation": "none",
+      "escalation": "low",
       "status_expiry": "6h"
     }
   },
@@ -318,15 +344,30 @@
     "priority_levels": {
       "immediate": {
         "description": "Time-sensitive. Send now regardless of batching.",
-        "examples": ["pickup in 30 min", "bill due today", "calendar conflict detected", "response to a direct question"]
+        "examples": [
+          "pickup in 30 min",
+          "bill due today",
+          "calendar conflict detected",
+          "response to a direct question"
+        ]
       },
       "batched": {
         "description": "Important but not urgent. Hold for next digest or quiet window.",
-        "examples": ["chore reminder for later today", "savings update", "school deadline in a few days", "post-appointment follow-up"]
+        "examples": [
+          "chore reminder for later today",
+          "savings update",
+          "school deadline in a few days",
+          "post-appointment follow-up"
+        ]
       },
       "silent": {
         "description": "Tracked internally. Surface only when asked.",
-        "examples": ["completed task log", "vendor history", "pet care log", "general status entry"]
+        "examples": [
+          "completed task log",
+          "vendor history",
+          "pet care log",
+          "general status entry"
+        ]
       }
     },
 
@@ -366,14 +407,14 @@
       "formats": ["1/2/3", "a/b/c", "yes/no"]
     },
     "reaction": {
-      "thumbs_up": "approve or mark done",
-      "thumbs_down": "reject or decline"
+      "positive": "approve or mark done",
+      "negative": "reject or decline"
     },
     "image": {
       "description": "Extract visible information. Ask one clarifying question if intent is unclear.",
       "examples": {
         "receipt_photo": "log as expense after confirmation",
-        "school_screenshot": "extract and track after confirmation"
+        "school_image": "extract and track after confirmation"
       }
     },
     "forwarded_content": {
@@ -411,7 +452,7 @@
       {
         "id": "forwarded_messages",
         "type": "forwarded",
-        "description": "Family member forwards a text or email to the assistant's number. Parse, classify, queue.",
+        "description": "Family member forwards a text or email to the assistant's messaging identity. Parse, classify, queue.",
         "active": true
       }
     ],
@@ -428,20 +469,66 @@
     "morning_digest": {
       "description": "Delivered to each person in their private thread. What's ahead, what's due, what's unresolved.",
       "times": {
-        "garrett": "07:00",
-        "sasha": "07:00",
-        "harrison": "07:30"
+        "participant_1": "07:00",
+        "participant_2": "07:00",
+        "participant_3": "07:30"
       }
     },
     "evening_checkin": {
       "description": "Brief check-in if anything is still open. Otherwise, nothing.",
       "times": {
-        "garrett": "20:00",
-        "sasha": "20:00",
-        "harrison": null
+        "participant_1": "20:00",
+        "participant_2": "20:00",
+        "participant_3": null
       }
     },
     "default_state": "quiet"
+  },
+
+  "worker": {
+    "processing_sequence": [
+      {
+        "step": 1,
+        "action": "classify_topic",
+        "service": "classifier",
+        "description": "Determine which of the 12 topics this item belongs to."
+      },
+      {
+        "step": 2,
+        "action": "identify_entities",
+        "service": "identity",
+        "description": "Identify which people or pets are involved."
+      },
+      {
+        "step": 3,
+        "action": "determine_action_type",
+        "description": "Is this a response, a proactive message, or internal storage?"
+      },
+      {
+        "step": 4,
+        "action": "check_outbound_budget",
+        "service": "budget",
+        "description": "Check if sending is within budget limits. If not, hold or batch."
+      },
+      {
+        "step": 5,
+        "action": "check_escalation",
+        "service": "escalation",
+        "description": "Determine if this item requires escalation based on topic profile."
+      },
+      {
+        "step": 6,
+        "action": "apply_behavior_profile",
+        "service": "topic_profile",
+        "description": "Apply tone, format, initiative style, and framework from the topic's behavior profile."
+      },
+      {
+        "step": 7,
+        "action": "route_and_dispatch",
+        "service": "routing",
+        "description": "Determine target thread, then dispatch (immediate), hold (batched), or store (silent)."
+      }
+    ]
   },
 
   "escalation_profiles": {
@@ -457,7 +544,7 @@
     },
     "medium": {
       "label": "Medium Accountability",
-      "applies_to": ["school", "health", "calendar"],
+      "applies_to": ["school", "health", "calendar", "travel"],
       "steps": [
         "message to responsible person",
         "one follow-up reminder",
@@ -476,11 +563,19 @@
     },
     "none": {
       "label": "No Escalation",
-      "applies_to": ["grocery", "vendors"],
-      "steps": [
-        "send once or store silently",
-        "no follow-up"
-      ]
+      "applies_to": ["grocery", "vendors", "photography"],
+      "steps": ["send once or store silently", "no follow-up"]
     }
+  },
+
+  "scenario_testing": {
+    "description": "Every scenario has five parts. Used for design validation and model refinement.",
+    "parts": [
+      "trigger — what initiates the scenario",
+      "expected_dispatch — what gets sent, to whom, when, how",
+      "expected_input_handling — what happens when the person responds or does not",
+      "escalation_check — does escalation apply, and at what level",
+      "collision_check — does this conflict with anything already pending or recently sent"
+    ]
   }
 }
