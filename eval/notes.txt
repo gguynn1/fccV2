@@ -1,0 +1,145 @@
+Eval and Auto-Tuning Utility
+
+Core Idea
+
+The system's expected behavior is already defined in CLAUDE.md files, topic profiles, and the five-part scenario framework (src/01-service-stack/CLAUDE.md lines 143-169). The eval tool closes the loop: run scenarios, compare actual vs expected, diagnose the failing service, generate a correction, re-run, verify.
+
+This is not prompt testing in isolation — it is end-to-end behavioral verification of the whole pipeline with an auto-correction feedback loop.
+
+Where It Lives
+
+eval/                          # Outside src/ — development/ops tool, not runtime
+├── vitest.config.ts           # Separate Vitest config (long timeouts, real API, sequential)
+├── scenarios/                 # Five-part scenario definitions
+│   ├── schema.ts              # Scenario type: trigger, expected dispatch, input handling, escalation, collision
+│   ├── classification/        # Topic classification scenarios
+│   ├── routing/               # Thread routing scenarios
+│   ├── composition/           # Message tone/format scenarios
+│   ├── escalation/            # Escalation behavior scenarios
+│   └── pipeline/              # Full multi-step end-to-end scenarios
+├── runners/                   # Execute scenarios through the pipeline
+│   ├── step.runner.ts         # Run a single worker step (classify, route, compose, etc.)
+│   └── pipeline.runner.ts     # Run a full scenario through all 7 worker steps
+├── scorers/                   # Compare actual vs expected
+│   ├── deterministic.ts       # Exact match: TopicKey, thread ID, priority, entity
+│   └── qualitative.ts         # LLM-as-judge: tone, format, helpfulness (Claude scores against the topic profile)
+├── tuner/                     # Auto-correction engine
+│   ├── diagnose.ts            # Identify which step failed and why
+│   ├── correct.ts             # Generate an improved prompt/config for that step
+│   └── verify.ts              # Re-run the scenario + full regression suite with the candidate
+├── prompts/                   # Prompt templates (versioned)
+│   ├── current/               # Active prompts (symlinked or copied from src/ at runtime)
+│   └── candidates/            # Generated corrections awaiting promotion
+├── reports/                   # Generated eval results (gitignored)
+└── README.md                  # How to run evals, interpret results, promote candidates
+
+The Feedback Loop
+
+Scenario Suite → Pipeline Runner → Scorer
+  ├── all pass → Done (no drift)
+  └── failures detected → Diagnoser
+        ├── step 1: wrong topic → Corrector
+        ├── step 6: wrong thread → Corrector
+        └── step 5: wrong tone → Corrector
+              → candidate prompt → Verifier
+                    ├── re-run failed + full suite → Scorer
+                    ├── passes all → Candidate for Promotion
+                    └── regression → Corrector (retry)
+
+Scenario Schema
+
+Mirrors the five-part framework already defined in the architecture, typed in TypeScript:
+
+  EvalScenario {
+    id: string
+    description: string
+    trigger: {
+      message: string
+      sender: string           — entity ID (participant_1, etc.)
+      thread: string           — originating thread ID
+      context?: string[]       — recent thread messages for ambiguous inputs
+    }
+    expected: {
+      topic: TopicKey
+      intent: string
+      target_thread: string
+      priority: DispatchPriority
+      tone_markers: string[]   — keywords the output should match (e.g., "direct", "factual")
+      escalation?: EscalationLevel
+      confirmation_required?: boolean
+    }
+    escalation_check?: {
+      silence_after_minutes: number
+      expected_step: string
+    }
+    collision_check?: {
+      concurrent_items: string[]
+      expected_batching: string
+    }
+  }
+
+This imports directly from src/ types — the eval tool shares the system's vocabulary.
+
+Vitest Configuration
+
+eval/vitest.config.ts needs different settings than unit tests:
+- Timeout: 60s per test (real API calls).
+- Sequential: pool forks, singleFork true — one scenario at a time to manage API rate limits.
+- Environment variables: real ANTHROPIC_API_KEY required.
+- Custom reporter: outputs a score summary per topic, per step, with pass/fail/regression counts.
+
+Run with: npx vitest --config eval/vitest.config.ts
+
+Package.json scripts:
+  "eval": "vitest --config eval/vitest.config.ts"
+  "eval:run": "vitest run --config eval/vitest.config.ts"
+
+Scoring
+
+Deterministic (pass/fail, no ambiguity):
+- Topic classification matches expected TopicKey.
+- Target thread matches expected thread ID.
+- Priority matches expected DispatchPriority.
+- Entities involved match expected set.
+- Confirmation required matches expected boolean.
+
+Qualitative (LLM-as-judge):
+- A second Claude call scores the generated message against the topic profile's tone/format/initiative spec from the CLAUDE.md.
+- Rubric: "Given this topic profile, does this message match the expected tone? Score 1-5 with reasoning."
+- Threshold: score >= 4 passes, 3 = warning, <= 2 = failure.
+
+Auto-Correction (the Tuner)
+
+When a scenario fails, the tuner:
+1. Diagnoses which worker step produced the wrong output (classify? route? compose?) by running each step in isolation and checking outputs.
+2. Generates a correction by calling Claude with: "Here is the current prompt for [step]. Here is the input. Here is the actual output. Here is the expected output. The topic profile says [tone/behavior]. Suggest a specific change to the prompt that would produce the correct output."
+3. Applies the correction to a candidate copy of the prompt (never modifies src/ directly).
+4. Re-runs the failed scenario with the candidate prompt.
+5. Runs the full regression suite to make sure the fix doesn't break other scenarios.
+6. Reports the candidate: what changed, which scenario it fixes, regression results.
+
+Candidates live in eval/prompts/candidates/. Promotion to src/ is a manual step — the developer reviews the candidate, agrees with the change, and copies it into the runtime prompt.
+
+What Gets Tuned
+
+The system's behavior is governed by three things the tuner can adjust:
+- System prompts: the instructions given to Claude for classification, composition, extraction.
+- Few-shot examples: example input/output pairs in the prompts.
+- Topic profile descriptions: the tone/format/initiative text that feeds into composition prompts.
+
+The tuner generates candidates for any of these. It does NOT modify runtime code, routing logic, or escalation state machines — those are code changes, not model refinements.
+
+Integration with Existing Architecture
+
+- eval/ imports types from src/ (TopicKey, DispatchPriority, Entity, etc.) but never modifies src/.
+- Scenarios encode the same five-part structure documented in src/01-service-stack/CLAUDE.md.
+- The ScenarioTesting interface already in src/index.ts can be extended to reference eval scenario IDs.
+- Topic profile CLAUDE.md files serve as the behavioral spec that the qualitative scorer judges against.
+
+Cost Management
+
+- Real Claude API calls cost money. Each scenario = 1-3 API calls (classify + compose + maybe judge).
+- A full suite of 50 scenarios ~ 150 calls ~ $0.50-2.00 per run (depending on model).
+- Tuning runs multiply this by the number of candidate variants.
+- Use claude-haiku for scoring/judging calls (cheap, fast) and claude-sonnet for the actual pipeline calls.
+- Cache deterministic inputs — same message + same prompt = same classification, no need to re-call.
