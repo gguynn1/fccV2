@@ -1,0 +1,551 @@
+{
+  "metadata": {
+    "snapshot_time": "2026-04-02T14:30:00-07:00",
+    "description": "Current state of all tracked items, pending actions, and active records."
+  },
+
+  "queue": {
+    "pending": [
+      {
+        "id": "q_001",
+        "source": "scheduled_trigger",
+        "type": "outbound",
+        "topic": "chores",
+        "concerning": ["harrison"],
+        "content": "Follow-up: trash was due by 5pm, not marked complete",
+        "priority": "immediate",
+        "target_thread": "harrison_private",
+        "created_at": "2026-04-02T17:01:00-07:00",
+        "escalation_step": 2
+      },
+      {
+        "id": "q_002",
+        "source": "scheduled_trigger",
+        "type": "outbound",
+        "topic": "health",
+        "concerning": ["garrett"],
+        "content": "Post-appointment follow-up: any notes from today's dentist visit?",
+        "priority": "batched",
+        "target_thread": "garrett_private",
+        "created_at": "2026-04-02T14:00:00-07:00",
+        "hold_until": "2026-04-02T16:00:00-07:00"
+      },
+      {
+        "id": "q_003",
+        "source": "email_monitor",
+        "type": "inbound",
+        "topic": "school",
+        "concerning": ["harrison"],
+        "content": {
+          "from": "teacher@school.edu",
+          "subject": "Science project due April 10",
+          "extracted": {
+            "assignment": "Science fair project — research phase",
+            "due_date": "2026-04-10",
+            "details": "Topic selection due by April 5, full project April 10"
+          }
+        },
+        "created_at": "2026-04-02T13:45:00-07:00",
+        "status": "pending_classification"
+      }
+    ],
+
+    "recently_dispatched": [
+      {
+        "id": "q_000a",
+        "topic": "calendar",
+        "target_thread": "garrett_private",
+        "content": "Reminder: dentist appointment today at 2pm at Smile Dental",
+        "dispatched_at": "2026-04-02T08:00:00-07:00",
+        "priority": "batched",
+        "included_in": "morning_digest"
+      },
+      {
+        "id": "q_000b",
+        "topic": "chores",
+        "target_thread": "harrison_private",
+        "content": "Harrison: trash needs to go out by 5pm today",
+        "dispatched_at": "2026-04-02T15:00:00-07:00",
+        "priority": "immediate",
+        "response_received": false,
+        "escalation_step": 1
+      }
+    ]
+  },
+
+  "calendar": {
+    "events": [
+      {
+        "id": "cal_001",
+        "title": "Garrett dentist appointment",
+        "date": "2026-04-02",
+        "time": "14:00",
+        "location": "Smile Dental",
+        "concerning": ["garrett"],
+        "topic": "health",
+        "status": "completed",
+        "follow_up_due": "2026-04-02T16:00:00-07:00",
+        "follow_up_sent": false,
+        "created_by": "sasha",
+        "created_in_thread": "couple",
+        "created_at": "2026-03-28T09:00:00-07:00"
+      },
+      {
+        "id": "cal_002",
+        "title": "Harrison science project — topic selection",
+        "date": "2026-04-05",
+        "time": null,
+        "location": null,
+        "concerning": ["harrison"],
+        "topic": "school",
+        "status": "upcoming",
+        "created_by": "email_monitor",
+        "created_at": "2026-04-02T13:45:00-07:00"
+      },
+      {
+        "id": "cal_003",
+        "title": "Family dinner at Grandma's",
+        "date": "2026-04-06",
+        "time": "17:00",
+        "location": "Grandma's house",
+        "concerning": ["garrett", "sasha", "harrison"],
+        "topic": "calendar",
+        "status": "upcoming",
+        "created_by": "garrett",
+        "created_in_thread": "family",
+        "created_at": "2026-04-01T19:00:00-07:00"
+      },
+      {
+        "id": "cal_004",
+        "title": "Tucker annual vet checkup",
+        "date": "2026-04-14",
+        "time": "10:00",
+        "location": "Pawsome Vet Clinic",
+        "concerning": ["tucker"],
+        "topic": "pets",
+        "responsible": "sasha",
+        "status": "upcoming",
+        "created_by": "sasha",
+        "created_in_thread": "sasha_private",
+        "created_at": "2026-04-01T10:00:00-07:00"
+      },
+      {
+        "id": "cal_005",
+        "title": "Maui trip",
+        "date_start": "2026-06-15",
+        "date_end": "2026-06-22",
+        "concerning": ["garrett", "sasha", "harrison"],
+        "topic": "travel",
+        "status": "planning",
+        "created_by": "garrett",
+        "created_in_thread": "family",
+        "created_at": "2026-03-15T20:00:00-07:00"
+      }
+    ]
+  },
+
+  "chores": {
+    "active": [
+      {
+        "id": "chore_001",
+        "task": "Take out the trash",
+        "assigned_to": "harrison",
+        "assigned_by": "garrett",
+        "assigned_in_thread": "family",
+        "due": "2026-04-02T17:00:00-07:00",
+        "status": "overdue",
+        "escalation_step": 2,
+        "history": [
+          {"event": "assigned", "at": "2026-04-02T08:00:00-07:00"},
+          {"event": "reminder_sent", "at": "2026-04-02T15:00:00-07:00", "thread": "harrison_private"},
+          {"event": "deadline_passed", "at": "2026-04-02T17:00:00-07:00"},
+          {"event": "follow_up_sent", "at": "2026-04-02T17:01:00-07:00", "thread": "harrison_private"}
+        ]
+      },
+      {
+        "id": "chore_002",
+        "task": "Unload dishwasher",
+        "assigned_to": "harrison",
+        "assigned_by": "sasha",
+        "assigned_in_thread": "family",
+        "due": "2026-04-03T10:00:00-07:00",
+        "status": "pending",
+        "escalation_step": 0
+      }
+    ],
+    "completed_recent": [
+      {
+        "id": "chore_000",
+        "task": "Mow the lawn",
+        "assigned_to": "garrett",
+        "completed_at": "2026-03-30T16:30:00-07:00",
+        "completed_via": "text",
+        "response": "Done"
+      }
+    ]
+  },
+
+  "finances": {
+    "bills": [
+      {
+        "id": "bill_001",
+        "name": "Mortgage",
+        "amount": 2450.00,
+        "due_date": "2026-04-15",
+        "status": "upcoming",
+        "reminder_sent": false,
+        "recurring": "monthly"
+      },
+      {
+        "id": "bill_002",
+        "name": "Electric bill",
+        "amount": 187.50,
+        "due_date": "2026-04-08",
+        "status": "upcoming",
+        "reminder_sent": false,
+        "recurring": "monthly"
+      },
+      {
+        "id": "bill_003",
+        "name": "Internet",
+        "amount": 79.99,
+        "due_date": "2026-04-05",
+        "status": "upcoming",
+        "reminder_sent": true,
+        "reminder_sent_at": "2026-04-02T07:00:00-07:00",
+        "recurring": "monthly"
+      }
+    ],
+    "expenses_recent": [
+      {
+        "id": "exp_001",
+        "description": "Target — household supplies",
+        "amount": 47.32,
+        "date": "2026-04-01",
+        "logged_by": "sasha",
+        "logged_via": "image",
+        "confirmed": true
+      },
+      {
+        "id": "exp_002",
+        "description": "Gas station",
+        "amount": 62.10,
+        "date": "2026-03-31",
+        "logged_by": "garrett",
+        "logged_via": "text",
+        "confirmed": true
+      }
+    ],
+    "savings_goals": [
+      {
+        "id": "savings_001",
+        "name": "Maui trip",
+        "target": 5000.00,
+        "current": 3700.00,
+        "percent": 74,
+        "deadline": "2026-06-01",
+        "last_contribution": {
+          "amount": 500.00,
+          "date": "2026-03-28",
+          "logged_by": "garrett"
+        },
+        "pace_status": "on_track"
+      },
+      {
+        "id": "savings_002",
+        "name": "Emergency fund",
+        "target": 10000.00,
+        "current": 6200.00,
+        "percent": 62,
+        "deadline": null,
+        "pace_status": "steady"
+      }
+    ]
+  },
+
+  "grocery": {
+    "list": [
+      {"id": "groc_001", "item": "Milk", "section": "dairy", "added_by": "sasha", "added_at": "2026-04-01T18:00:00-07:00"},
+      {"id": "groc_002", "item": "Eggs", "section": "dairy", "added_by": "garrett", "added_at": "2026-04-02T07:30:00-07:00"},
+      {"id": "groc_003", "item": "Chicken breast", "section": "meat", "added_by": "sasha", "added_at": "2026-04-01T18:00:00-07:00"},
+      {"id": "groc_004", "item": "Bananas", "section": "produce", "added_by": "harrison", "added_at": "2026-04-02T08:00:00-07:00"},
+      {"id": "groc_005", "item": "Bread", "section": "pantry", "added_by": "sasha", "added_at": "2026-04-02T10:00:00-07:00"},
+      {"id": "groc_006", "item": "Dish soap", "section": "household", "added_by": "garrett", "added_at": "2026-04-02T12:00:00-07:00"}
+    ],
+    "recently_purchased": [
+      {"item": "Pasta", "purchased_by": "sasha", "purchased_at": "2026-03-30T14:00:00-07:00"},
+      {"item": "Tomato sauce", "purchased_by": "sasha", "purchased_at": "2026-03-30T14:00:00-07:00"}
+    ]
+  },
+
+  "health": {
+    "profiles": [
+      {
+        "entity": "garrett",
+        "medications": [
+          {"name": "Vitamin D", "dosage": "2000 IU", "frequency": "daily", "reminder": false}
+        ],
+        "allergies": ["penicillin"],
+        "providers": [
+          {"type": "dentist", "name": "Dr. Chen", "location": "Smile Dental", "last_visit": "2026-04-02"},
+          {"type": "primary", "name": "Dr. Patel", "location": "Family Medical Group", "last_visit": "2025-11-15"}
+        ],
+        "upcoming_appointments": ["cal_001"],
+        "notes": []
+      },
+      {
+        "entity": "sasha",
+        "medications": [],
+        "allergies": [],
+        "providers": [
+          {"type": "primary", "name": "Dr. Rivera", "location": "Wellness Clinic", "last_visit": "2026-01-20"}
+        ],
+        "upcoming_appointments": [],
+        "notes": []
+      }
+    ]
+  },
+
+  "pets": {
+    "profiles": [
+      {
+        "entity": "tucker",
+        "species": "dog",
+        "vet": "Pawsome Vet Clinic",
+        "last_vet_visit": "2025-05-10",
+        "medications": [],
+        "care_log_recent": [
+          {"activity": "walk", "by": "garrett", "at": "2026-04-02T06:30:00-07:00"},
+          {"activity": "fed breakfast", "by": "harrison", "at": "2026-04-02T07:00:00-07:00"},
+          {"activity": "walk", "by": "sasha", "at": "2026-04-01T17:00:00-07:00"},
+          {"activity": "grooming", "by": "sasha", "at": "2026-03-29T10:00:00-07:00"}
+        ],
+        "upcoming": ["cal_004"],
+        "notes": ["Needs flea treatment before summer"]
+      }
+    ]
+  },
+
+  "school": {
+    "students": [
+      {
+        "entity": "harrison",
+        "assignments": [
+          {
+            "id": "school_001",
+            "title": "Science fair project — topic selection",
+            "due_date": "2026-04-05",
+            "status": "not_started",
+            "source": "email_monitor",
+            "parent_notified": false
+          },
+          {
+            "id": "school_002",
+            "title": "Science fair project — full project",
+            "due_date": "2026-04-10",
+            "status": "not_started",
+            "source": "email_monitor",
+            "parent_notified": false
+          },
+          {
+            "id": "school_003",
+            "title": "Math homework chapter 7",
+            "due_date": "2026-04-03",
+            "status": "in_progress",
+            "source": "harrison",
+            "parent_notified": false
+          }
+        ],
+        "completed_recent": [
+          {
+            "title": "English essay — personal narrative",
+            "completed_at": "2026-03-31T20:00:00-07:00",
+            "completed_via": "text"
+          }
+        ]
+      }
+    ]
+  },
+
+  "travel": {
+    "trips": [
+      {
+        "id": "trip_001",
+        "name": "Maui trip",
+        "dates": {"start": "2026-06-15", "end": "2026-06-22"},
+        "travelers": ["garrett", "sasha", "harrison"],
+        "status": "planning",
+        "checklist": [
+          {"item": "Book flights", "status": "done", "completed_at": "2026-03-20T12:00:00-07:00"},
+          {"item": "Book hotel", "status": "done", "completed_at": "2026-03-22T15:00:00-07:00"},
+          {"item": "Arrange pet boarding for Tucker", "status": "not_started", "topic_link": "pets"},
+          {"item": "Request time off work", "status": "done", "completed_at": "2026-03-18T09:00:00-07:00"},
+          {"item": "Pack sunscreen and snorkel gear", "status": "not_started"},
+          {"item": "Set up mail hold", "status": "not_started"},
+          {"item": "Confirm car rental", "status": "not_started"}
+        ],
+        "budget_link": "savings_001",
+        "notes": ["Harrison wants to try surfing lessons", "Check if hotel has airport shuttle"]
+      }
+    ]
+  },
+
+  "vendors": {
+    "records": [
+      {
+        "id": "vendor_001",
+        "name": "Mike's Plumbing",
+        "type": "plumber",
+        "jobs": [
+          {
+            "description": "Fixed kitchen sink leak",
+            "date": "2026-02-10",
+            "cost": 275.00,
+            "status": "completed",
+            "notes": "Good work, arrived on time"
+          }
+        ],
+        "contact": "555-0199",
+        "managed_by": "garrett",
+        "follow_up_pending": false
+      },
+      {
+        "id": "vendor_002",
+        "name": "Green Thumb Landscaping",
+        "type": "landscaper",
+        "jobs": [
+          {
+            "description": "Spring yard cleanup quote",
+            "date": "2026-03-25",
+            "cost": null,
+            "status": "waiting_for_quote",
+            "notes": "Said they'd send quote by end of week"
+          }
+        ],
+        "contact": "555-0234",
+        "managed_by": "garrett",
+        "follow_up_pending": true,
+        "follow_up_due": "2026-04-04"
+      }
+    ]
+  },
+
+  "photography": {
+    "leads": [
+      {
+        "id": "photo_001",
+        "client_name": "Jessica M.",
+        "inquiry_date": "2026-03-28",
+        "event_type": "family portrait session",
+        "event_date": "2026-05-10",
+        "status": "awaiting_reply",
+        "last_contact": "2026-03-29T10:00:00-07:00",
+        "draft_reply": null,
+        "follow_up_due": "2026-04-03",
+        "notes": "Wants outdoor location, 2 kids under 5"
+      },
+      {
+        "id": "photo_002",
+        "client_name": "Mark and Dana",
+        "inquiry_date": "2026-04-01",
+        "event_type": "engagement shoot",
+        "event_date": null,
+        "status": "new",
+        "last_contact": "2026-04-01T14:00:00-07:00",
+        "draft_reply": "Hi Mark and Dana! Thank you so much for reaching out. I'd love to hear more about what you're envisioning for your engagement session. Do you have a preferred location or timeframe in mind?",
+        "draft_approved": false,
+        "notes": "Found via Instagram"
+      }
+    ]
+  },
+
+  "relationship": {
+    "last_nudge": {
+      "date": "2026-03-27",
+      "thread": "couple",
+      "content": "Busy week — what's one thing you appreciated about each other?",
+      "response_received": true
+    },
+    "next_nudge_eligible": "2026-04-01",
+    "nudge_history": [
+      {"date": "2026-03-27", "type": "appreciation_prompt", "responded": true},
+      {"date": "2026-03-20", "type": "date_night_suggestion", "responded": false},
+      {"date": "2026-03-13", "type": "conversation_starter", "responded": true}
+    ]
+  },
+
+  "family_status": {
+    "current": [
+      {
+        "entity": "garrett",
+        "status": "At dentist appointment",
+        "updated_at": "2026-04-02T13:45:00-07:00",
+        "expires_at": "2026-04-02T19:45:00-07:00"
+      },
+      {
+        "entity": "sasha",
+        "status": "Working from home",
+        "updated_at": "2026-04-02T08:30:00-07:00",
+        "expires_at": "2026-04-02T14:30:00-07:00"
+      }
+    ]
+  },
+
+  "confirmations": {
+    "pending": [
+      {
+        "id": "confirm_001",
+        "type": "financial_action",
+        "action": "Mark internet bill ($79.99) as paid",
+        "requested_by": "garrett",
+        "requested_in_thread": "couple",
+        "requested_at": "2026-04-02T14:15:00-07:00",
+        "expires_at": "2026-04-02T14:20:00-07:00",
+        "status": "waiting"
+      }
+    ],
+    "recent": [
+      {
+        "id": "confirm_000",
+        "type": "sending_on_behalf",
+        "action": "Send draft reply to Mark and Dana (photography inquiry)",
+        "requested_by": "sasha",
+        "result": "not_yet_approved",
+        "requested_at": "2026-04-01T15:00:00-07:00"
+      }
+    ]
+  },
+
+  "digests": {
+    "last_morning": {
+      "garrett": {
+        "delivered_at": "2026-04-02T07:00:00-07:00",
+        "thread": "garrett_private",
+        "included": [
+          "Dentist at 2pm today at Smile Dental",
+          "Internet bill due April 5 ($79.99)",
+          "Vendor follow-up: Green Thumb Landscaping quote still pending",
+          "Maui savings at 74% — on track"
+        ]
+      },
+      "sasha": {
+        "delivered_at": "2026-04-02T07:00:00-07:00",
+        "thread": "sasha_private",
+        "included": [
+          "Tucker vet checkup April 14 at 10am",
+          "Photography: new lead from Mark and Dana — draft reply ready for review",
+          "Photography: Jessica M. follow-up due tomorrow",
+          "Grocery list has 6 items"
+        ]
+      },
+      "harrison": {
+        "delivered_at": "2026-04-02T07:30:00-07:00",
+        "thread": "harrison_private",
+        "included": [
+          "Math homework chapter 7 due tomorrow",
+          "Trash needs to go out by 5pm today"
+        ]
+      }
+    }
+  }
+}
