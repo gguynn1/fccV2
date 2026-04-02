@@ -1,3 +1,8 @@
+export interface TopicDisambiguationRule {
+  close_topics: string[];
+  guidance: string;
+}
+
 export interface InputRecognition {
   text: { description: string };
   structured_choice: { description: string; formats: string[] };
@@ -8,5 +13,9 @@ export interface InputRecognition {
     high_accountability: string;
     low_accountability: string;
     never: string;
+  };
+  topic_disambiguation: {
+    description: string;
+    rules: TopicDisambiguationRule[];
   };
 }

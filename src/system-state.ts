@@ -19,11 +19,16 @@ import {
   ChecklistItemStatus,
   TripStatus,
   VendorJobStatus,
-  PhotoLeadStatus,
+  BusinessLeadStatus,
   NudgeType,
   ConfirmationResult,
   EscalationStepAction,
   HealthProviderType,
+  MealType,
+  MealPlanStatus,
+  MaintenanceAssetType,
+  MaintenanceInterval,
+  MaintenanceStatus,
 } from "./index.js";
 
 export const systemState: SystemState = {
@@ -682,27 +687,37 @@ export const systemState: SystemState = {
     ],
   },
 
-  photography: {
+  business: {
+    profiles: [
+      {
+        entity: "participant_2",
+        business_type: "photography",
+        business_name: "Portrait & event photography",
+        follow_up_quiet_period: "48h",
+      },
+    ],
     leads: [
       {
-        id: "photo_001",
+        id: "biz_001",
+        owner: "participant_2",
         client_name: "Jessica M.",
         inquiry_date: new Date("2026-03-28"),
         event_type: "family portrait session",
         event_date: new Date("2026-05-10"),
-        status: PhotoLeadStatus.AwaitingReply,
+        status: BusinessLeadStatus.AwaitingReply,
         last_contact: new Date("2026-03-29T10:00:00-07:00"),
         draft_reply: null,
         follow_up_due: new Date("2026-04-03"),
         notes: "Wants outdoor location, 2 kids under 5",
       },
       {
-        id: "photo_002",
+        id: "biz_002",
+        owner: "participant_2",
         client_name: "Mark and Dana",
         inquiry_date: new Date("2026-04-01"),
         event_type: "engagement shoot",
         event_date: null,
-        status: PhotoLeadStatus.New,
+        status: BusinessLeadStatus.New,
         last_contact: new Date("2026-04-01T14:00:00-07:00"),
         draft_reply:
           "Hi Mark and Dana! Thank you so much for reaching out. I'd love to hear more about what you're envisioning for your engagement session. Do you have a preferred location or timeframe in mind?",
@@ -750,6 +765,83 @@ export const systemState: SystemState = {
     ],
   },
 
+  meals: {
+    planned: [
+      {
+        id: "meal_001",
+        date: new Date("2026-04-02"),
+        meal_type: MealType.Dinner,
+        description: "Tacos — ground beef, tortillas, cheese, salsa",
+        planned_by: "participant_2",
+        status: MealPlanStatus.Planned,
+        grocery_items_linked: ["ground beef", "tortillas", "shredded cheese", "salsa"],
+      },
+      {
+        id: "meal_002",
+        date: new Date("2026-04-03"),
+        meal_type: MealType.Dinner,
+        description: "Pasta with marinara and garlic bread",
+        planned_by: "participant_1",
+        status: MealPlanStatus.Planned,
+      },
+    ],
+    dietary_notes: [
+      {
+        entity: "participant_3",
+        note: "No mushrooms",
+        added_at: new Date("2026-03-15T10:00:00-07:00"),
+      },
+    ],
+  },
+
+  maintenance: {
+    assets: [
+      {
+        id: "asset_001",
+        type: MaintenanceAssetType.Vehicle,
+        name: "Family SUV",
+        details: { year: "2022", make: "Toyota", model: "Highlander" },
+      },
+      {
+        id: "asset_002",
+        type: MaintenanceAssetType.Home,
+        name: "Primary residence",
+        details: {},
+      },
+    ],
+    items: [
+      {
+        id: "maint_001",
+        asset_id: "asset_001",
+        task: "Oil change",
+        interval: MaintenanceInterval.Quarterly,
+        last_performed: new Date("2026-01-15"),
+        next_due: new Date("2026-04-15"),
+        responsible: "participant_1",
+        status: MaintenanceStatus.DueSoon,
+        history: [
+          {
+            date: new Date("2026-01-15"),
+            performed_by: "participant_1",
+            cost: 75,
+            notes: "Full synthetic at dealership",
+          },
+        ],
+      },
+      {
+        id: "maint_002",
+        asset_id: "asset_002",
+        task: "HVAC filter replacement",
+        interval: MaintenanceInterval.Quarterly,
+        last_performed: new Date("2025-12-01"),
+        next_due: new Date("2026-03-01"),
+        responsible: "participant_1",
+        status: MaintenanceStatus.Overdue,
+        history: [],
+      },
+    ],
+  },
+
   confirmations: {
     pending: [],
     recent: [
@@ -766,7 +858,7 @@ export const systemState: SystemState = {
       {
         id: "confirm_000",
         type: ConfirmationActionType.SendingOnBehalf,
-        action: "Send draft reply to Mark and Dana (photography inquiry)",
+        action: "Send draft reply to Mark and Dana (business inquiry)",
         requested_by: "participant_2",
         result: ConfirmationResult.NotYetApproved,
         requested_at: new Date("2026-04-01T15:00:00-07:00"),
@@ -822,14 +914,14 @@ export const systemState: SystemState = {
       ],
     },
     participant_2_private: {
-      active_topic_context: "photography",
+      active_topic_context: "business",
       last_activity: new Date("2026-04-02T10:05:12-07:00"),
       recent_messages: [
         {
           id: "msg_201",
           from: "assistant",
           content:
-            "Good morning. Here's your update:\n- PET vet checkup April 14 at 10am\n- Photography: new lead from Mark and Dana — draft reply ready for review\n- Photography: Jessica M. follow-up due tomorrow\n- Grocery list has 6 items",
+            "Good morning. Here's your update:\n- PET vet checkup April 14 at 10am\n- Business: new lead from Mark and Dana — draft reply ready for review\n- Business: Jessica M. follow-up due tomorrow\n- Grocery list has 6 items",
           at: new Date("2026-04-02T07:00:00-07:00"),
           topic_context: "digest",
           dispatch_ref: "digest_p2",
@@ -839,7 +931,7 @@ export const systemState: SystemState = {
           from: "participant_2",
           content: "Show me the draft for Mark and Dana",
           at: new Date("2026-04-02T10:04:00-07:00"),
-          topic_context: "photography",
+          topic_context: "business",
         },
         {
           id: "msg_203",
@@ -847,15 +939,15 @@ export const systemState: SystemState = {
           content:
             "Here's the draft:\n\n\"Hi Mark and Dana! Thank you so much for reaching out. I'd love to hear more about what you're envisioning for your engagement session. Do you have a preferred location or timeframe in mind?\"\n\nWant me to send it, edit it, or hold off?",
           at: new Date("2026-04-02T10:04:06-07:00"),
-          topic_context: "photography",
-          state_ref: "photo_002",
+          topic_context: "business",
+          state_ref: "biz_002",
         },
         {
           id: "msg_204",
           from: "participant_2",
           content: "Hold off for now, I want to tweak the wording later",
           at: new Date("2026-04-02T10:05:12-07:00"),
-          topic_context: "photography",
+          topic_context: "business",
         },
       ],
     },
@@ -996,11 +1088,11 @@ export const systemState: SystemState = {
         {
           source_id: "fwd_001",
           from: "participant_2",
-          content_type: "photography_inquiry",
+          content_type: "business_inquiry",
           received_at: new Date("2026-04-01T14:00:00-07:00"),
           processed_at: new Date("2026-04-01T14:00:05-07:00"),
-          topic_classified: "photography",
-          state_ref: "photo_002",
+          topic_classified: "business",
+          state_ref: "biz_002",
         },
       ],
       total_processed: 4,
@@ -1027,8 +1119,8 @@ export const systemState: SystemState = {
             thread: "participant_2_private",
             included: [
               "PET vet checkup April 14 at 10am",
-              "Photography: new lead from Mark and Dana — draft reply ready for review",
-              "Photography: Jessica M. follow-up due tomorrow",
+              "Business: new lead from Mark and Dana — draft reply ready for review",
+              "Business: Jessica M. follow-up due tomorrow",
               "Grocery list has 6 items",
             ],
           },
@@ -1059,7 +1151,7 @@ export const systemState: SystemState = {
             delivered_at: new Date("2026-04-01T07:00:00-07:00"),
             thread: "participant_2_private",
             included: [
-              "New photography inquiry from Mark and Dana",
+              "New business inquiry from Mark and Dana",
               "Jessica M. follow-up: no response yet (inquiry 3 days ago)",
               "PET vet checkup in 13 days",
             ],
@@ -1085,7 +1177,7 @@ export const systemState: SystemState = {
           participant_2: {
             delivered_at: new Date("2026-04-01T20:00:00-07:00"),
             thread: "participant_2_private",
-            included: ["Photography draft reply for Mark and Dana ready for review"],
+            included: ["Business draft reply for Mark and Dana ready for review"],
           },
         },
       },

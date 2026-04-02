@@ -9,17 +9,19 @@ All external data enters through three doors: phone messages, email parsing, or 
 
 ## Input Patterns by Domain
 
-| Domain      | Input method                         | Explicitly excluded                                   |
-| ----------- | ------------------------------------ | ----------------------------------------------------- |
-| Calendar    | Email parsing + conversational input | Google Calendar API, tsdav, any external calendar API |
-| School      | Email parsing + conversational input | Canvas, Google Classroom, any LMS API                 |
-| Finances    | Email parsing + conversational input | Plaid, any bank/financial API                         |
-| Travel      | Email parsing + conversational input | FlightAware, AeroAPI, any flight/booking API          |
-| Photography | Email parsing + conversational input | HoneyBook, Dubsado, 17hats, any external CRM          |
+| Domain      | Input method                         | Explicitly excluded                                        |
+| ----------- | ------------------------------------ | ---------------------------------------------------------- |
+| Calendar    | Email parsing + conversational input | Google Calendar API, tsdav, any external calendar API      |
+| School      | Email parsing + conversational input | Canvas, Google Classroom, any LMS API                      |
+| Finances    | Email parsing + conversational input | Plaid, any bank/financial API                              |
+| Travel      | Email parsing + conversational input | FlightAware, AeroAPI, any flight/booking API               |
+| Business    | Email parsing + conversational input | HoneyBook, Dubsado, 17hats, any external CRM               |
+| Meals       | Conversational input                 | Spoonacular, Edamam, any recipe/meal planning API          |
+| Maintenance | Conversational input                 | CarFax, HomeZada, any vehicle/home maintenance service API |
 
-## Photography CRM
+## Business CRM
 
-Photography lead tracking uses an internal CRM schema owned by the topic profile — not an external CRM service. The schema covers: lead contact, inquiry date, event details, pipeline stage, follow-up history, and booking status.
+Business lead tracking uses an internal CRM schema owned by the topic profile — not an external CRM service. The schema covers: lead contact, inquiry date, event details, pipeline stage, follow-up history, and booking status. Each entity with a service business gets a profile; leads are scoped to their owner.
 
 ## Calendar Serving
 

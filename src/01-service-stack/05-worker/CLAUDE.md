@@ -65,7 +65,7 @@ STEP 1 — What topic is this?
          School
          Travel
          Vendors
-         Photography
+         Business
          Relationship
          Family Status
          |

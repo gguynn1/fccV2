@@ -108,7 +108,7 @@ export const systemConfig: SystemConfig = {
       type: ThreadType.Private,
       participants: ["participant_2"],
       description:
-        "PARTICIPANT 2's private thread. Photography, morning check-in, digests, drafts, review space.",
+        "PARTICIPANT 2's private thread. Business leads, morning check-in, digests, drafts, review space.",
     },
     {
       id: "participant_3_private",
@@ -150,6 +150,12 @@ export const systemConfig: SystemConfig = {
         follow_up_after: "2h",
         conflict_detection: true,
       },
+      cross_topic_connections: [
+        TopicKey.Health,
+        TopicKey.Travel,
+        TopicKey.School,
+        TopicKey.Business,
+      ],
     },
 
     chores: {
@@ -219,6 +225,7 @@ export const systemConfig: SystemConfig = {
         GrocerySection.Household,
         GrocerySection.Other,
       ],
+      cross_topic_connections: [TopicKey.Meals],
     },
 
     health: {
@@ -241,6 +248,7 @@ export const systemConfig: SystemConfig = {
         medication_reminder: "as configured per medication",
         routine_checkup_flag: "11 months since last visit",
       },
+      cross_topic_connections: [TopicKey.Calendar],
     },
 
     pets: {
@@ -257,6 +265,7 @@ export const systemConfig: SystemConfig = {
           "gentle: periodic reminders for overdue care, pre-travel checklists, medication tracking",
       },
       escalation: EscalationLevel.Low,
+      cross_topic_connections: [TopicKey.Calendar, TopicKey.Vendors],
     },
 
     school: {
@@ -281,6 +290,7 @@ export const systemConfig: SystemConfig = {
         escalate_to_parent: "day of deadline if not complete",
         flag_in_digest: true,
       },
+      cross_topic_connections: [TopicKey.Calendar],
     },
 
     travel: {
@@ -319,24 +329,27 @@ export const systemConfig: SystemConfig = {
           "follow-up-driven: remind when a vendor hasn't responded within expected window",
       },
       escalation: EscalationLevel.None,
+      cross_topic_connections: [TopicKey.Finances, TopicKey.Maintenance],
     },
 
-    photography: {
-      label: "Photography",
-      description: "Lead tracking, inquiry management, draft replies, booking status.",
+    business: {
+      label: "Business",
+      description:
+        "Per-entity service business tracking. Lead pipeline, inquiry management, draft replies, booking status.",
       routing: {
-        default: "participant_2_private",
+        default: "business owner's private thread",
       },
       behavior: {
         tone_internal: "professional and organized, business assistant",
-        tone_client_drafts: "professional and warm, client-facing",
+        tone_client_drafts:
+          "professional and adapted to business type — warm for client-facing services, specific for service-based businesses",
         format: "pipeline: new leads, follow-up timing, draft replies, booking status",
         initiative:
           "pipeline-driven: new lead alerts, follow-up reminders after quiet period, draft replies for approval",
       },
       escalation: EscalationLevel.None,
       confirmation_required_for_sends: true,
-      follow_up_quiet_period: "48h",
+      cross_topic_connections: [TopicKey.Finances, TopicKey.Calendar],
     },
 
     relationship: {
@@ -377,6 +390,45 @@ export const systemConfig: SystemConfig = {
       },
       escalation: EscalationLevel.Low,
       status_expiry: "6h",
+    },
+
+    meals: {
+      label: "Meals",
+      description:
+        "Meal planning, dinner decisions, dietary notes, and connecting meal choices to the grocery list.",
+      routing: {
+        meal_planning: "broadest shared thread",
+        dietary_note: "relevant entity's private thread",
+        readback: "same thread as request",
+      },
+      behavior: {
+        tone: "collaborative and practical",
+        format: "meal plans, suggestions, grocery list connections",
+        initiative:
+          "moderate: may surface meal planning before a typical grocery day or suggest repeating a recent meal the family liked, otherwise stays quiet",
+      },
+      escalation: EscalationLevel.None,
+      grocery_linking: true,
+      cross_topic_connections: [TopicKey.Grocery, TopicKey.Health],
+    },
+
+    maintenance: {
+      label: "Maintenance",
+      description:
+        "Home, vehicle, and appliance maintenance tracking — what needs doing, when it was last done, when it's due next.",
+      routing: {
+        individual_item: "responsible adult's private thread",
+        household_item: "relevant shared thread",
+        readback: "same thread as request",
+      },
+      behavior: {
+        tone: "practical and reminder-driven",
+        format: "maintenance schedules, history logs, upcoming due items",
+        initiative:
+          "cycle-driven: reminders surface when maintenance is due based on last-performed date and configured interval, no nagging on items that aren't overdue",
+      },
+      escalation: EscalationLevel.Low,
+      cross_topic_connections: [TopicKey.Vendors, TopicKey.Finances, TopicKey.Calendar],
     },
   },
 
@@ -456,6 +508,7 @@ export const systemConfig: SystemConfig = {
       examples: {
         receipt_photo: "log as expense after confirmation",
         school_image: "extract and track after confirmation",
+        maintenance_photo: "log work completed, extract cost if visible, update maintenance item",
       },
     },
     forwarded_content: {
@@ -466,6 +519,31 @@ export const systemConfig: SystemConfig = {
       high_accountability: "feeds escalation ladder",
       low_accountability: "means not now, respected, no follow-up",
       never: "treated as approval",
+    },
+    topic_disambiguation: {
+      description: "Guidance for the classifier when input could match multiple topics.",
+      rules: [
+        {
+          close_topics: ["meals", "grocery"],
+          guidance:
+            "If the message is about what to eat, what to cook, meal planning, recipes, or dinner decisions → Meals. If the message is about items to buy, shopping lists, or store runs → Grocery. 'What should we have for dinner?' is Meals. 'We need ground beef' is Grocery — unless it's part of an active meal planning conversation, then Meals.",
+        },
+        {
+          close_topics: ["maintenance", "vendors"],
+          guidance:
+            "If the message is about recurring upkeep, service intervals, or 'when did we last...' → Maintenance. If the message is about hiring or scheduling a specific service provider → Vendors. 'When was the oil changed last?' is Maintenance. 'The plumber is coming Tuesday' is Vendors.",
+        },
+        {
+          close_topics: ["maintenance", "chores"],
+          guidance:
+            "If the task recurs on a cycle (seasonal, mileage, quarterly) and involves a home, vehicle, or appliance → Maintenance. If the task is a one-off household duty assigned to a person → Chores. 'Change the furnace filter' is Maintenance. 'Take out the trash' is Chores.",
+        },
+        {
+          close_topics: ["business", "vendors"],
+          guidance:
+            "If the message is about YOUR clients, leads, inquiries, or draft replies to people seeking your services → Business. If the message is about someone YOU are hiring or scheduling to do work for you → Vendors. 'I got a new inquiry about a portrait session' is Business. 'The plumber can come Thursday' is Vendors.",
+        },
+      ],
     },
   },
 
@@ -606,7 +684,12 @@ export const systemConfig: SystemConfig = {
     },
     low: {
       label: "Low Accountability",
-      applies_to: [TopicKey.Relationship, TopicKey.Pets, TopicKey.FamilyStatus],
+      applies_to: [
+        TopicKey.Relationship,
+        TopicKey.Pets,
+        TopicKey.FamilyStatus,
+        TopicKey.Maintenance,
+      ],
       steps: [
         "send once",
         "if ignored, quietly disappear",
@@ -616,7 +699,7 @@ export const systemConfig: SystemConfig = {
     },
     none: {
       label: "No Escalation",
-      applies_to: [TopicKey.Grocery, TopicKey.Vendors, TopicKey.Photography],
+      applies_to: [TopicKey.Grocery, TopicKey.Vendors, TopicKey.Business, TopicKey.Meals],
       steps: ["send once or store silently", "no follow-up"],
     },
   },

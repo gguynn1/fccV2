@@ -1,0 +1,22 @@
+Required tools/dependencies:
+- Node.js (LTS) with TypeScript (strict, ESM) for all runtime modules.
+- `src/types.ts` for shared enums and cross-service vocabulary.
+- Respect service and type boundaries: no direct runtime imports from sibling services.
+- Local `types.ts` in this folder for scope-owned contracts.
+- Business lead-pipeline types for inquiries, draft replies, booking status, and quiet-period follow-up.
+- Per-entity business profiles declaring business type and name.
+- Approval-gated drafting support before anything is sent on behalf of the business owner.
+
+Recommended tools/dependencies:
+- `tsc --noEmit` to verify type boundaries.
+- `eslint` to keep imports and unused symbols clean.
+- `prettier` to keep docs and source formatting consistent.
+- `vitest` for fixture-driven verification where the scope has behavior worth testing.
+- Fixtures for new leads, stalled leads, and booking transitions across different business types.
+- Tests that separate client-facing draft tone from internal assistant guidance.
+
+Technologies and integrations:
+- Business lead data persists in SQLite through the state service.
+- Anthropic Claude API can draft or summarize lead communications before confirmation.
+- Lead intake should come from email parsing or conversation rather than an external CRM.
+- Each entity's business_type informs the tone the assistant uses when drafting client-facing messages.

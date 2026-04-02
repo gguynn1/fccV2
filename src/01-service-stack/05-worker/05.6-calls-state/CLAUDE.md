@@ -12,7 +12,7 @@ During the processing sequence, the Worker reads state to inform its decisions:
 - **Escalation status** — active escalations for the item's topic and entities. Used by the escalation check (step 5) to determine which step we're on and what happens next.
 - **Confirmation records** — pending confirmations for the originating entity. Used by the confirmation check (step 6) to determine if an incoming message resolves a pending confirmation.
 - **Outbound budget tracker** — messages sent per person and per thread. Used by the budget check (step 4) to decide whether to send, batch, or hold.
-- **Per-topic records** — calendar events, chore assignments, bills, grocery list, health profiles, school assignments, travel plans, vendor records, photography leads, relationship nudge history, family status snapshots. Used by the behavior profile step (step 7) to compose contextually accurate messages.
+- **Per-topic records** — calendar events, chore assignments, bills, grocery list, health profiles, school assignments, travel plans, vendor records, business leads, relationship nudge history, family status snapshots, meal plans, dietary notes, maintenance assets and schedules. Used by the behavior profile step (step 7) to compose contextually accurate messages.
 - **Digest history** — what was included in the last digest for each person. Used to avoid repeating information and to build the next digest.
 
 ## What the Worker Writes

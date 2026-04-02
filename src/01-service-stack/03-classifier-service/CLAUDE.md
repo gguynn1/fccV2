@@ -13,4 +13,4 @@ Example: "this is a calendar request about a vet appointment involving PET"
 
 Topics are internal classifications, not threads. Each topic carries routing rules, a tone, a response format, an initiative style, and an escalation level. The assistant is one entity but shifts how it behaves depending on the topic.
 
-The topics are: Calendar, Chores, Finances, Grocery, Health, Pets, School, Travel, Vendors, Photography, Relationship, Family Status.
+The topics are: Calendar, Chores, Finances, Grocery, Health, Pets, School, Travel, Vendors, Business, Relationship, Family Status, Meals, Maintenance.

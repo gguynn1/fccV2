@@ -12,4 +12,4 @@ Maps a sender identifier to an entity. Most often this is a phone number, but th
 
 ## Classification
 
-Returns: topic (Calendar, Chores, Finances, Grocery, Health, Pets, School, Travel, Vendors, Photography, Relationship, Family Status) and intent (request, response, completion, question, forwarded data).
+Returns: topic (Calendar, Chores, Finances, Grocery, Health, Pets, School, Travel, Vendors, Business, Relationship, Family Status, Meals, Maintenance) and intent (request, response, completion, question, forwarded data).

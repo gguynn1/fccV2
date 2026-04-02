@@ -24,4 +24,5 @@ export interface TopicConfig {
   on_ignored?: string;
   minimum_gap_between_nudges?: string;
   status_expiry?: string;
+  grocery_linking?: boolean;
 }

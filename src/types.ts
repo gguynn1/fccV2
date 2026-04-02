@@ -8,9 +8,11 @@ export enum TopicKey {
   School = "school",
   Travel = "travel",
   Vendors = "vendors",
-  Photography = "photography",
+  Business = "business",
   Relationship = "relationship",
   FamilyStatus = "family_status",
+  Meals = "meals",
+  Maintenance = "maintenance",
 }
 
 export enum EscalationLevel {
