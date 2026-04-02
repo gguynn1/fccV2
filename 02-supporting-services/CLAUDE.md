@@ -11,3 +11,5 @@ Routing Service
 Budget Service
 Escalation Service
 Confirmation Service
+
+Adding a new data source never requires rethinking the dispatch logic. It just feeds the queue.
