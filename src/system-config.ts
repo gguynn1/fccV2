@@ -11,7 +11,7 @@ import {
   DataIngestSourceType,
   WorkerAction,
   WorkerService,
-} from "./system-config-types.js";
+} from "./types.js";
 
 export const systemConfig: SystemConfig = {
   system: {

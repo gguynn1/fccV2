@@ -24,7 +24,7 @@ import {
   ConfirmationResult,
   EscalationStepAction,
   HealthProviderType,
-} from "./system-state-types.js";
+} from "./types.js";
 
 export const systemState: SystemState = {
   metadata: {
