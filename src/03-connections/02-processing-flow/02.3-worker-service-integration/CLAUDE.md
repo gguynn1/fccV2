@@ -20,16 +20,16 @@ WORKER (orchestrator only)
 
 This table mirrors **`WorkerAction`** / **`WorkerService`** in `src/01-service-stack/05-worker/types.ts` and the trace order in `05-worker/index.ts`:
 
-| # | Action | Service enum (when traced) | Responsibility |
-| - | ------ | -------------------------- | -------------- |
-| 1 | `classify_topic` | `WorkerService.Classifier` | Topic + intent + concerning |
-| 2 | `identify_entities` | `WorkerService.Identity` | Entity/thread identity details |
-| 3 | `determine_action_type` | _(none — worker-internal)_ | Typed action or clarification signal |
-| 4 | `check_outbound_budget` | `WorkerService.Budget` | `DispatchPriority`, batching, collisions |
-| 5 | `check_escalation` | `WorkerService.Escalation` | Stages, broader threads, timers |
-| 6 | `check_confirmation` | `WorkerService.Confirmation` | Gates / reply resolution |
-| 7 | `apply_behavior_profile` | `WorkerService.TopicProfile` | Tone, format, composition |
-| 8 | `route_and_dispatch` | `WorkerService.Routing` | Target thread + **Action Router** result |
+| #   | Action                   | Service enum (when traced)   | Responsibility                           |
+| --- | ------------------------ | ---------------------------- | ---------------------------------------- |
+| 1   | `classify_topic`         | `WorkerService.Classifier`   | Topic + intent + concerning              |
+| 2   | `identify_entities`      | `WorkerService.Identity`     | Entity/thread identity details           |
+| 3   | `determine_action_type`  | _(none — worker-internal)_   | Typed action or clarification signal     |
+| 4   | `check_outbound_budget`  | `WorkerService.Budget`       | `DispatchPriority`, batching, collisions |
+| 5   | `check_escalation`       | `WorkerService.Escalation`   | Stages, broader threads, timers          |
+| 6   | `check_confirmation`     | `WorkerService.Confirmation` | Gates / reply resolution                 |
+| 7   | `apply_behavior_profile` | `WorkerService.TopicProfile` | Tone, format, composition                |
+| 8   | `route_and_dispatch`     | `WorkerService.Routing`      | Target thread + **Action Router** result |
 
 **State** is not a numbered `WorkerService` in traces but underpins history reads, persistence of `appendDispatchResult`, confirmations, escalations, and topic rows.
 

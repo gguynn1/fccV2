@@ -98,12 +98,6 @@ export interface ConfirmationsState {
   recent: ConfirmationHistoryRecord[];
 }
 
-export interface ConfirmationMatchOutcome {
-  confirmation_id: string;
-  result: ConfirmationResult.Approved | ConfirmationResult.Rejected;
-  resolved_in_thread: string;
-}
-
 export interface ConfirmationExpiryNotification {
   confirmation_id: string;
   target_thread: string;

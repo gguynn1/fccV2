@@ -64,12 +64,6 @@ export interface MaintenanceState {
   items: MaintenanceItem[];
 }
 
-export interface MaintenanceCrossTopicLinks {
-  vendor_topic: "vendors";
-  finance_topic: "finances";
-  calendar_topic: "calendar";
-}
-
 export type MaintenanceAction =
   | { type: "log_maintenance"; item_id: string; performed_by: string; cost?: number; notes: string }
   | {

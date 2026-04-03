@@ -22,7 +22,14 @@ export default defineConfig(
       "react-refresh": reactRefresh,
       "unused-imports": unusedImports,
     },
-    settings: flatConfigs.typescript.settings,
+    settings: {
+      ...flatConfigs.typescript.settings,
+      "import-x/resolver": {
+        typescript: {
+          project: "./tsconfig.app.json",
+        },
+      },
+    },
     languageOptions: {
       globals: globals.browser,
       parserOptions: {

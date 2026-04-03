@@ -1,5 +1,5 @@
 {
-  "current_step": "step-43-part-2",
+  "current_step": "step-55",
   "status_notes": {
     "step-00-part-1": {
       "updated_at": "2026-04-03T13:55:03Z",
@@ -668,6 +668,62 @@
         "confirm the top navigation visually in a browser across all 8 routes"
       ],
       "next_action": "Proceed to step-43-part-2."
+    },
+    "step-43-part-2": {
+      "updated_at": "2026-04-03T22:12:00Z",
+      "checks_completed": [
+        "entities page renders with entity registry table and permissions matrix with inline toggle switches",
+        "threads page renders with thread configuration, participant membership toggles, and inline-editable descriptions",
+        "topics page renders all 14 topic cards with inline-editable tone/format, escalation level selector, confirmation toggles, and read-only cross-topic connections",
+        "topics page includes confirmation gates editor and escalation profiles viewer",
+        "budget page renders outbound budget limits with inline-editable numeric fields and collision precedence display",
+        "scheduler page renders morning digest and evening check-in time editors, digest eligibility toggles, and staleness threshold control",
+        "all five config pages use TanStack Query mutations for auto-save on blur/Enter",
+        "pet entity messaging identity is not editable (shows 'no messaging' badge)",
+        "cross-topic connections displayed as read-only badges",
+        "shared UI components created: EditableCell, Input (forwardRef), Badge, Switch, Select, Table, Pagination",
+        "TanStack Query hooks created for all config surfaces: useEntities, useTopics, useBudget, useScheduler, useConfig",
+        "npm run typecheck passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-43-part-3."
+    },
+    "step-43-part-3": {
+      "updated_at": "2026-04-03T22:12:00Z",
+      "checks_completed": [
+        "queue page shows depth cards (waiting, delayed, active, dead letter), pending items table, DLQ with retry/discard buttons, and recent completions",
+        "activity page shows dispatches, escalations, and confirmations with date range filter (24h/7d/custom)",
+        "activity page supports topic, thread, and entity filtering across all tables",
+        "all tables paginate correctly with Pagination component (20 items per page)",
+        "no message body content is displayed — metadata only (content_kind indicator in queue, no raw content)",
+        "data refreshes on polling interval (5s for state pages via TanStack Query refetchInterval)",
+        "DLQ retry and discard use TanStack Query mutations with automatic query invalidation",
+        "npm run typecheck passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-43-part-4."
+    },
+    "step-43-part-4": {
+      "updated_at": "2026-04-03T22:12:00Z",
+      "checks_completed": [
+        "dashboard renders 6 status cards: queue depth, DLQ, active escalations, pending confirmations, dispatched today, budget cap",
+        "DLQ > 0 shows red badge and destructive card border with action-needed alert",
+        "budget approaching cap (>=75%) shows amber/warning badge with percentage",
+        "stuck escalations (overdue next_action_at) show warning badge",
+        "all status cards link to their detail pages via React Router",
+        "full build pipeline works: npm run ui:build produces bundle in ui/dist",
+        "npm run typecheck passed (both src/ and ui/)",
+        "npm run lint passed",
+        "npm test passed (22 backend tests)",
+        "npm run ui:build passed (337KB JS, 17KB CSS)"
+      ],
+      "requires_manual_verification": [
+        "verify Fastify serves ui/dist at /admin after build",
+        "verify ngrok requests to /admin and /api/admin/* return 403",
+        "verify all 8 pages functional with the running backend",
+        "verify top nav active-state highlighting works on all routes"
+      ],
+      "next_action": "Step 43 complete. Proceed to step-55."
     }
   },
   "steps": {
@@ -717,9 +773,9 @@
     "step-41": { "status": "complete", "completed_at": "2026-04-03T17:47:36Z" },
     "step-42": { "status": "complete", "completed_at": "2026-04-03T17:47:36Z" },
     "step-43-part-1": { "status": "complete", "completed_at": "2026-04-03T18:21:16Z" },
-    "step-43-part-2": { "status": "pending" },
-    "step-43-part-3": { "status": "pending" },
-    "step-43-part-4": { "status": "pending" },
+    "step-43-part-2": { "status": "complete", "completed_at": "2026-04-03T22:12:00Z" },
+    "step-43-part-3": { "status": "complete", "completed_at": "2026-04-03T22:12:00Z" },
+    "step-43-part-4": { "status": "complete", "completed_at": "2026-04-03T22:12:00Z" },
     "step-44": { "status": "complete", "completed_at": "2026-04-03T19:00:00Z" },
     "step-45": { "status": "complete", "completed_at": "2026-04-03T19:00:00Z" },
     "step-46": { "status": "complete", "completed_at": "2026-04-03T19:00:00Z" },

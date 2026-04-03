@@ -14,8 +14,6 @@ export enum EscalationReassignmentPolicy {
   Cancel = "cancel",
 }
 
-export type AccountabilityLevel = EscalationLevel;
-
 export interface EscalationProfile {
   label: string;
   applies_to: TopicKey[];
@@ -46,9 +44,4 @@ export interface ActiveEscalation {
 
 export interface EscalationStatus {
   active: ActiveEscalation[];
-}
-
-export interface EscalationTransitionResult {
-  active: ActiveEscalation | null;
-  emitted_action?: EscalationStepAction;
 }

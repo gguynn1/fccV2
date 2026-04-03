@@ -32,16 +32,16 @@ TRANSPORT / INGEST / SCHEDULER
 
 ## Worker step sequence (implemented)
 
-| Step | WorkerAction | Primary service / notes |
-| ---- | ------------ | ------------------------ |
-| 1 | `classify_topic` | **Classifier** (Claude structured output; stack validates). Skipped/trusted when preclassified. |
-| 2 | `identify_entities` | **Identity** |
-| 3 | `determine_action_type` | Worker-internal resolution to a typed action; may **raise clarification** instead |
-| 4 | `check_outbound_budget` | **Budget** |
-| 5 | `check_escalation` | **Escalation** |
-| 6 | `check_confirmation` | **Confirmation** |
-| 7 | `apply_behavior_profile` | **Topic Profile** (composition) |
-| 8 | `route_and_dispatch` | **Routing** + **Action Router** outcome |
+| Step | WorkerAction             | Primary service / notes                                                                         |
+| ---- | ------------------------ | ----------------------------------------------------------------------------------------------- |
+| 1    | `classify_topic`         | **Classifier** (Claude structured output; stack validates). Skipped/trusted when preclassified. |
+| 2    | `identify_entities`      | **Identity**                                                                                    |
+| 3    | `determine_action_type`  | Worker-internal resolution to a typed action; may **raise clarification** instead               |
+| 4    | `check_outbound_budget`  | **Budget**                                                                                      |
+| 5    | `check_escalation`       | **Escalation**                                                                                  |
+| 6    | `check_confirmation`     | **Confirmation**                                                                                |
+| 7    | `apply_behavior_profile` | **Topic Profile** (composition)                                                                 |
+| 8    | `route_and_dispatch`     | **Routing** + **Action Router** outcome                                                         |
 
 Supporting services **do not import each other** at runtime; only the Worker orchestrates them (`architecture.mdc`).
 

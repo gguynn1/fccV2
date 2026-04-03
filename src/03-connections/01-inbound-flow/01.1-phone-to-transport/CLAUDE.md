@@ -16,14 +16,14 @@ Inbound signature verification rejects forged requests before normalization.
 
 Transport is responsible for recognizing and normalizing:
 
-| Shape | Role |
-| ----- | ---- |
-| Plain content | Free-form text interpreted with thread context after classification |
-| Structured choice | Assistant-offered options; short replies map to the offered choice |
-| Reaction | Positive or negative reaction on a prior assistant segment; used for confirmations and quick resolutions where supported |
-| Image / attachment | Media reference; downloaded to local media store for downstream interpretation |
-| Forwarded content | Outer/inner body treated as forwarded payload for extraction |
-| Silence | Absence of a reply within an escalation or follow-up window is **not** approval; handling depends on topic escalation profile |
+| Shape              | Role                                                                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Plain content      | Free-form text interpreted with thread context after classification                                                           |
+| Structured choice  | Assistant-offered options; short replies map to the offered choice                                                            |
+| Reaction           | Positive or negative reaction on a prior assistant segment; used for confirmations and quick resolutions where supported      |
+| Image / attachment | Media reference; downloaded to local media store for downstream interpretation                                                |
+| Forwarded content  | Outer/inner body treated as forwarded payload for extraction                                                                  |
+| Silence            | Absence of a reply within an escalation or follow-up window is **not** approval; handling depends on topic escalation profile |
 
 **Reactions:** Behavior is **conservative** — not every client encodes reactions the same way. When mapping is uncertain, the system falls back to text clarification rather than assuming intent.
 

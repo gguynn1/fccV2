@@ -11,7 +11,7 @@
 
 ## Identity resolution (step 2 inside Worker; after Transport for phone)
 
-- Maps messaging identities to **participant_*** / **pet** entity ids (anonymized configuration).
+- Maps messaging identities to **participant\_\*** / **pet** entity ids (anonymized configuration).
 - Supplies thread membership used later by Routing and Escalation.
 
 ## Classification output (aligns with `src/types.ts`)

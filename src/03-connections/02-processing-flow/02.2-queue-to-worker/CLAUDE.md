@@ -16,15 +16,15 @@ All sources produce **`PendingQueueItem`** shapes validated by **`pendingQueueIt
 
 ## What each item carries (high level)
 
-| Field | Note |
-| ----- | ---- |
-| `source` | `human_message`, `reaction`, `email_monitor`, `data_ingest`, `scheduled_trigger`, … |
-| `concerning` | Entity ids (required array) |
-| `content` | String or structured email extract |
-| `target_thread` | Originating thread id |
-| `topic` / `intent` | **Optional** until Worker step 1 completes (or provided for preclassified items) |
-| `created_at` | Enqueue time |
-| `idempotency_key` / `clarification_of` | Optional linkage / dedupe |
+| Field                                  | Note                                                                                |
+| -------------------------------------- | ----------------------------------------------------------------------------------- |
+| `source`                               | `human_message`, `reaction`, `email_monitor`, `data_ingest`, `scheduled_trigger`, … |
+| `concerning`                           | Entity ids (required array)                                                         |
+| `content`                              | String or structured email extract                                                  |
+| `target_thread`                        | Originating thread id                                                               |
+| `topic` / `intent`                     | **Optional** until Worker step 1 completes (or provided for preclassified items)    |
+| `created_at`                           | Enqueue time                                                                        |
+| `idempotency_key` / `clarification_of` | Optional linkage / dedupe                                                           |
 
 ## Worker pull model
 

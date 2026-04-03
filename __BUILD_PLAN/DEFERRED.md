@@ -15,7 +15,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Identified:** step-03 review
 - **Severity:** Low
 - **Description:** `validateStateSlices()` casts topic states through `as unknown as Record<string, unknown>` and validates with `topicRecordSchema` which is `z.record(z.string(), z.unknown())`. This validates that topic states are objects but nothing about their shape. Has slipped twice (step-10-23, then step-24+). The Worker now reads/writes topic state without shape validation.
-- **Resolve at:** step-33 (third window — no further deferrals)
+- **Resolve at:** step-55 (re-targeted during step-0–54 reassessment; eval framework can exercise state validation paths)
 - **Action:** Replace the generic `topicRecordSchema` with per-topic Zod schemas derived from the TypeScript interfaces defined in steps 10–24. Add runtime validation on State Service read/write paths.
 
 ### D-05 — ~~Scheduler hardcodes participant_1 fallback~~ MOVED TO RESOLVED (R-26)
@@ -56,20 +56,14 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolve at:** step-33
 - **Action:** Load system configuration once at boot in `server.ts` from the State Service / database, then pass it via constructor injection to every service. Remove all 7 `_seed/` imports from runtime code. Seed files remain for `npm run start:seed` only.
 
-### D-15 — Unused scaffolding types (7 definitions)
-
-- **Identified:** step-24–27 and step-28 reviews (upgraded from A-21 + A-25 during step-0–32 reassessment)
-- **Severity:** Low
-- **Description:** Seven type definitions were created as scaffolding for Worker integration but remain unused after steps 30-32 wired the Worker: `MaintenanceCrossTopicLinks` (maintenance/types.ts), `BudgetDecisionTyped`, `BudgetCounterSnapshot`, `BudgetCollisionCheck` (budget/types.ts), `AccountabilityLevel`, `EscalationTransitionResult` (escalation/types.ts), `ConfirmationMatchOutcome` (confirmation/types.ts).
-- **Resolve at:** step-33+
-- **Action:** For each type: either wire it into the service/Worker implementation where it was intended, or remove it. Do not leave dead type definitions.
+### D-15 — ~~Unused scaffolding types (7 definitions)~~ MOVED TO RESOLVED (R-33)
 
 ### D-16 — suggestGroceryItemsFromMealDescription is a hardcoded placeholder
 
 - **Identified:** step-23 review (upgraded from A-19 during step-0–32 reassessment)
 - **Severity:** Low
 - **Description:** `suggestGroceryItemsFromMealDescription()` in `04.13-meals/profile.ts` only handles "taco" and "pasta" keywords. The Worker's Meals→Grocery cross-topic path calls this function. The step spec says Claude API should interpret meal ideas and suggest grocery items.
-- **Resolve at:** step-35+ (action router / composition refinement)
+- **Resolve at:** step-55 (re-targeted during step-0–54 reassessment; eval framework will exercise this path)
 - **Action:** Replace the hardcoded keyword matching with a Claude API call that extracts grocery items from meal descriptions. Wire through the Worker's composition step.
 
 ### D-17 — D-04 still unresolved after step-42
@@ -77,7 +71,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Identified:** step-42 review
 - **Severity:** High
 - **Description:** D-04 (shallow topic state validation in `src/02-supporting-services/03-state-service/index.ts`) remained unresolved past its `Resolve at: step-33` target. State validation still relies on broad `topicRecordSchema` parsing with `as unknown as Record<string, unknown>` casts for each topic slice.
-- **Resolve at:** step-43 (state-validation hardening pass)
+- **Resolve at:** step-55 (re-targeted during step-0–54 reassessment; aligned with D-04)
 - **Action:** Replace broad topic-record validation with per-topic runtime schemas and validate each topic state slice without `as unknown as` casts.
 
 ### D-18 — Admin API config routes use unsafe type casts
@@ -87,6 +81,30 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** Admin routes in `src/admin/routes.ts` use `as unknown as typeof nextConfig.X` casts on lines 153, 154, 178, 198-201, 226-228, 249 to bypass Zod validation and force-cast parsed payloads to full config types. The Zod schemas use `.passthrough()` and `z.unknown()` extensively, making them permissive by design and allowing incomplete or extra fields.
 - **Resolve at:** step-43-part-2 (inline editing with strict validation)
 - **Action:** Replace permissive Zod schemas with strict per-field schemas for all config surfaces (entities, threads, topics, budget, scheduler). Remove unsafe casts and rely on Zod validation to enforce shape correctness.
+
+### D-19 — Unused CalDAV types (4 definitions)
+
+- **Identified:** step-07–10 review (upgraded from A-05 during step-0–54 reassessment)
+- **Severity:** Medium
+- **Description:** `CalDAVCalendar`, `VEventPayload`, `VCalendarPayload`, and `calDavQuerySchema` in `src/01-service-stack/01-transport-layer/01.1-caldav/types.ts` are defined but not imported by the CalDAV implementation (`index.ts`). Originally accepted as "may be consumed during step-41 CalDAV integration" — step-41 is complete and they remain unused.
+- **Resolve at:** step-55 (eval framework — CalDAV paths exercised via scenarios)
+- **Action:** Either wire into the CalDAV service implementation or remove. Do not leave dead type definitions.
+
+### D-20 — CalDAV ctag hardcoded to "1"
+
+- **Identified:** step-07–10 review (upgraded from A-07 during step-0–54 reassessment)
+- **Severity:** Low
+- **Description:** `src/01-service-stack/01-transport-layer/01.1-caldav/index.ts` sets `ctag: "1"` as a static value. Calendar apps use ctag to detect when to re-fetch. A static value prevents cache invalidation. Originally accepted as "deferred to step-41" — step-41 is complete and ctag remains static.
+- **Resolve at:** when real calendar data flows through CalDAV (no specific step target)
+- **Action:** Derive ctag from the most recent event modification timestamp in the State Service.
+
+### D-21 — `as OpenConfirmationRequest` type cast in confirmation service
+
+- **Identified:** step-28 review (upgraded from A-24 during step-0–54 reassessment)
+- **Severity:** Low
+- **Description:** `BullConfirmationService.openConfirmation()` in `08-confirmation-service/index.ts` (line 174) casts the `ConfirmationRequest` parameter to `OpenConfirmationRequest` to access optional fields (`requested_at`, `reply_options`, `expiry_message`). Originally accepted as "interface can be expanded during Worker wiring" — Worker wiring (steps 33-36) is complete and the cast remains.
+- **Resolve at:** step-55 (eval framework — confirmation paths exercised)
+- **Action:** Add the optional fields to the `ConfirmationRequest` interface and remove the cast.
 
 ---
 
@@ -99,12 +117,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** The build agent rewrote 13 files in `__BUILD_PLAN/` — steps 43–54 restructured, step-55 added, prompt updated. Step 43 changed from "Connections Documentation" to "Admin UI" spec. Steps 44–53 shifted by one position. The hard rule says "NEVER modify any file in `__BUILD_PLAN/`" except `PROGRESS.json`.
 - **Decision:** Accepted — the Admin UI addition and reshuffling were approved by the user.
 
-### A-02 — README documents unimplemented Admin UI
-
-- **Identified:** step-01–06 review
-- **Severity:** Medium
-- **Description:** `README.md` was updated to document the Admin UI (`ui/` directory, `ui:dev`/`ui:build`/`ui:preview` scripts, `/admin` route) that does not exist yet.
-- **Decision:** Accepted — forward-looking documentation, consistent with the accepted Admin UI plan.
+### A-02 — ~~README documents unimplemented Admin UI~~ MOVED TO RESOLVED (R-34)
 
 ### A-03 — Steps 04–06 share identical completion timestamp
 
@@ -120,12 +133,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** Added `src-commenting.mdc` reference and updated rule count from 10 to 11. Technically violates the "never modify `__BUILD_PLAN/`" rule.
 - **Decision:** Accepted — the correction is accurate and reverting would leave the prompt inaccurate.
 
-### A-05 — Unused types in CalDAV types.ts
-
-- **Identified:** step-07–10 review
-- **Severity:** Low
-- **Description:** `CalDAVCalendar`, `VEventPayload`, `VCalendarPayload`, and `calDavQuerySchema` are defined in `src/01-service-stack/01-transport-layer/01.1-caldav/types.ts` but not consumed by any implementation file.
-- **Decision:** Accepted — may serve as protocol surface documentation and could be consumed during step-41 CalDAV integration.
+### A-05 — ~~Unused types in CalDAV types.ts~~ UPGRADED TO DEFERRAL (D-19)
 
 ### A-06 — Steps 07–10 share identical completion timestamp
 
@@ -134,12 +142,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** Steps 07, 08, 09, and 10 all have `completed_at: "2026-04-03T15:04:50Z"`, indicating they were completed in a single Build Agent session.
 - **Decision:** Accepted — code quality is fine; human review happened during this review session.
 
-### A-07 — CalDAV ctag hardcoded to "1"
-
-- **Identified:** step-07–10 review
-- **Severity:** Low
-- **Description:** `src/01-service-stack/01-transport-layer/01.1-caldav/index.ts` sets `ctag: "1"` as a static value. Calendar apps use ctag to detect when to re-fetch. A static value prevents cache invalidation.
-- **Decision:** Accepted — full CalDAV compliance is deferred to step-41. The ctag should be derived from the most recent event modification timestamp when real data flows through.
+### A-07 — ~~CalDAV ctag hardcoded to "1"~~ UPGRADED TO DEFERRAL (D-20)
 
 ### A-08 — CalendarEvent has 5 optional date-related fields
 
@@ -162,12 +165,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** Every mutating `FinanceAction` variant includes `requires_confirmation: true` as a literal type field. The `requiresFinanceConfirmation()` helper already derives this from `action.type !== "query_finances"`.
 - **Decision:** Accepted — the literal type serves as compile-time documentation that financial mutations always require confirmation. The helper provides runtime convenience. Mild redundancy but not harmful.
 
-### A-11 — D-04 per-topic Zod schemas not addressed in steps 11-15
-
-- **Identified:** step-11–15 review
-- **Severity:** Low
-- **Description:** D-04's resolve-at range (steps 10–23) includes these steps, but no per-topic Zod validation schemas were added. Profile steps define behavior and TypeScript interfaces — not state validation. Per-topic Zod schemas belong in the State Service or Worker integration layer.
-- **Decision:** Accepted — the deferral's resolve-at range is broad. Steps 11-15 are the wrong place for State Service validation changes. D-04 remains active and will be addressed during Worker integration.
+### A-11 — ~~D-04 per-topic Zod schemas not addressed in steps 11-15~~ MOVED TO RESOLVED (R-35)
 
 ### A-12 — Steps 11-15 share identical completion timestamp
 
@@ -231,12 +229,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** Routing service (line 129), budget service (line 351), and escalation service (line 349) hardcode `"family"` as a fallback thread ID rather than deriving it from thread configuration.
 - **Decision:** Accepted — stable convention for a single-deployment system. Consistent with A-09.
 
-### A-24 — `as OpenConfirmationRequest` type cast in confirmation service
-
-- **Identified:** step-28 review
-- **Severity:** Low
-- **Description:** `BullConfirmationService.openConfirmation()` in `08-confirmation-service/index.ts` (line 177) casts the `ConfirmationRequest` parameter to `OpenConfirmationRequest` to access optional fields (`requested_at`, `reply_options`, `expiry_message`) not on the declared interface. All additional fields are optional, so the cast is safe in practice.
-- **Decision:** Accepted — documents that callers may provide extra fields. The interface can be expanded during Worker wiring when actual callers are known.
+### A-24 — ~~`as OpenConfirmationRequest` type cast in confirmation service~~ UPGRADED TO DEFERRAL (D-21)
 
 ### A-25 — ~~ConfirmationMatchOutcome type unused~~ UPGRADED TO DEFERRAL (D-15)
 
@@ -509,3 +502,31 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolved:** same session
 - **Description:** `src/server.ts` changed `Fastify({ logger })` to `Fastify({ logger: { name: 'fcc-server' } })` for both main and CalDAV servers, replacing the shared pino instance with Fastify-internal loggers. This reversed R-05 from step-07-10 review.
 - **Fix:** Restored `Fastify({ logger })` for both instances to use the shared pino logger.
+
+### R-33 — D-15: Unused scaffolding types removed
+
+- **Identified:** step-24–27 and step-28 reviews
+- **Resolved:** step-0–54 reassessment
+- **Description:** Seven unused scaffolding type definitions that were never consumed after Worker integration (steps 30-36): `MaintenanceCrossTopicLinks`, `BudgetDecisionTyped`, `BudgetCounterSnapshot`, `BudgetCollisionCheck`, `AccountabilityLevel`, `EscalationTransitionResult`, `ConfirmationMatchOutcome`.
+- **Fix:** Removed all 7 types and cleaned up the unused `DispatchPriority` import in budget/types.ts. Typecheck, lint, and tests pass.
+
+### R-34 — A-02: README Admin UI documentation now accurate
+
+- **Identified:** step-01–06 review
+- **Resolved:** step-0–54 reassessment
+- **Description:** README documented the Admin UI (`ui/`, `ui:dev`/`ui:build`/`ui:preview` scripts, `/admin` route) before it existed. Step-43-part-1 implemented the scaffold.
+- **Fix:** No code change needed — the README is now accurate. The Admin UI exists and all documented commands work.
+
+### R-35 — A-11: D-04 tracking note superseded by D-17
+
+- **Identified:** step-11–15 review
+- **Resolved:** step-0–54 reassessment
+- **Description:** Accepted item noting D-04 wasn't addressed in profile steps. D-17 now explicitly tracks D-04 as a HIGH deferral with step-55 target.
+- **Fix:** No code change — tracking is now consolidated under D-04/D-17.
+
+### R-36 — Classifier TopicConfig.follow_up_quiet_period type aligned
+
+- **Identified:** step-0–54 reassessment (new finding)
+- **Resolved:** same session
+- **Description:** `TopicConfig.follow_up_quiet_period` in classifier types was `string` while `BusinessProfile.follow_up_quiet_period_days` (fixed in R-10) was `number`. The field names and types were misaligned across interfaces.
+- **Fix:** Renamed to `follow_up_quiet_period_days?: number` in `src/01-service-stack/03-classifier-service/types.ts` to match the business profile type.

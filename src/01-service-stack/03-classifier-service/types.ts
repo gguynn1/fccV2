@@ -43,7 +43,7 @@ export interface TopicConfig {
   sections?: GrocerySection[];
   cross_topic_connections?: TopicKey[];
   confirmation_required_for_sends?: boolean;
-  follow_up_quiet_period?: string;
+  follow_up_quiet_period_days?: number;
   on_ignored?: string;
   minimum_gap_between_nudges?: string;
   status_expiry?: string;
