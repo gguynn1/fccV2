@@ -40,8 +40,10 @@ function buildSummary(scenarios: EvalScenarioResult[]): EvalRunSummary {
     queued: scenarios.filter((scenario) => scenario.status === "queued").length,
     running: scenarios.filter((scenario) => scenario.status === "running").length,
     passed: scenarios.filter((scenario) => scenario.status === "passed").length,
-    fixed: scenarios.filter((scenario) => scenario.status === "fixed").length,
-    deferred: scenarios.filter((scenario) => scenario.status === "deferred").length,
+    prompt_fix_suggested: scenarios.filter((scenario) => scenario.status === "prompt_fix_suggested")
+      .length,
+    investigation_needed: scenarios.filter((scenario) => scenario.status === "investigation_needed")
+      .length,
     failed: scenarios.filter((scenario) => scenario.status === "failed").length,
     regressed: scenarios.filter((scenario) => scenario.status === "regressed").length,
   };
@@ -426,26 +428,28 @@ export async function runSequentialEval(options: RunSequentialEvalOptions): Prom
       const diagnosis = diagnoseScenarioFailures(scenario, failures);
 
       if (diagnosis.can_fix_with_prompt) {
-        const tunerOutcome = await generateCandidatePrompt({
-          repo_root: options.repo_root,
-          candidate_dir: workspace.candidate_dir,
-          run_id: options.run_id,
+        const tunerOutcome = generateCandidatePrompt({
           scenario,
           actual,
           failures,
         });
         scenarioResult.status = tunerOutcome.status;
         scenarioResult.tuner = tunerOutcome;
-        await pushLog("tuner", "Prompt candidate created and scenario marked fixed.", scenario.id, {
-          candidate_path: tunerOutcome.candidate?.path,
-        });
+        await pushLog(
+          "tuner",
+          "Prompt candidate created and scenario marked prompt_fix_suggested.",
+          scenario.id,
+          {
+            candidate_title: tunerOutcome.candidate?.title,
+          },
+        );
       } else {
         const tunerOutcome = toDeferredTunerOutcome(diagnosis);
         scenarioResult.status = tunerOutcome.status;
         scenarioResult.tuner = tunerOutcome;
         await pushLog(
           "tuner",
-          "Scenario deferred because the failure is outside prompt-only tuning scope.",
+          "Scenario marked investigation_needed because the failure is outside prompt-only tuning scope.",
           scenario.id,
           { failing_dimensions: diagnosis.failing_dimensions },
           "warn",

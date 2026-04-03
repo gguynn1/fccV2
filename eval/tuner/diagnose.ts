@@ -22,13 +22,13 @@ export function diagnoseScenarioFailures(
     failing_dimensions: [...new Set(failingDimensions)],
     summary: canFixWithPrompt
       ? "The failing dimensions are limited to message composition, so a prompt candidate can be proposed."
-      : "The failure touches classification, routing, priority, or confirmation behavior and should stay deferred for runtime work.",
+      : "The failure touches classification, routing, priority, or confirmation behavior and needs code-level investigation.",
   };
 }
 
 export function toDeferredTunerOutcome(diagnosis: EvalDiagnosis): EvalTunerOutcome {
   return {
-    status: "deferred",
+    status: "investigation_needed",
     summary: diagnosis.summary,
     failing_dimensions: diagnosis.failing_dimensions,
   };

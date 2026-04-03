@@ -58,7 +58,7 @@ export const defaultScenarios: EvalScenarioDefinition[] = [
       priority: DispatchPriority.Immediate,
       confirmation_required: true,
       tone_markers: ["approval", "bill"],
-      format_markers: ["numbers"],
+      format_markers: ["confirm"],
     },
   },
   {
@@ -79,15 +79,6 @@ export const defaultScenarios: EvalScenarioDefinition[] = [
       tone_markers: ["warm", "draft", "client"],
       format_markers: ["reply"],
     },
-    notes:
-      "This scenario intentionally simulates a composition miss so the tuner can suggest a prompt fix.",
-    simulation: {
-      tuning_scope: "prompt",
-      actual_overrides: {
-        composed_message:
-          "Business pipeline note: portrait inquiry captured. Reply is professional and concise.",
-      },
-    },
   },
   {
     id: "vendors-vs-maintenance-handoff",
@@ -106,17 +97,6 @@ export const defaultScenarios: EvalScenarioDefinition[] = [
       confirmation_required: false,
       tone_markers: ["vendor", "Tuesday"],
       format_markers: ["record"],
-    },
-    notes:
-      "This scenario intentionally simulates a structural miss to demonstrate deferred status.",
-    simulation: {
-      tuning_scope: "structural",
-      actual_overrides: {
-        topic: TopicKey.Maintenance,
-        intent: ClassifierIntent.Update,
-        target_thread: "participant_1_private",
-        priority: DispatchPriority.Batched,
-      },
     },
   },
 ];

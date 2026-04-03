@@ -11,8 +11,8 @@ export type EvalScenarioStatus =
   | "queued"
   | "running"
   | "passed"
-  | "fixed"
-  | "deferred"
+  | "prompt_fix_suggested"
+  | "investigation_needed"
   | "failed"
   | "regressed";
 
@@ -84,13 +84,13 @@ export interface EvalScenarioLogEvent {
 }
 
 export interface EvalCandidateSummary {
-  path: string;
   title: string;
   summary: string;
+  body: string;
 }
 
 export interface EvalTunerOutcome {
-  status: Extract<EvalScenarioStatus, "fixed" | "deferred" | "failed">;
+  status: Extract<EvalScenarioStatus, "prompt_fix_suggested" | "investigation_needed" | "failed">;
   summary: string;
   failing_dimensions: string[];
   candidate?: EvalCandidateSummary;
@@ -115,8 +115,8 @@ export interface EvalRunSummary {
   queued: number;
   running: number;
   passed: number;
-  fixed: number;
-  deferred: number;
+  prompt_fix_suggested: number;
+  investigation_needed: number;
   failed: number;
   regressed: number;
 }

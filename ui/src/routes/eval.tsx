@@ -25,13 +25,13 @@ function formatDate(value: string | null): string {
 function toStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   switch (status) {
     case "passed":
-    case "fixed":
+    case "prompt_fix_suggested":
     case "completed":
       return "default";
     case "running":
     case "queued":
       return "secondary";
-    case "deferred":
+    case "investigation_needed":
     case "failed":
     case "regressed":
       return "destructive";
@@ -64,8 +64,14 @@ export function EvalRoute() {
     return [
       { label: "Total", value: selectedRun.summary.total ?? 0 },
       { label: "Passed", value: selectedRun.summary.passed ?? 0 },
-      { label: "Fixed", value: selectedRun.summary.fixed ?? 0 },
-      { label: "Deferred", value: selectedRun.summary.deferred ?? 0 },
+      {
+        label: "Prompt Fix Suggested",
+        value: selectedRun.summary.prompt_fix_suggested ?? 0,
+      },
+      {
+        label: "Investigation Needed",
+        value: selectedRun.summary.investigation_needed ?? 0,
+      },
       { label: "Failed", value: selectedRun.summary.failed ?? 0 },
     ];
   }, [selectedRun]);
@@ -191,7 +197,7 @@ export function EvalRoute() {
                     <TableHead>Status</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Failures</TableHead>
-                    <TableHead>Candidate</TableHead>
+                    <TableHead>Suggestion</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -213,7 +219,7 @@ export function EvalRoute() {
                           : scenario.failures.map((failure) => failure.field).join(", ")}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        {scenario.tuner?.candidate?.path ?? "—"}
+                        {scenario.tuner?.candidate ? "embedded" : "—"}
                       </TableCell>
                     </TableRow>
                   ))}

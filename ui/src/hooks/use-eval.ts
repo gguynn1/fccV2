@@ -32,7 +32,9 @@ export interface EvalScenarioRecord {
     status: string;
     summary: string;
     candidate?: {
-      path: string;
+      title: string;
+      summary: string;
+      body: string;
     };
   } | null;
 }

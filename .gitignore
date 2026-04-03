@@ -6,4 +6,3 @@ data/*
 !data/.gitkeep
 data/media/
 eval/results/
-eval/prompts/candidates/

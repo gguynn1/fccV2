@@ -18,12 +18,120 @@ function formatLogLines(state: EvalRunState, scenarioId: string): string {
   return lines.length > 0 ? lines.join("\n") : "- No logs captured.";
 }
 
+function quoteForPrompt(value: string): string {
+  return value.replaceAll('"""', '\\"\\"\\"');
+}
+
+function toLikelyFiles(scenario: EvalRunState["scenarios"][number]): string[] {
+  const files = new Set<string>();
+
+  files.add("eval/scenarios/default.ts");
+
+  for (const failure of scenario.failures) {
+    switch (failure.field) {
+      case "tone_markers":
+      case "format_markers":
+      case "must_not":
+        files.add("eval/runners/sequential-runner.ts");
+        files.add("eval/tuner/correct.ts");
+        break;
+      case "topic":
+      case "intent":
+      case "target_thread":
+      case "priority":
+      case "confirmation_required":
+        files.add("eval/runners/sequential-runner.ts");
+        break;
+      default:
+        break;
+    }
+  }
+
+  return [...files];
+}
+
+function buildAgentPrompt(state: EvalRunState): string {
+  const failingScenarios = state.scenarios.filter((scenario) => scenario.raw_outcome === "fail");
+
+  const scenarioInstructions = failingScenarios
+    .map((scenario) => {
+      const failureLines = scenario.failures
+        .map(
+          (failure) =>
+            `- ${failure.field}: expected ${JSON.stringify(failure.expected)}, actual ${JSON.stringify(failure.actual)}`,
+        )
+        .join("\n");
+      const likelyFiles = toLikelyFiles(scenario)
+        .map((file) => `- \`${file}\``)
+        .join("\n");
+      const suggestionLine = scenario.tuner?.candidate
+        ? `- Prompt suggestion is embedded in this run artifact under the detailed results section.`
+        : "- No embedded prompt suggestion was generated.";
+      return `### ${scenario.title}
+
+- Scenario ID: \`${scenario.id}\`
+- Final status: \`${scenario.status}\`
+- Category: \`${scenario.category}\`
+${suggestionLine}
+
+Failures:
+${failureLines}
+
+Likely files to inspect:
+${likelyFiles}
+
+Latest logs:
+${formatLogLines(state, scenario.id)}
+`;
+    })
+    .join("\n");
+
+  return `# Prompt For Cursor Or Claude Code
+
+Copy everything in the block below into your coding agent:
+
+\`\`\`text
+You are fixing failures from eval run \`${state.id}\` in the repository currently open on disk.
+
+Goal:
+- decide what is actually wrong
+- identify the smallest correct change
+- make the fix in the right file(s)
+- do not blindly trust scenario expectations if the scenario itself appears wrong
+
+Important context:
+- this eval implementation is the current local sequential runner under \`eval/\`, not a full real-pipeline eval system
+- \`prompt_fix_suggested\` means the eval tuner considered the failure prompt-fixable and embedded a prompt suggestion in the run artifact
+- \`investigation_needed\` means the failure likely needs code-level investigation rather than a prompt-only change
+- generated run artifacts live under \`eval/results/\`
+
+Run summary:
+- total: ${state.summary.total}
+- passed: ${state.summary.passed}
+- prompt_fix_suggested: ${state.summary.prompt_fix_suggested}
+- investigation_needed: ${state.summary.investigation_needed}
+- failed: ${state.summary.failed}
+- regressed: ${state.summary.regressed}
+
+Your task:
+1. Read the failing scenarios listed below.
+2. Inspect the suggested files first.
+3. Decide whether each failure should be fixed in scenario expectations, runner logic, tuner output, or another nearby file.
+4. Implement the fixes.
+5. Re-run the relevant eval command and confirm the result improves without breaking other scenarios.
+
+Failing scenarios:
+${quoteForPrompt(scenarioInstructions)}
+\`\`\`
+`;
+}
+
 function buildMarkdown(state: EvalRunState): string {
   const scenarioSections = state.scenarios
     .map((scenario) => {
-      const candidateLine = scenario.tuner?.candidate
-        ? `- Candidate: \`${scenario.tuner.candidate.path}\``
-        : "- Candidate: none";
+      const suggestionLine = scenario.tuner?.candidate
+        ? "- Prompt suggestion: embedded below"
+        : "- Prompt suggestion: none";
       const failureLines =
         scenario.failures.length > 0
           ? scenario.failures
@@ -42,10 +150,21 @@ function buildMarkdown(state: EvalRunState): string {
 - Raw outcome: \`${scenario.raw_outcome}\`
 - Started: ${scenario.started_at ?? "n/a"}
 - Completed: ${scenario.completed_at ?? "n/a"}
-${candidateLine}
+${suggestionLine}
 
 ### Tuner Summary
 ${scenario.tuner?.summary ?? "No tuner action required."}
+
+${
+  scenario.tuner?.candidate
+    ? `### Embedded Prompt Suggestion
+
+\`\`\`md
+${scenario.tuner.candidate.body}
+\`\`\`
+`
+    : ""
+}
 
 ### Failures
 ${failureLines}
@@ -68,10 +187,16 @@ ${formatLogLines(state, scenario.id)}
 
 - Total: ${state.summary.total}
 - Passed: ${state.summary.passed}
-- Fixed: ${state.summary.fixed}
-- Deferred: ${state.summary.deferred}
+- Prompt Fix Suggested: ${state.summary.prompt_fix_suggested}
+- Investigation Needed: ${state.summary.investigation_needed}
 - Failed: ${state.summary.failed}
 - Regressed: ${state.summary.regressed}
+
+## Pasteable Prompt
+
+${buildAgentPrompt(state)}
+
+## Detailed Results
 
 ${scenarioSections}
 `;
