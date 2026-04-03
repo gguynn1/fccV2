@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { adminFetch } from "@/lib/api";
 import type { DispatchMetadata } from "@/hooks/use-queue";
+import { adminFetch } from "@/lib/api";
 
 export interface ActiveEscalationPayload {
   id: string;

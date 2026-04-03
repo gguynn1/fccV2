@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
-import type { StateService } from "../../../02-supporting-services/types.js";
 import type { CalendarEvent } from "../../../02-supporting-services/04-topic-profile-service/04.01-calendar/types.js";
+import type { StateService } from "../../../02-supporting-services/types.js";
 import type { CalDAVCollectionMetadata, CalDAVEvent } from "./types.js";
 
 const DAV_HEADER = "1, calendar-access";

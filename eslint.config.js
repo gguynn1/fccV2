@@ -1,8 +1,8 @@
 import eslint from "@eslint/js";
-import { defineConfig } from "eslint/config";
 import eslintConfigPrettier from "eslint-config-prettier";
 import { flatConfigs } from "eslint-plugin-import-x";
 import unusedImports from "eslint-plugin-unused-imports";
+import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(

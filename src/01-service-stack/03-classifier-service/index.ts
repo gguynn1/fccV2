@@ -1,10 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { pino, type Logger } from "pino";
 
+import type { ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
+import type { StateService } from "../../02-supporting-services/types.js";
 import { ClassifierIntent, TopicKey } from "../../types.js";
 import type { StackClassificationResult, StackQueueItem } from "../types.js";
-import type { StateService } from "../../02-supporting-services/types.js";
-import type { ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
 import { classifierSystemPrompt, classifierUserPrompt } from "./prompts.js";
 import {
   classificationResultSchema,

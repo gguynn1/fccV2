@@ -1,10 +1,9 @@
 import type {
-  ClassifierIntent,
   ClarificationReason,
+  ClassifierIntent,
   EscalationLevel,
   TopicKey,
 } from "../../types.js";
-
 import type { CalendarAction } from "./04.01-calendar/types.js";
 import type { ChoreAction } from "./04.02-chores/types.js";
 import type { FinanceAction } from "./04.03-finances/types.js";

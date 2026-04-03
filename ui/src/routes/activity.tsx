@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { Pagination } from "@/components/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Pagination } from "@/components/pagination";
 import { useConfirmations, useDispatches, useEscalations } from "@/hooks/use-activity";
 
 const PAGE_SIZE = 20;

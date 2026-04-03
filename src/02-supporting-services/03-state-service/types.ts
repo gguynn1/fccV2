@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import type { QueueState } from "../../01-service-stack/04-queue/types.js";
+import type { DigestsState } from "../01-scheduler-service/types.js";
+import type { DataIngestState } from "../02-data-ingest-service/types.js";
 import type { CalendarState } from "../04-topic-profile-service/04.01-calendar/types.js";
 import type { ChoresState } from "../04-topic-profile-service/04.02-chores/types.js";
 import type { FinancesState } from "../04-topic-profile-service/04.03-finances/types.js";
@@ -19,8 +21,6 @@ import type { ThreadHistory } from "../05-routing-service/types.js";
 import type { OutboundBudgetTracker } from "../06-budget-service/types.js";
 import type { EscalationStatus } from "../07-escalation-service/types.js";
 import type { ConfirmationsState } from "../08-confirmation-service/types.js";
-import type { DigestsState } from "../01-scheduler-service/types.js";
-import type { DataIngestState } from "../02-data-ingest-service/types.js";
 
 export const queueStateRecordSchema = z.object({
   pending: z.array(z.unknown()),

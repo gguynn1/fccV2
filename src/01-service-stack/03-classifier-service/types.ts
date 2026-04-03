@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { EscalationLevel, GrocerySection, TopicKey, ClassifierIntent } from "../../types.js";
+import type { ClassifierIntent, EscalationLevel, GrocerySection, TopicKey } from "../../types.js";
 
 export interface ClassificationResult {
   topic: TopicKey;

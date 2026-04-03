@@ -1,10 +1,10 @@
 import { EscalationLevel, TopicKey } from "../../../types.js";
 import type { TopicProfile } from "../types.js";
 import {
-  type MaintenanceHistoryEntry,
-  type MaintenanceItem,
   MaintenanceInterval,
   MaintenanceStatus,
+  type MaintenanceHistoryEntry,
+  type MaintenanceItem,
 } from "./types.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

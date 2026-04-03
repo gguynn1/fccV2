@@ -1,13 +1,3 @@
-export * from "./01-scheduler-service/types.js";
-export * from "./02-data-ingest-service/types.js";
-export * from "./03-state-service/types.js";
-export * from "./04-topic-profile-service/types.js";
-export * from "./05-routing-service/types.js";
-export * from "./06-budget-service/types.js";
-export * from "./07-escalation-service/types.js";
-export * from "./08-confirmation-service/types.js";
-
-import type { ClassifierIntent, DispatchPriority, TopicKey } from "../types.js";
 import type {
   ActionRouterResult,
   CollisionPolicy,
@@ -15,9 +5,11 @@ import type {
   StackQueueItem,
   WorkerDecision,
 } from "../01-service-stack/types.js";
+import type { SystemConfig } from "../index.js";
+import type { ClassifierIntent, DispatchPriority, TopicKey } from "../types.js";
+import type { DigestDay } from "./01-scheduler-service/types.js";
 import type { DataIngestState } from "./02-data-ingest-service/types.js";
 import type { SystemState } from "./03-state-service/types.js";
-import type { SystemConfig } from "../index.js";
 import type { TopicProfileConfig } from "./04-topic-profile-service/types.js";
 import type { RoutingDecision, Thread, ThreadHistory } from "./05-routing-service/types.js";
 import type { OutboundBudgetTracker } from "./06-budget-service/types.js";
@@ -29,7 +21,15 @@ import type {
   ConfirmationResult,
   ConfirmationsState,
 } from "./08-confirmation-service/types.js";
-import type { DigestDay } from "./01-scheduler-service/types.js";
+
+export * from "./01-scheduler-service/types.js";
+export * from "./02-data-ingest-service/types.js";
+export * from "./03-state-service/types.js";
+export * from "./04-topic-profile-service/types.js";
+export * from "./05-routing-service/types.js";
+export * from "./06-budget-service/types.js";
+export * from "./07-escalation-service/types.js";
+export * from "./08-confirmation-service/types.js";
 
 export interface SchedulerQueueProducer {
   produceScheduledItems(reference_time: Date): Promise<StackQueueItem[]>;

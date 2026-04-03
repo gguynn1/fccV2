@@ -1,9 +1,9 @@
 import { pino, type Logger } from "pino";
 import { z } from "zod";
 
+import type { Thread } from "../../02-supporting-services/05-routing-service/types.js";
 import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import type { SystemConfig } from "../../index.js";
-import type { Thread } from "../../02-supporting-services/05-routing-service/types.js";
 import { entitiesSchema, EntityType, type Entity, type IdentityResolutionResult } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "identity-service" });

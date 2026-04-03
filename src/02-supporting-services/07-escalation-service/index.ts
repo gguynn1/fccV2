@@ -3,14 +3,14 @@ import { pino, type Logger } from "pino";
 import { assign, createActor, setup } from "xstate";
 
 import type { StackQueueItem } from "../../01-service-stack/types.js";
-import { ClassifierIntent, EscalationLevel, QueueItemSource, TopicKey } from "../../types.js";
 import { toRedisConnection } from "../../lib/redis.js";
+import { ClassifierIntent, EscalationLevel, QueueItemSource, TopicKey } from "../../types.js";
 import type { EscalationDecision, EscalationService, StateService } from "../types.js";
 import {
-  type ActiveEscalation,
   EscalationReassignmentPolicy,
-  type EscalationStatus,
   EscalationStepAction,
+  type ActiveEscalation,
+  type EscalationStatus,
 } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "escalation-service" });

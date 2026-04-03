@@ -1,13 +1,14 @@
-import BetterSqlite3 from "better-sqlite3";
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+
+import BetterSqlite3 from "better-sqlite3";
 import { pino, type Logger } from "pino";
 
-import type { SystemConfig } from "../../index.js";
 import { systemState as seedSystemState } from "../../_seed/system-state.js";
 import type { ActionRouterResult, StackQueueItem } from "../../01-service-stack/types.js";
-import type { StateService } from "../types.js";
+import type { SystemConfig } from "../../index.js";
 import type { ThreadHistory } from "../05-routing-service/types.js";
+import type { StateService } from "../types.js";
 import {
   confirmationsStateRecordSchema,
   dataIngestStateRecordSchema,

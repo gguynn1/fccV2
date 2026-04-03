@@ -59,14 +59,9 @@ All project tasks run through `npm run`. Never invoke tooling directly when a sc
 | `npm run ui:build`     | Build admin UI production bundle to `ui/dist/`                                    |
 | `npm run ui:preview`   | Preview admin UI production build                                                 |
 | `npm run ngrok:auth`   | Configure ngrok auth token from `.env`                                            |
-
-When the eval framework is implemented, additional scripts will be added:
-
-| Command                 | What it will do                     |
-| ----------------------- | ----------------------------------- |
-| `npm run eval`          | Run eval suite in watch mode        |
-| `npm run eval:run`      | Run eval suite once                 |
-| `npm run eval:coverage` | Run eval suite with coverage matrix |
+| `npm run eval`         | Invoke the eval CLI with the `watch` command alias                                |
+| `npm run eval:run`     | Run one sequential eval pass and write JSON/markdown artifacts                    |
+| `npm run eval:coverage`| Invoke the eval CLI with the `coverage` command alias                             |
 
 ### Script lifecycle for a typical workflow
 
@@ -75,6 +70,7 @@ npm run typecheck     →  backend + admin UI types clean?
 npm run lint          →  backend + admin UI lint clean?
 npm run build         →  compile backend to dist/
 npm run ui:build      →  build admin UI to ui/dist/
+npm run eval:run      →  write eval/results/*.json and *.prompt.md
 npm run start:seed    →  first boot: populate database from seed
 npm start             →  subsequent boots: run with existing database
 ```
@@ -94,3 +90,5 @@ npm start             →  subsequent boots: run with existing database
 6. **No global npm installs.** All project tooling (tsc, eslint, prettier, vitest) runs via `npx` from the project's `node_modules`. Never `npm install -g`.
 
 7. **Version awareness.** When installing new packages or writing scripts, account for the installed versions. Node 22 supports ESM natively, top-level await, and the latest V8 features. TypeScript 6 has `verbatimModuleSyntax` enabled.
+
+8. **Use the eval scripts for eval runs.** The current eval implementation is a TypeScript CLI under `eval/cli.ts`. Prefer `npm run eval:run` for one-shot runs. The backend starts eval from the UI by spawning that script rather than importing `eval/` into `src/`.

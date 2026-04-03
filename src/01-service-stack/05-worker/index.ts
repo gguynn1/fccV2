@@ -1,46 +1,7 @@
 import { pino, type Logger } from "pino";
 
-import {
-  ClarificationReason,
-  ClassifierIntent,
-  DispatchPriority,
-  QueueItemSource,
-  TopicKey,
-} from "../../types.js";
-import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
-import type {
-  ActionRouterContract,
-  ActionRouterResult,
-  ClassifierServiceContract,
-  CollisionPolicy,
-  DispatchAction,
-  HoldAction,
-  IdentityResolutionResult,
-  StackClassificationResult,
-  StackQueueItem,
-  StoreAction,
-  TransportOutboundEnvelope,
-  TransportServiceContract,
-  WorkerDecision,
-} from "../types.js";
-import { SamePrecedenceStrategy } from "../types.js";
-import { createActionRouter } from "../06-action-router/index.js";
-import { createIdentityService } from "../02-identity-service/index.js";
-import {
-  type BudgetDecision,
-  type BudgetService,
-  type ConfirmationService,
-  type EscalationService,
-  type RoutingService,
-  type StateService,
-  type TopicProfileService,
-} from "../../02-supporting-services/types.js";
-import type { RoutingDecision } from "../../02-supporting-services/05-routing-service/types.js";
-import {
-  type TopicAction,
-  type TopicProfile,
-} from "../../02-supporting-services/04-topic-profile-service/types.js";
 import { HealthProviderType } from "../../02-supporting-services/04-topic-profile-service/04.05-health/types.js";
+import { PetCareCategory } from "../../02-supporting-services/04-topic-profile-service/04.06-pets/types.js";
 import { SchoolInputSource } from "../../02-supporting-services/04-topic-profile-service/04.07-school/types.js";
 import {
   TravelInputSource,
@@ -53,19 +14,58 @@ import {
   MaintenanceAssetType,
   MaintenanceStatus,
 } from "../../02-supporting-services/04-topic-profile-service/04.14-maintenance/types.js";
-import { PetCareCategory } from "../../02-supporting-services/04-topic-profile-service/04.06-pets/types.js";
+import {
+  type TopicAction,
+  type TopicProfile,
+} from "../../02-supporting-services/04-topic-profile-service/types.js";
+import type { RoutingDecision } from "../../02-supporting-services/05-routing-service/types.js";
 import {
   ConfirmationActionType,
   ConfirmationResult,
 } from "../../02-supporting-services/08-confirmation-service/types.js";
 import {
-  type ClarificationRequest,
-  type ProcessingTrace,
-  type ProcessingTraceStep,
-  type ProcessingOutcome,
-  type WorkerConfig,
+  type BudgetDecision,
+  type BudgetService,
+  type ConfirmationService,
+  type EscalationService,
+  type RoutingService,
+  type StateService,
+  type TopicProfileService,
+} from "../../02-supporting-services/types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
+import {
+  ClarificationReason,
+  ClassifierIntent,
+  DispatchPriority,
+  QueueItemSource,
+  TopicKey,
+} from "../../types.js";
+import { createIdentityService } from "../02-identity-service/index.js";
+import { createActionRouter } from "../06-action-router/index.js";
+import {
+  SamePrecedenceStrategy,
+  type ActionRouterContract,
+  type ActionRouterResult,
+  type ClassifierServiceContract,
+  type CollisionPolicy,
+  type DispatchAction,
+  type HoldAction,
+  type IdentityResolutionResult,
+  type StackClassificationResult,
+  type StackQueueItem,
+  type StoreAction,
+  type TransportOutboundEnvelope,
+  type TransportServiceContract,
+  type WorkerDecision,
+} from "../types.js";
+import {
   WorkerAction,
   WorkerService,
+  type ClarificationRequest,
+  type ProcessingOutcome,
+  type ProcessingTrace,
+  type ProcessingTraceStep,
+  type WorkerConfig,
 } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "worker" });

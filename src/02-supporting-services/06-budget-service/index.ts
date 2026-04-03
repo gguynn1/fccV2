@@ -2,10 +2,10 @@ import BetterSqlite3 from "better-sqlite3";
 import { Queue } from "bullmq";
 import { pino, type Logger } from "pino";
 
-import { DispatchPriority } from "../../types.js";
+import type { CollisionPolicy, StackQueueItem } from "../../01-service-stack/types.js";
 import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
-import type { StackQueueItem, CollisionPolicy } from "../../01-service-stack/types.js";
 import { toRedisConnection } from "../../lib/redis.js";
+import { DispatchPriority } from "../../types.js";
 import type { BudgetDecision, BudgetService, StateService } from "../types.js";
 import type { OutboundBudgetTracker } from "./types.js";
 

@@ -1,10 +1,14 @@
 import { useCallback } from "react";
 
+import { EditableCell } from "@/components/editable-cell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { EditableCell } from "@/components/editable-cell";
-import { useScheduler, useUpdateScheduler } from "@/hooks/use-scheduler";
-import type { DailyRhythmPayload, SchedulerResponse } from "@/hooks/use-scheduler";
+import {
+  useScheduler,
+  useUpdateScheduler,
+  type DailyRhythmPayload,
+  type SchedulerResponse,
+} from "@/hooks/use-scheduler";
 
 function DigestBlock({
   title,

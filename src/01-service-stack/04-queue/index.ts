@@ -1,15 +1,15 @@
-import { Queue, type Job, type JobsOptions, Worker } from "bullmq";
+import { Queue, Worker, type Job, type JobsOptions } from "bullmq";
 import { pino, type Logger } from "pino";
 
 import type { StateService } from "../../02-supporting-services/types.js";
 import { toRedisConnection } from "../../lib/redis.js";
 import type { StackQueueItem } from "../types.js";
 import {
-  type PendingQueueItem,
   pendingQueueItemSchema,
-  type QueueConsumerOptions,
   QueueItemSource,
   QueueItemType,
+  type PendingQueueItem,
+  type QueueConsumerOptions,
 } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "queue-service" });

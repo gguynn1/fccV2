@@ -1,5 +1,5 @@
-import { ClassifierIntent, DispatchPriority, QueueItemSource, TopicKey } from "../types.js";
 import type { StackQueueItem } from "../01-service-stack/types.js";
+import { ClassifierIntent, DispatchPriority, QueueItemSource, TopicKey } from "../types.js";
 
 export function fixtureNow(): Date {
   return new Date("2026-04-03T12:00:00.000Z");

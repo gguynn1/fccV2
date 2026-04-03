@@ -1,13 +1,21 @@
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
+import { EntityType, Permission } from "../01-service-stack/02-identity-service/types.js";
 import { type BullQueueService } from "../01-service-stack/04-queue/index.js";
 import type { PendingQueueItem } from "../01-service-stack/04-queue/types.js";
-import { EntityType, Permission } from "../01-service-stack/02-identity-service/types.js";
 import { type SqliteStateService } from "../02-supporting-services/03-state-service/index.js";
-import { ConfirmationActionType } from "../02-supporting-services/08-confirmation-service/types.js";
 import { ThreadType } from "../02-supporting-services/05-routing-service/types.js";
+import { ConfirmationActionType } from "../02-supporting-services/08-confirmation-service/types.js";
 import { applyRuntimeSystemConfig } from "../config/runtime-system-config.js";
+import {
+  getActiveEvalRunId,
+  getEvalRun,
+  getEvalRunMarkdown,
+  getEvalScenarioSets,
+  listEvalRuns,
+  startEvalRun,
+} from "./eval-runs.js";
 
 const threadSchema = z.object({
   id: z.string().min(1),
@@ -66,6 +74,10 @@ const budgetPayloadSchema = z.object({
 
 const schedulerPayloadSchema = z.object({
   daily_rhythm: z.record(z.string(), z.unknown()),
+});
+
+const evalStartPayloadSchema = z.object({
+  scenario_set: z.string().min(1).optional(),
 });
 
 export interface AdminRoutesOptions {
@@ -312,6 +324,64 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
       ok: true,
       discarded: toPendingQueueMetadata(item),
     };
+  });
+
+  fastify.get("/eval", async () => {
+    const [runs] = await Promise.all([listEvalRuns()]);
+
+    return {
+      scenario_sets: getEvalScenarioSets(),
+      active_run_id: getActiveEvalRunId(),
+      runs,
+    };
+  });
+
+  fastify.post("/eval/runs", async (request, reply) => {
+    const payload = evalStartPayloadSchema.parse(request.body ?? {});
+
+    try {
+      const result = await startEvalRun(payload.scenario_set ?? "default");
+      return {
+        ok: true,
+        ...result,
+      };
+    } catch (error: unknown) {
+      return reply.code(409).send({
+        error: "eval_run_conflict",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  fastify.get("/eval/runs/:id", async (request, reply) => {
+    const params = z.object({ id: z.string().min(1) }).parse(request.params);
+    const run = await getEvalRun(params.id);
+
+    if (!run) {
+      return reply.code(404).send({
+        error: "eval_run_not_found",
+        message: "Eval run not found.",
+      });
+    }
+
+    return {
+      run,
+      active_run_id: getActiveEvalRunId(),
+    };
+  });
+
+  fastify.get("/eval/runs/:id/markdown", async (request, reply) => {
+    const params = z.object({ id: z.string().min(1) }).parse(request.params);
+    const artifact = await getEvalRunMarkdown(params.id);
+
+    if (!artifact) {
+      return reply.code(404).send({
+        error: "eval_markdown_not_found",
+        message: "Eval markdown artifact not found.",
+      });
+    }
+
+    return artifact;
   });
 
   done();

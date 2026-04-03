@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ClassifierIntent, QueueItemSource, TopicKey } from "../../types.js";
-import type { CollisionPolicy, WorkerDecision } from "../types.js";
-import { SamePrecedenceStrategy } from "../types.js";
+import { SamePrecedenceStrategy, type CollisionPolicy, type WorkerDecision } from "../types.js";
 import { createActionRouter } from "./index.js";
 import { CollisionPrecedence, DispatchPriority } from "./types.js";
 

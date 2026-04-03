@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { systemConfig } from "../_seed/system-config.js";
+import { RoutingRule } from "../02-supporting-services/05-routing-service/types.js";
 import {
   ClassifierIntent,
   DispatchPriority,
@@ -7,8 +9,7 @@ import {
   QueueItemSource,
   TopicKey,
 } from "../types.js";
-import { systemConfig } from "../_seed/system-config.js";
-import { RoutingRule } from "../02-supporting-services/05-routing-service/types.js";
+import { createWorker, type WorkerOptions } from "./05-worker/index.js";
 import type {
   ActionRouterContract,
   ActionRouterResult,
@@ -21,7 +22,6 @@ import type {
   TransportServiceContract,
   WorkerDecision,
 } from "./types.js";
-import { createWorker, type WorkerOptions } from "./05-worker/index.js";
 
 function resolved<T>(value: T): Promise<T> {
   return Promise.resolve(value);

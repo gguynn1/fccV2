@@ -1,13 +1,12 @@
 import { pino, type Logger } from "pino";
 import { z } from "zod";
 
-import { ClassifierIntent, EscalationLevel, TopicKey } from "../../types.js";
-import type { TopicProfileConfig, TopicProfile } from "./types.js";
 import type {
   StackClassificationResult,
   StackQueueItem,
   WorkerDecision,
 } from "../../01-service-stack/types.js";
+import { ClassifierIntent, EscalationLevel, TopicKey } from "../../types.js";
 import type { ThreadHistory } from "../05-routing-service/types.js";
 import { CALENDAR_TOPIC_PROFILE } from "./04.01-calendar/profile.js";
 import { CHORES_TOPIC_PROFILE } from "./04.02-chores/profile.js";
@@ -23,6 +22,7 @@ import { RELATIONSHIP_TOPIC_PROFILE } from "./04.11-relationship/profile.js";
 import { FAMILY_STATUS_TOPIC_PROFILE } from "./04.12-family-status/profile.js";
 import { MEALS_TOPIC_PROFILE } from "./04.13-meals/profile.js";
 import { MAINTENANCE_TOPIC_PROFILE } from "./04.14-maintenance/profile.js";
+import type { TopicProfile, TopicProfileConfig } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "topic-profile-service" });
 

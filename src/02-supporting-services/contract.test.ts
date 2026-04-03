@@ -4,8 +4,10 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { systemConfig } from "../_seed/system-config.js";
-import { DispatchPriority } from "../types.js";
 import { SamePrecedenceStrategy } from "../01-service-stack/types.js";
+import { DispatchPriority } from "../types.js";
+import { ConfirmationActionType } from "./08-confirmation-service/types.js";
+import { fixtureQueueItem, fixtureThreadHistory } from "./test-fixtures.js";
 import type {
   BudgetService,
   ConfirmationService,
@@ -15,8 +17,6 @@ import type {
   StateService,
   TopicProfileService,
 } from "./types.js";
-import { ConfirmationActionType } from "./08-confirmation-service/types.js";
-import { fixtureQueueItem, fixtureThreadHistory } from "./test-fixtures.js";
 
 function getServiceDirectories(): string[] {
   const root = resolve(process.cwd(), "src/02-supporting-services");

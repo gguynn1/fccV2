@@ -1,7 +1,8 @@
-import BetterSqlite3 from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
+import BetterSqlite3 from "better-sqlite3";
 
 import { createStateService } from "./02-supporting-services/03-state-service/index.js";
 import { StateSnapshotMode } from "./02-supporting-services/03-state-service/types.js";

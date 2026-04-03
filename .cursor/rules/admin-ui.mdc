@@ -1,8 +1,13 @@
+---
+description: Admin UI scope, interaction patterns, and local-only constraints
+alwaysApply: true
+---
+
 # Admin UI
 
 ## Purpose
 
-The admin UI is a **management tool** for system configuration and state. It is not a monitoring dashboard, not a message reader, and not an eval interface. Every page exists to let the operator view and change something actionable. If data cannot be managed through the UI, it does not belong in the UI.
+The admin UI is a **local operator surface** for system configuration, state, and the current eval runner workflow. It is not a message reader. Every page should expose either editable configuration, operational controls, or run-state that the operator can act on.
 
 ## Design Decisions
 
@@ -16,7 +21,7 @@ The admin UI is a **management tool** for system configuration and state. It is 
 
 - **Top navigation bar** with horizontal links to all pages. Full-width content area below.
 - No sidebar. No collapsible rail. No nested navigation.
-- Pages: Dashboard, Entities, Threads, Topics, Budget, Scheduler, Queue, Activity.
+- Pages: Dashboard, Entities, Threads, Topics, Budget, Scheduler, Queue, Activity, Eval.
 
 ### Responsiveness
 
@@ -31,10 +36,10 @@ The admin UI is a **management tool** for system configuration and state. It is 
 
 ### Scope Boundaries
 
-- **Show only what can be managed.** No read-only display pages. Every piece of data shown is either editable or actionable (retry, discard).
+- **Show only operationally useful data.** Pages should expose editable configuration, direct actions, or run-state that supports a direct action such as starting, following, or reviewing a run.
 - **No message content.** The UI never displays raw message bodies from participant threads. Queue items and dispatch records show metadata only: timestamps, topics, threads, entity IDs, status.
 - **No manual enqueue.** The UI cannot create new queue items. Queue page is inspect + retry/discard for DLQ items only.
-- **No eval integration.** The eval framework is a CLI/developer tool. No eval pages, no eval results, no tuner candidate management in the UI.
+- **Eval scope is narrow.** The Eval page may start a sequential run, show run status, show structured logs, show per-scenario outcomes, and display the generated prompt markdown artifact. It must not edit prompts, promote candidates, or expose participant message history.
 
 ### Topic Profile Editability
 
@@ -100,6 +105,7 @@ ui/
 - All admin API routes under `/api/admin/*`.
 - Both `/admin` (UI) and `/api/admin/*` (API) are **local-network only** — reject requests arriving through the ngrok tunnel via `X-Forwarded-For` / `X-Forwarded-Host` header inspection.
 - No authentication required (local network trust model).
+- Eval APIs follow the same local-only rule and use polling against persisted run state. No WebSocket or SSE transport.
 
 ## Testing
 

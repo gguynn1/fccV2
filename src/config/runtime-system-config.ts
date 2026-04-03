@@ -1,5 +1,5 @@
-import type { SystemConfig } from "../index.js";
 import { systemConfig } from "../_seed/system-config.js";
+import type { SystemConfig } from "../index.js";
 
 function replaceValueInPlace(target: unknown, source: unknown): unknown {
   if (Array.isArray(target) && Array.isArray(source)) {

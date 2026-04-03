@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { systemConfig } from "../../_seed/system-config.js";
+import { systemState } from "../../_seed/system-state.js";
 import { type SystemState } from "../../02-supporting-services/03-state-service/types.js";
 import { createTopicProfileService } from "../../02-supporting-services/04-topic-profile-service/index.js";
 import { createRoutingService } from "../../02-supporting-services/05-routing-service/index.js";
 import { type ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
-import { systemConfig } from "../../_seed/system-config.js";
-import { systemState } from "../../_seed/system-state.js";
+import { ConfirmationResult } from "../../02-supporting-services/08-confirmation-service/types.js";
 import { ClassifierIntent, DispatchPriority, QueueItemSource, TopicKey } from "../../types.js";
 import type {
   IdentityResolutionResult,
@@ -13,7 +14,6 @@ import type {
   StackQueueItem,
   TransportOutboundEnvelope,
 } from "../types.js";
-import { ConfirmationResult } from "../../02-supporting-services/08-confirmation-service/types.js";
 import { createWorker } from "./index.js";
 
 function resolved<T>(value: T): Promise<T> {

@@ -1,4 +1,4 @@
-import type { TopicKey, EscalationLevel } from "../../types.js";
+import type { EscalationLevel, TopicKey } from "../../types.js";
 
 export enum EscalationStepAction {
   ReminderSent = "reminder_sent",

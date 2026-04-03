@@ -2,12 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ImapFlow } from "imapflow";
 import { pino, type Logger } from "pino";
 
-import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import type {
   ClassifierServiceContract,
   StackClassificationResult,
   StackQueueItem,
 } from "../../01-service-stack/types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import {
   ClassifierIntent,
   DispatchPriority,

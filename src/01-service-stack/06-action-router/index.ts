@@ -1,16 +1,16 @@
 import { pino, type Logger } from "pino";
 
 import { ClassifierIntent, QueueItemSource, TopicKey } from "../../types.js";
-import type {
-  ActionRouterContract,
-  ActionRouterResult,
-  CollisionPolicy,
-  DispatchAction,
-  HoldAction,
-  StoreAction,
-  WorkerDecision,
+import {
+  SamePrecedenceStrategy,
+  type ActionRouterContract,
+  type ActionRouterResult,
+  type CollisionPolicy,
+  type DispatchAction,
+  type HoldAction,
+  type StoreAction,
+  type WorkerDecision,
 } from "../types.js";
-import { SamePrecedenceStrategy } from "../types.js";
 import { validateDispatchAction } from "./06.1-dispatch/index.js";
 import { validateHoldAction } from "./06.2-hold/index.js";
 import { validateStoreAction } from "./06.3-store/index.js";

@@ -1,24 +1,28 @@
 import { existsSync } from "node:fs";
-import { parse as parseQueryString } from "node:querystring";
 import { resolve } from "node:path";
-import { Queue, type Worker } from "bullmq";
+import { parse as parseQueryString } from "node:querystring";
+
 import fastifyStaticPlugin from "@fastify/static";
-import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
+import type BetterSqlite3 from "better-sqlite3";
+import { Queue, type Worker } from "bullmq";
+import Fastify, {
+  type FastifyBaseLogger,
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from "fastify";
 import type { ImapFlow } from "imapflow";
 import { pino } from "pino";
-import type BetterSqlite3 from "better-sqlite3";
 
 import { createCalDavService } from "./01-service-stack/01-transport-layer/01.1-caldav/index.js";
 import { createTwilioTransportLayer } from "./01-service-stack/01-transport-layer/index.js";
+import { createClassifierService } from "./01-service-stack/03-classifier-service/index.js";
+import { BullQueueService } from "./01-service-stack/04-queue/index.js";
+import { createWorker, createWorkerIdentityService } from "./01-service-stack/05-worker/index.js";
 import type {
   TransportOutboundEnvelope,
   TransportServiceContract,
 } from "./01-service-stack/types.js";
-import { adminRoutes } from "./admin/routes.js";
-import { createClassifierService } from "./01-service-stack/03-classifier-service/index.js";
-import { BullQueueService } from "./01-service-stack/04-queue/index.js";
-import { createWorker, createWorkerIdentityService } from "./01-service-stack/05-worker/index.js";
-import { applyRuntimeSystemConfig, runtimeSystemConfig } from "./config/runtime-system-config.js";
 import { createDataIngestService } from "./02-supporting-services/02-data-ingest-service/index.js";
 import {
   createStateService,
@@ -38,8 +42,10 @@ import {
   createConfirmationService,
   type BullConfirmationService,
 } from "./02-supporting-services/08-confirmation-service/index.js";
-import { loadEnv } from "./env.js";
+import { adminRoutes } from "./admin/routes.js";
 import { initializeDatabase } from "./bootstrap.js";
+import { applyRuntimeSystemConfig, runtimeSystemConfig } from "./config/runtime-system-config.js";
+import { loadEnv } from "./env.js";
 import { toRedisConnection } from "./lib/redis.js";
 
 const logger = pino({ name: "fcc-server" });
@@ -195,7 +201,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
   await queueService.verifyConnection();
   logger.info("Redis connected and AOF verified.");
 
-  const fastify = Fastify({ logger });
+  const fastify = Fastify({ loggerInstance: logger as FastifyBaseLogger });
   fastify.addContentTypeParser(
     "application/x-www-form-urlencoded",
     { parseAs: "string" },
@@ -253,7 +259,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
   // CalDAV runs on a separate port, accessible only on the local network.
   // No ngrok tunnel — unauthenticated calendar data stays off the public internet.
   const caldavPort = Number(env.CALDAV_PORT || "3001");
-  const caldavServer = Fastify({ logger });
+  const caldavServer = Fastify({ loggerInstance: logger as FastifyBaseLogger });
   caldavServer.addHttpMethod("PROPFIND", { hasBody: true });
   caldavServer.addHttpMethod("REPORT", { hasBody: true });
   const calDavService = createCalDavService({ state_service: stateService });

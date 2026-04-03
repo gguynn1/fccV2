@@ -1,10 +1,9 @@
 import { useCallback } from "react";
 
+import { EditableCell } from "@/components/editable-cell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EditableCell } from "@/components/editable-cell";
-import { useBudget, useUpdateBudget } from "@/hooks/use-budget";
-import type { BudgetResponse } from "@/hooks/use-budget";
+import { useBudget, useUpdateBudget, type BudgetResponse } from "@/hooks/use-budget";
 
 export function BudgetRoute() {
   const { data, isLoading } = useBudget();

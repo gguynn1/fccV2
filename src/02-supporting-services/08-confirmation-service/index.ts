@@ -1,10 +1,10 @@
 import { Queue } from "bullmq";
 import { pino, type Logger } from "pino";
 
-import { QueueItemSource, QueueItemType } from "../../types.js";
 import { type PendingQueueItem } from "../../01-service-stack/04-queue/types.js";
 import type { StackQueueItem } from "../../01-service-stack/types.js";
 import { toRedisConnection } from "../../lib/redis.js";
+import { QueueItemSource, QueueItemType } from "../../types.js";
 import type { ConfirmationRequest, ConfirmationService, StateService } from "../types.js";
 import {
   ConfirmationReplyDecision,

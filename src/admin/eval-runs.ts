@@ -1,0 +1,162 @@
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { mkdir, readdir, readFile, stat } from "node:fs/promises";
+import { resolve } from "node:path";
+
+interface EvalScenarioSetSummary {
+  name: string;
+  label: string;
+}
+
+export interface EvalRunRecord {
+  id: string;
+  scenario_set: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  summary: Record<string, number>;
+  scenarios: Array<{
+    id: string;
+    title: string;
+    status: string;
+    category: string;
+  }>;
+  logs: Array<{
+    seq: number;
+    timestamp: string;
+    level: string;
+    phase: string;
+    scenario_id?: string;
+    message: string;
+  }>;
+  artifacts: {
+    json_path: string;
+    markdown_path: string | null;
+  };
+}
+
+const activeRuns = new Map<string, ChildProcessWithoutNullStreams>();
+const scenarioSets: EvalScenarioSetSummary[] = [{ name: "default", label: "Default" }];
+
+function getResultsDirectory(): string {
+  return resolve(process.cwd(), "eval/results");
+}
+
+function getNpmExecutable(): string {
+  return process.platform === "win32" ? "npm.cmd" : "npm";
+}
+
+async function ensureResultsDirectory(): Promise<string> {
+  const resultsDirectory = getResultsDirectory();
+  await mkdir(resultsDirectory, { recursive: true });
+  return resultsDirectory;
+}
+
+async function readRunRecord(filePath: string): Promise<EvalRunRecord | null> {
+  try {
+    const contents = await readFile(filePath, "utf8");
+    return JSON.parse(contents) as EvalRunRecord;
+  } catch {
+    return null;
+  }
+}
+
+export async function listEvalRuns(limit = 20): Promise<EvalRunRecord[]> {
+  const resultsDirectory = await ensureResultsDirectory();
+  const filenames = (await readdir(resultsDirectory)).filter((filename) =>
+    filename.endsWith(".json"),
+  );
+  const entries = await Promise.all(
+    filenames.map(async (filename) => {
+      const filePath = resolve(resultsDirectory, filename);
+      const fileStat = await stat(filePath);
+      return { filePath, modifiedAt: fileStat.mtimeMs };
+    }),
+  );
+
+  entries.sort((left, right) => right.modifiedAt - left.modifiedAt);
+
+  const records = await Promise.all(
+    entries.slice(0, limit).map((entry) => readRunRecord(entry.filePath)),
+  );
+
+  return records.filter((record): record is EvalRunRecord => record !== null);
+}
+
+export async function getEvalRun(runId: string): Promise<EvalRunRecord | null> {
+  const resultsDirectory = await ensureResultsDirectory();
+  return readRunRecord(resolve(resultsDirectory, `${runId}.json`));
+}
+
+export async function getEvalRunMarkdown(
+  runId: string,
+): Promise<{ path: string; content: string } | null> {
+  const resultsDirectory = await ensureResultsDirectory();
+  const markdownPath = resolve(resultsDirectory, `${runId}.prompt.md`);
+
+  try {
+    const content = await readFile(markdownPath, "utf8");
+    return {
+      path: `eval/results/${runId}.prompt.md`,
+      content,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function getEvalScenarioSets(): EvalScenarioSetSummary[] {
+  return scenarioSets;
+}
+
+export function getActiveEvalRunId(): string | null {
+  for (const [runId, child] of activeRuns.entries()) {
+    if (child.exitCode === null && !child.killed) {
+      return runId;
+    }
+  }
+
+  return null;
+}
+
+export async function startEvalRun(scenarioSet: string): Promise<{ run_id: string }> {
+  if (getActiveEvalRunId()) {
+    throw new Error("An eval run is already active.");
+  }
+
+  await ensureResultsDirectory();
+  const runId = `eval-run-${randomUUID()}`;
+  const child = spawn(
+    getNpmExecutable(),
+    [
+      "run",
+      "eval:run",
+      "--",
+      "--run-id",
+      runId,
+      "--scenario-set",
+      scenarioSet,
+      "--step-delay-ms",
+      "250",
+    ],
+    {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: "pipe",
+    },
+  );
+
+  activeRuns.set(runId, child);
+
+  const cleanup = () => {
+    activeRuns.delete(runId);
+  };
+
+  child.on("exit", cleanup);
+  child.on("error", cleanup);
+
+  child.stdout.resume();
+  child.stderr.resume();
+
+  return { run_id: runId };
+}

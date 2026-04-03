@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { adminFetch } from "@/lib/api";
-import type { QueueResponse } from "@/hooks/use-queue";
 import type {
-  EscalationsResponse,
   ConfirmationsResponse,
   DispatchesResponse,
+  EscalationsResponse,
 } from "@/hooks/use-activity";
 import type { BudgetResponse } from "@/hooks/use-budget";
+import type { QueueResponse } from "@/hooks/use-queue";
+import { adminFetch } from "@/lib/api";
 
 export interface DashboardData {
   queue: QueueResponse;

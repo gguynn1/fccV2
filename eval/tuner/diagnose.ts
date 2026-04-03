@@ -1,0 +1,35 @@
+import type { EvalScenarioDefinition, EvalScenarioFailure, EvalTunerOutcome } from "../types.js";
+
+export interface EvalDiagnosis {
+  can_fix_with_prompt: boolean;
+  failing_dimensions: string[];
+  summary: string;
+}
+
+export function diagnoseScenarioFailures(
+  scenario: EvalScenarioDefinition,
+  failures: EvalScenarioFailure[],
+): EvalDiagnosis {
+  const failingDimensions = failures.map((failure) => failure.field);
+  const promptFixable = failures.every((failure) => failure.prompt_fixable);
+  const forcedScope = scenario.simulation?.tuning_scope;
+
+  const canFixWithPrompt =
+    forcedScope === "prompt" ? true : forcedScope === "structural" ? false : promptFixable;
+
+  return {
+    can_fix_with_prompt: canFixWithPrompt,
+    failing_dimensions: [...new Set(failingDimensions)],
+    summary: canFixWithPrompt
+      ? "The failing dimensions are limited to message composition, so a prompt candidate can be proposed."
+      : "The failure touches classification, routing, priority, or confirmation behavior and should stay deferred for runtime work.",
+  };
+}
+
+export function toDeferredTunerOutcome(diagnosis: EvalDiagnosis): EvalTunerOutcome {
+  return {
+    status: "deferred",
+    summary: diagnosis.summary,
+    failing_dimensions: diagnosis.failing_dimensions,
+  };
+}

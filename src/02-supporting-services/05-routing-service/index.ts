@@ -1,17 +1,18 @@
 import { pino, type Logger } from "pino";
 
-import { EntityType } from "../../types.js";
 import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
+import { EntityType } from "../../types.js";
 import type { RoutingRequest, RoutingService } from "../types.js";
-import type {
-  ContextTransitionPolicy,
-  RoutingDecision,
-  RoutingDecisionInput,
-  Thread,
-  ThreadHistory,
-  ThreadTarget,
+import {
+  RoutingRule,
+  ThreadType,
+  type ContextTransitionPolicy,
+  type RoutingDecision,
+  type RoutingDecisionInput,
+  type Thread,
+  type ThreadHistory,
+  type ThreadTarget,
 } from "./types.js";
-import { RoutingRule, ThreadType } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "routing-service" });
 

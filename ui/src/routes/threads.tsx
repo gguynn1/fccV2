@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 
+import { EditableCell } from "@/components/editable-cell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -10,9 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EditableCell } from "@/components/editable-cell";
-import { useEntities, useUpdateEntities } from "@/hooks/use-entities";
 import { useConfig, useUpdateConfig } from "@/hooks/use-config";
+import { useEntities, useUpdateEntities } from "@/hooks/use-entities";
 
 export function ThreadsRoute() {
   const { data: entitiesData, isLoading: entitiesLoading } = useEntities();

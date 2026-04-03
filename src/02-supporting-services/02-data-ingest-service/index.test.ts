@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { systemConfig } from "../../_seed/system-config.js";
 import { systemState } from "../../_seed/system-state.js";
+import type { StackQueueItem } from "../../01-service-stack/types.js";
 import { QueueItemSource, TopicKey } from "../../types.js";
 import type { SystemState } from "../03-state-service/types.js";
-import type { StackQueueItem } from "../../01-service-stack/types.js";
 import { createDataIngestService } from "./index.js";
 
 function resolved<T>(value: T): Promise<T> {

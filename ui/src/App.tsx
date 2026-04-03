@@ -7,6 +7,7 @@ import { ActivityRoute } from "@/routes/activity";
 import { BudgetRoute } from "@/routes/budget";
 import { DashboardRoute } from "@/routes/dashboard";
 import { EntitiesRoute } from "@/routes/entities";
+import { EvalRoute } from "@/routes/eval";
 import { QueueRoute } from "@/routes/queue";
 import { SchedulerRoute } from "@/routes/scheduler";
 import { ThreadsRoute } from "@/routes/threads";
@@ -36,6 +37,7 @@ export function App() {
             <Route path="/scheduler" element={<SchedulerRoute />} />
             <Route path="/queue" element={<QueueRoute />} />
             <Route path="/activity" element={<ActivityRoute />} />
+            <Route path="/eval" element={<EvalRoute />} />
           </Routes>
         </Layout>
       </HashRouter>

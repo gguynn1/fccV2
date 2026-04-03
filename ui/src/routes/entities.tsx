@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 
+import { EditableCell } from "@/components/editable-cell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -11,9 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EditableCell } from "@/components/editable-cell";
-import { useEntities, useUpdateEntities } from "@/hooks/use-entities";
-import type { EntityPayload } from "@/hooks/use-entities";
+import { useEntities, useUpdateEntities, type EntityPayload } from "@/hooks/use-entities";
 
 function permissionLabel(p: string): string {
   return p.replace(/_/g, " ");

@@ -1,12 +1,16 @@
 import { useCallback } from "react";
 
+import { EditableCell } from "@/components/editable-cell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { EditableCell } from "@/components/editable-cell";
-import { useTopics, useUpdateTopics } from "@/hooks/use-topics";
-import type { TopicConfigPayload, TopicsResponse } from "@/hooks/use-topics";
+import {
+  useTopics,
+  useUpdateTopics,
+  type TopicConfigPayload,
+  type TopicsResponse,
+} from "@/hooks/use-topics";
 
 const ESCALATION_LEVELS = ["high", "medium", "low", "none"] as const;
 

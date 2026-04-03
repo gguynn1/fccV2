@@ -1,6 +1,9 @@
 import { Queue } from "bullmq";
 import { pino, type Logger } from "pino";
 
+import { type PendingQueueItem } from "../../01-service-stack/04-queue/types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
+import { toRedisConnection } from "../../lib/redis.js";
 import {
   ClassifierIntent,
   DispatchPriority,
@@ -8,17 +11,14 @@ import {
   QueueItemSource,
   QueueItemType,
 } from "../../types.js";
-import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
-import { type PendingQueueItem } from "../../01-service-stack/04-queue/types.js";
-import { toRedisConnection } from "../../lib/redis.js";
 import type { StateService } from "../types.js";
-import type {
-  DailyRhythm,
-  DigestDay,
-  SchedulerStartupRecoveryResult,
-  ScheduledEvent,
+import {
+  ScheduledEventType,
+  type DailyRhythm,
+  type DigestDay,
+  type ScheduledEvent,
+  type SchedulerStartupRecoveryResult,
 } from "./types.js";
-import { ScheduledEventType } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "scheduler-service" });
 const SCHEDULER_JOB_QUEUE = "fcc-scheduler";

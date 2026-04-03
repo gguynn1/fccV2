@@ -1,17 +1,17 @@
 import {
-  type SystemConfig,
-  EntityType,
-  Permission,
-  ThreadType,
-  EscalationLevel,
-  TopicKey,
-  GrocerySection,
+  CollisionPrecedence,
   ConfirmationActionType,
   DataIngestSourceType,
+  EntityType,
+  EscalationLevel,
+  EscalationReassignmentPolicy,
+  GrocerySection,
+  Permission,
+  ThreadType,
+  TopicKey,
   WorkerAction,
   WorkerService,
-  CollisionPrecedence,
-  EscalationReassignmentPolicy,
+  type SystemConfig,
 } from "../index.js";
 
 export const systemConfig: SystemConfig = {

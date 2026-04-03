@@ -1,26 +1,27 @@
-import { Queue, Worker, type JobsOptions } from "bullmq";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
+
+import { Queue, Worker, type JobsOptions } from "bullmq";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { pino, type Logger } from "pino";
 import twilio from "twilio";
-import type { FastifyInstance, FastifyRequest } from "fastify";
 
-import { QueueItemSource } from "../../types.js";
+import { ThreadType } from "../../02-supporting-services/05-routing-service/types.js";
 import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import { toRedisConnection } from "../../lib/redis.js";
-import type { StackQueueItem } from "../types.js";
+import { QueueItemSource } from "../../types.js";
 import type { QueueConsumerOptions } from "../04-queue/types.js";
-import { ThreadType } from "../../02-supporting-services/05-routing-service/types.js";
+import type { StackQueueItem } from "../types.js";
 import {
   DeliveryStatusType,
-  type DeliveryStatusUpdate,
   ReactionSentiment,
   TransportInputKind,
+  twilioInboundPayloadSchema,
+  twilioStatusPayloadSchema,
+  type DeliveryStatusUpdate,
   type TransportAttachment,
   type TransportInboundInput,
   type TransportOutboundMessage,
-  twilioInboundPayloadSchema,
-  twilioStatusPayloadSchema,
 } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "transport-layer" });

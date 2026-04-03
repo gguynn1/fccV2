@@ -1,17 +1,22 @@
+import { z } from "zod";
+
+import type { ThreadHistory } from "../02-supporting-services/05-routing-service/types.js";
+import {
+  ClassifierIntent,
+  DispatchPriority,
+  QueueItemSource,
+  TopicKey,
+  type ClarificationReason,
+} from "../types.js";
+import { inboundEmailContentSchema } from "./04-queue/types.js";
+import type { CollisionPrecedence } from "./06-action-router/types.js";
+
 export * from "./01-transport-layer/types.js";
 export * from "./02-identity-service/types.js";
 export * from "./03-classifier-service/types.js";
 export * from "./04-queue/types.js";
 export * from "./05-worker/types.js";
 export * from "./06-action-router/types.js";
-
-import { z } from "zod";
-
-import { ClassifierIntent, DispatchPriority, QueueItemSource, TopicKey } from "../types.js";
-import type { CollisionPrecedence } from "./06-action-router/types.js";
-import type { ClarificationReason } from "../types.js";
-import { inboundEmailContentSchema } from "./04-queue/types.js";
-import type { ThreadHistory } from "../02-supporting-services/05-routing-service/types.js";
 
 export const stackQueueItemSchema = z.object({
   id: z.string().min(1).optional(),

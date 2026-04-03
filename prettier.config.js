@@ -8,4 +8,8 @@ export default {
   useTabs: false,
   arrowParens: "always",
   endOfLine: "lf",
+  plugins: ["@ianvs/prettier-plugin-sort-imports"],
+  importOrder: ["<BUILTIN_MODULES>", "", "<THIRD_PARTY_MODULES>", "", "^@/(.*)$", "", "^[.]"],
+  importOrderParserPlugins: ["typescript", "jsx"],
+  importOrderTypeScriptVersion: "6.0.0",
 };
