@@ -62,13 +62,13 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolve at:** Worker wiring step (step-28+, alongside D-03 and D-06)
 - **Action:** Accept entity/thread configuration via constructor injection from the State Service or system configuration loaded at boot. Remove the seed import from both files.
 
-### D-09 — Cross-boundary runtime enum imports (EntityType, DispatchPriority, QueueItemSource)
+### D-09 — Cross-boundary runtime enum imports (EntityType, DispatchPriority, QueueItemSource, QueueItemType)
 
-- **Identified:** step-24–27 review
+- **Identified:** step-24–27 review (updated step-28 review)
 - **Severity:** Medium
-- **Description:** Three enums are imported across the 01↔02 service boundary as runtime values: `EntityType` from `02-identity-service/types.js` (routing service), `DispatchPriority` from `06-action-router/types.js` (budget service), and `QueueItemSource` from `04-queue/types.js` (escalation service). The type-boundaries rule says: "If an enum is used across the 01↔02 boundary, it belongs in `src/types.ts`."
-- **Resolve at:** Worker wiring step (step-28+, when cross-service enum usage is finalized)
-- **Action:** Move `EntityType`, `DispatchPriority`, and `QueueItemSource` to `src/types.ts`. Update all imports across the codebase to reference the shared location.
+- **Description:** Four enums are imported across the 01↔02 service boundary as runtime values: `EntityType` from `02-identity-service/types.js` (routing service), `DispatchPriority` from `06-action-router/types.js` (budget service), `QueueItemSource` from `04-queue/types.js` (escalation service, confirmation service), and `QueueItemType` from `04-queue/types.js` (confirmation service). The type-boundaries rule says: "If an enum is used across the 01↔02 boundary, it belongs in `src/types.ts`."
+- **Resolve at:** Worker wiring step (when cross-service enum usage is finalized)
+- **Action:** Move `EntityType`, `DispatchPriority`, `QueueItemSource`, and `QueueItemType` to `src/types.ts`. Update all imports across the codebase to reference the shared location.
 
 ### D-10 — Unsafe type casts in routing, budget, and escalation services
 
@@ -236,6 +236,20 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** Routing service (line 129), budget service (line 351), and escalation service (line 349) hardcode `"family"` as a fallback thread ID rather than deriving it from thread configuration.
 - **Decision:** Accepted — stable convention for a single-deployment system. Consistent with A-09.
 
+### A-24 — `as OpenConfirmationRequest` type cast in confirmation service
+
+- **Identified:** step-28 review
+- **Severity:** Low
+- **Description:** `BullConfirmationService.openConfirmation()` in `08-confirmation-service/index.ts` (line 177) casts the `ConfirmationRequest` parameter to `OpenConfirmationRequest` to access optional fields (`requested_at`, `reply_options`, `expiry_message`) not on the declared interface. All additional fields are optional, so the cast is safe in practice.
+- **Decision:** Accepted — documents that callers may provide extra fields. The interface can be expanded during Worker wiring when actual callers are known.
+
+### A-25 — ConfirmationMatchOutcome type unused
+
+- **Identified:** step-28 review
+- **Severity:** Low
+- **Description:** `ConfirmationMatchOutcome` is defined in `08-confirmation-service/types.ts` (lines 101-105) but not consumed by `index.ts`. Scaffolding for Worker integration.
+- **Decision:** Accepted — consistent with A-21 (six unused scaffolding types from steps 24-27). Will be consumed when the Worker wires the confirmation service.
+
 ### A-23 — BullMQ Queue used solely for Redis client access in budget service
 
 - **Identified:** step-24–27 review
@@ -351,3 +365,10 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolved:** same session
 - **Description:** `buildMachine()` in `07-escalation-service/index.ts` created the XState machine with hardcoded `context: { current_step: 1 }`, ignoring the actual `ActiveEscalation.current_step`. This caused `advanceEscalation()` to always compute the next step from step 1, producing incorrect progression during `reconcileOnStartup()`.
 - **Fix:** Added `initialContext` parameter to `buildMachine()`. `advanceEscalation()` now passes `{ current_step: active.current_step, responsible_entity: active.responsible_entity }` so the machine starts from the actual persisted state.
+
+### R-16 — ConfirmationService interface missing reconcileOnStartup and close
+
+- **Identified:** step-28 review
+- **Resolved:** same session
+- **Description:** `ConfirmationService` interface in `src/02-supporting-services/types.ts` was missing `reconcileOnStartup(now: Date)` and `close()` methods that `BullConfirmationService` implements. The `EscalationService` interface already includes `reconcileOnStartup`.
+- **Fix:** Added `reconcileOnStartup(now: Date): Promise<ConfirmationRecoveryResult>` and `close(): Promise<void>` to the `ConfirmationService` interface. Added `ConfirmationRecoveryResult` to the import.

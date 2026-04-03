@@ -25,6 +25,7 @@ import type { ActiveEscalation, EscalationStatus } from "./07-escalation-service
 import type {
   Confirmation,
   ConfirmationActionType,
+  ConfirmationRecoveryResult,
   ConfirmationResult,
   ConfirmationsState,
 } from "./08-confirmation-service/types.js";
@@ -127,4 +128,6 @@ export interface ConfirmationService {
   openConfirmation(request: ConfirmationRequest): Promise<Confirmation>;
   resolveFromQueueItem(queue_item: StackQueueItem): Promise<ConfirmationResult | null>;
   expirePending(now: Date): Promise<Confirmation[]>;
+  reconcileOnStartup(now: Date): Promise<ConfirmationRecoveryResult>;
+  close(): Promise<void>;
 }

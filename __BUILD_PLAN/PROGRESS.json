@@ -1,5 +1,5 @@
 {
-  "current_step": "step-28",
+  "current_step": "step-29",
   "status_notes": {
     "step-00-part-1": {
       "updated_at": "2026-04-03T13:55:03Z",
@@ -445,6 +445,19 @@
         "npm run lint passed"
       ],
       "next_action": "Proceed to step-28."
+    },
+    "step-28": {
+      "updated_at": "2026-04-03T16:32:03Z",
+      "checks_completed": [
+        "confirmation record types expanded with explicit pending, resolved, and expired states plus thread-bound reply option metadata",
+        "confirmation service implemented in 08-confirmation-service/index.ts with BullMQ expiry timers and SQLite-backed state persistence through the state service",
+        "reply matching implemented for yes/no text, positive or negative reaction content, and default structured choices",
+        "cross-thread confirmation replies are rejected and recorded with resolved_in_thread for auditability",
+        "startup and runtime expiry reconciliation mark overdue confirmations expired and generate reissue notifications without auto-executing actions",
+        "npm run typecheck passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-29 Setup Gate (IMAP)."
     }
   },
   "steps": {
@@ -478,7 +491,7 @@
     "step-25": { "status": "complete", "completed_at": "2026-04-03T16:07:54Z" },
     "step-26": { "status": "complete", "completed_at": "2026-04-03T16:07:54Z" },
     "step-27": { "status": "complete", "completed_at": "2026-04-03T16:07:54Z" },
-    "step-28": { "status": "pending" },
+    "step-28": { "status": "complete", "completed_at": "2026-04-03T16:32:03Z" },
     "step-29": { "status": "pending" },
     "step-30": { "status": "pending" },
     "step-31": { "status": "pending" },
