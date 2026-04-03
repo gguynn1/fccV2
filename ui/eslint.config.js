@@ -40,6 +40,7 @@ export default defineConfig(
     rules: {
       ...flatConfigs.recommended.rules,
       ...flatConfigs.typescript.rules,
+      eqeqeq: ["error", "always", { null: "always" }],
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": [
         "warn",

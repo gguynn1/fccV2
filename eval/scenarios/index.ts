@@ -20,5 +20,5 @@ export function listScenarioSets(): Array<Pick<EvalScenarioSet, "name" | "label"
 }
 
 export function getScenarioSet(name: string): EvalScenarioSet {
-  return scenarioSets.find((scenarioSet) => scenarioSet.name === name) ?? scenarioSets[0]!;
+  return scenarioSets.find((scenarioSet) => scenarioSet.name === name) ?? scenarioSets[0];
 }

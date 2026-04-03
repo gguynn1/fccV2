@@ -15,14 +15,12 @@ This project uses ECMAScript Modules (`"type": "module"`). `verbatimModuleSyntax
 
 ```typescript
 // ✅ Correct
-import { TopicKey } from "../../types.js";
-import type { SystemConfig } from "./index.js";
 
 // ❌ Missing extension
 import { TopicKey } from "../../types";
-
+import { TopicKey } from "../../types.js";
 // ❌ Non-type import used only as a type
-import { SystemConfig } from "./index.js";
+import { SystemConfig, type SystemConfig } from "./index.js";
 ```
 
 ## Seed Data Files

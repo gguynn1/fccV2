@@ -27,6 +27,7 @@ export default defineConfig(
     rules: {
       ...flatConfigs.recommended.rules,
       ...flatConfigs.typescript.rules,
+      eqeqeq: ["error", "always", { null: "always" }],
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": "off",
       "unused-imports/no-unused-imports": "error",
