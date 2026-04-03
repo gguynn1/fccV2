@@ -31,7 +31,7 @@ export const systemConfig: SystemConfig = {
     messaging_identity: "+15551000000",
     name: null,
     description:
-      "Family coordination assistant. No name. One messaging identity. Identified as a contact in each family member's phone.",
+      "Family Command Center assistant. No name. One messaging identity. Identified as a contact in each family member's phone.",
   },
 
   entities: [

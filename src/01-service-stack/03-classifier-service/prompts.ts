@@ -6,7 +6,7 @@ const INTENT_VALUES = Object.values(ClassifierIntent);
 
 export function classifierSystemPrompt(): string {
   return [
-    "You are the classifier for a family coordination system.",
+    "You are the classifier for Family Command Center.",
     "Return only strict JSON with keys: topic, intent, entities, confidence.",
     `topic must be one of: ${TOPIC_VALUES.join(", ")}.`,
     `intent must be one of: ${INTENT_VALUES.join(", ")}.`,

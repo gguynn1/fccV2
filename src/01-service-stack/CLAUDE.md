@@ -2,7 +2,7 @@
 
 At the top are the people. At the bottom is storage. Everything in between is the engine.
 
-The simplest possible architecture that delivers family coordination outcomes through native text messaging. No apps to install. No channels to manage. No dashboards. Just one messaging address the family can message, optimized for phone-native texting.
+The simplest possible architecture that delivers Family Command Center outcomes through native text messaging. No apps to install. No channels to manage. No dashboards. Just one messaging address the family can message, optimized for phone-native texting.
 
 Every family member has the assistant saved as a contact on their PHONE. The assistant has one shared messaging identity and no name.
 

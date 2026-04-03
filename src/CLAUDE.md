@@ -1,4 +1,4 @@
-# Family Coordination System
+# Family Command Center
 
 Root of the system architecture. Contains configuration, state, and all service definitions.
 

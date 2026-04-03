@@ -167,7 +167,7 @@ Example multi-step scenarios:
     Step 4: Silence from client (delay: 2880, input_type: silence)
             Expected: system nudges participant_2 about follow-up due
 
-  Concurrent family coordination:
+  Concurrent Family Command Center:
     Step 1: participant_1 messages "what's for dinner?" in family thread (delay: 0)
             Expected: classified as meals, checks meal plan state
     Step 2: participant_2 replies "maybe tacos?" in family thread (delay: 5)

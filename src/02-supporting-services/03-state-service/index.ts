@@ -107,7 +107,7 @@ function createMinimalSystemConfig(): SystemConfig {
     assistant: {
       messaging_identity: "",
       name: null,
-      description: "Family coordination assistant",
+      description: "Family Command Center assistant",
     },
     entities: [],
     threads: [],
