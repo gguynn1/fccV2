@@ -106,6 +106,9 @@ npm test               # Run tests (Vitest)
 npm run ui:dev         # Vite dev server (port 5173, proxies API to :3000)
 npm run ui:build       # Build production bundle to ui/dist/
 npm run ui:preview     # Preview production build locally
+
+# Infrastructure
+npm run ngrok:auth     # Configure ngrok auth token from .env
 ```
 
 Typical first-boot workflow:
@@ -362,13 +365,20 @@ src/
 ├── 01-service-stack/       Core pipeline (Transport → Identity → Queue → Worker → Action Router)
 ├── 02-supporting-services/ Services called by the Worker or feeding the Queue
 ├── 03-connections/         Documentation only — how services interact
+├── _seed/                  Seed data for database bootstrapping (system-config.ts, system-state.ts)
+├── admin/                  Admin API route handlers (served at /api/admin)
+├── config/                 Runtime system configuration loader
+├── lib/                    Shared utilities (Redis helpers, etc.)
+├── server.ts               Fastify server entry point — wires all services, starts listeners
+├── bootstrap.ts            Database initialization and seed loading (--seed flag)
+├── env.ts                  Environment variable loading and validation
 ├── types.ts                Shared vocabulary enums (TopicKey, EscalationLevel, etc.)
 └── index.ts                Barrel exports + SystemConfig interface
 
 ui/                         Admin UI — React SPA served by Fastify at /admin
 ├── src/                    Components, routes, hooks
-├── vite.config.ts          Vite build config (proxies /api to Fastify in dev)
-└── package.json            Separate dependency tree from the backend
+├── vite.config.ts          Vite build config (base: /admin/, proxies /api to Fastify in dev)
+└── package.json            Separate dependency tree (pins own TypeScript version)
 ```
 
 Each numbered folder under `src/` is a bounded service with its own `CLAUDE.md` (behavior docs), `types.ts` (owned types), and `notes.txt` (technology notes).
@@ -388,3 +398,4 @@ The `ui/` directory is a standalone React project. In production, Fastify serves
 | `npm run ui:dev`     | Start admin UI dev server (Vite, port 5173)    |
 | `npm run ui:build`   | Build admin UI production bundle to `ui/dist/` |
 | `npm run ui:preview` | Preview admin UI production build              |
+| `npm run ngrok:auth` | Configure ngrok auth token from `.env`         |

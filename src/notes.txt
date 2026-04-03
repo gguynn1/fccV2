@@ -3,7 +3,7 @@ Required tools/dependencies:
 - `src/types.ts` for shared enums and cross-service vocabulary.
 - Respect service and type boundaries: no direct runtime imports from sibling services.
 - Local `types.ts` in this folder for scope-owned contracts.
-- Root configuration and state stores such as `system-config.ts` and `system-state.ts`.
+- Root configuration and state stores: `_seed/system-config.ts` and `_seed/system-state.ts`.
 - Scenario-friendly bootstrapping so the whole system can start from a known state.
 
 Recommended tools/dependencies:

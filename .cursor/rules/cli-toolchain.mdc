@@ -25,10 +25,10 @@ alwaysApply: true
 
 ### Tier 2 — Infrastructure (required for production, installed when deploying)
 
-| Tool  | Version           | Installed via               | Purpose                                            |
-| ----- | ----------------- | --------------------------- | -------------------------------------------------- |
-| Redis | not yet installed | `brew install redis`        | Queue (BullMQ), scheduling, rate-limiting counters |
-| ngrok | not yet installed | `brew install --cask ngrok` | Tunnel from public URL to localhost:3000           |
+| Tool  | Version                  | Installed via               | Purpose                                            |
+| ----- | ------------------------ | --------------------------- | -------------------------------------------------- |
+| Redis | install when deploying   | `brew install redis`        | Queue (BullMQ), scheduling, rate-limiting counters |
+| ngrok | install when deploying   | `brew install --cask ngrok` | Tunnel from public URL to localhost:3000           |
 
 ### Tier 3 — System utilities (available, used occasionally)
 

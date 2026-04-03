@@ -53,6 +53,7 @@ Scenario Suite → Pipeline Runner → Scorer
   └── failures detected → Diagnoser
         ├── step 1: wrong topic → Corrector
         ├── step 2: wrong entities → Corrector
+        ├── step 3: wrong action / missed clarification → Corrector
         ├── step 4: wrong priority → Corrector
         ├── step 5: wrong escalation → Corrector
         ├── step 6: missed confirmation → Corrector
@@ -307,7 +308,7 @@ Run with: npx vitest --config eval/vitest.config.ts
 Package.json scripts:
   "eval": "vitest --config eval/vitest.config.ts"
   "eval:run": "vitest run --config eval/vitest.config.ts"
-  "eval:coverage": "vitest run --config eval/vitest.config.ts -- coverage"
+  "eval:coverage": "vitest run --config eval/vitest.config.ts --coverage"
 
 Scoring
 
@@ -362,8 +363,8 @@ Integration with Existing Architecture
 - Scenarios encode the same five-part structure documented in src/01-service-stack/CLAUDE.md.
 - The ScenarioTesting interface already in src/index.ts can be extended to reference eval scenario IDs.
 - Topic profile CLAUDE.md files serve as the behavioral spec that the qualitative scorer judges against.
-- Disambiguation rules in system-config.ts inform the scenario generator for edge-case classification tests.
-- Cross-topic connections in system-config.ts define which side-effect scenarios must exist.
+- Disambiguation rules in src/_seed/system-config.ts inform the scenario generator for edge-case classification tests.
+- Cross-topic connections in src/_seed/system-config.ts define which side-effect scenarios must exist.
 - state_overrides in scenarios allow injecting specific system state (e.g., a maintenance item that's overdue, a business lead awaiting follow-up) without modifying the base state snapshot.
 
 Scenario Generation
