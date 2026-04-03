@@ -43,25 +43,25 @@ alwaysApply: true
 
 All project tasks run through `npm run`. Never invoke tooling directly when a script exists.
 
-| Command                | What it does                                                                      |
-| ---------------------- | --------------------------------------------------------------------------------- |
-| `npm start`            | Run the compiled application (`node dist/server.js`)                              |
-| `npm run start:seed`   | Run the application and populate the database from `src/_seed/`                   |
-| `npm run dev`          | Run in development with file watching and auto-restart                            |
-| `npm run build`        | Compile TypeScript (`tsc`)                                                        |
-| `npm run typecheck`    | Type-check backend and admin UI (`tsc --noEmit && npm run --prefix ui typecheck`) |
-| `npm run lint`         | Lint backend + admin UI and run Prettier check                                    |
-| `npm run lint:fix`     | Auto-fix backend + admin UI lint issues, then format                              |
-| `npm run format`       | Format all files with Prettier                                                    |
-| `npm run format:check` | Check formatting without writing                                                  |
-| `npm test`             | Run tests (`vitest run --passWithNoTests`)                                        |
-| `npm run ui:dev`       | Start admin UI dev server (Vite, port 5173, proxies API to :3000)                 |
-| `npm run ui:build`     | Build admin UI production bundle to `ui/dist/`                                    |
-| `npm run ui:preview`   | Preview admin UI production build                                                 |
-| `npm run ngrok:auth`   | Configure ngrok auth token from `.env`                                            |
-| `npm run eval`         | Invoke the eval CLI with the `watch` command alias                                |
-| `npm run eval:run`     | Run one sequential eval pass and write JSON/markdown artifacts                    |
-| `npm run eval:coverage`| Invoke the eval CLI with the `coverage` command alias                             |
+| Command                 | What it does                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `npm start`             | Run the compiled application (`node dist/server.js`)                              |
+| `npm run start:seed`    | Run the application and populate the database from `src/_seed/`                   |
+| `npm run dev`           | Run in development with file watching and auto-restart                            |
+| `npm run build`         | Compile TypeScript (`tsc`)                                                        |
+| `npm run typecheck`     | Type-check backend and admin UI (`tsc --noEmit && npm run --prefix ui typecheck`) |
+| `npm run lint`          | Lint backend + admin UI and run Prettier check                                    |
+| `npm run lint:fix`      | Auto-fix backend + admin UI lint issues, then format                              |
+| `npm run format`        | Format all files with Prettier                                                    |
+| `npm run format:check`  | Check formatting without writing                                                  |
+| `npm test`              | Run tests (`vitest run --passWithNoTests`)                                        |
+| `npm run ui:dev`        | Start admin UI dev server (Vite, port 5173, proxies API to :3000)                 |
+| `npm run ui:build`      | Build admin UI production bundle to `ui/dist/`                                    |
+| `npm run ui:preview`    | Preview admin UI production build                                                 |
+| `npm run ngrok:auth`    | Configure ngrok auth token from `.env`                                            |
+| `npm run eval`          | Invoke the eval CLI with the `watch` command alias                                |
+| `npm run eval:run`      | Run one sequential eval pass and write JSON/markdown artifacts                    |
+| `npm run eval:coverage` | Invoke the eval CLI with the `coverage` command alias                             |
 
 ### Script lifecycle for a typical workflow
 
