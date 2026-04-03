@@ -29,10 +29,7 @@ import {
   type StateService,
   type TopicProfileService,
 } from "../../02-supporting-services/types.js";
-import {
-  RoutingRule,
-  type RoutingDecision,
-} from "../../02-supporting-services/05-routing-service/types.js";
+import type { RoutingDecision } from "../../02-supporting-services/05-routing-service/types.js";
 import {
   type TopicAction,
   type TopicProfile,
@@ -490,7 +487,7 @@ export class Worker {
       WorkerService.Routing,
       provisionalTargetThread,
       async () => {
-        const routingDecision = await this.resolveRoutingDecision({
+        const routingDecision = this.resolveRoutingDecision({
           topic: classification.topic,
           intent: classification.intent,
           concerning: classification.concerning,
@@ -1060,51 +1057,24 @@ export class Worker {
     );
   }
 
-  private async resolveRoutingDecision(request: {
+  private resolveRoutingDecision(request: {
     topic: TopicKey;
     intent: ClassifierIntent;
     concerning: string[];
     origin_thread: string;
     is_response: boolean;
-  }): Promise<RoutingDecision> {
-    const maybeRichRouting = this.routingService as RoutingService & {
-      resolveRoutingDecision?: (input: typeof request) => RoutingDecision;
-    };
-    if (typeof maybeRichRouting.resolveRoutingDecision === "function") {
-      const decision = maybeRichRouting.resolveRoutingDecision(request);
-      if (request.is_response) {
-        return {
-          ...decision,
-          follow_up_target: this.shouldCreateFollowUpTarget(request.intent)
-            ? maybeRichRouting.resolveRoutingDecision({ ...request, is_response: false }).target
-            : decision.follow_up_target,
-        };
-      }
-      return decision;
+  }): RoutingDecision {
+    const decision = this.routingService.resolveRoutingDecision(request);
+    if (request.is_response && this.shouldCreateFollowUpTarget(request.intent)) {
+      return {
+        ...decision,
+        follow_up_target: this.routingService.resolveRoutingDecision({
+          ...request,
+          is_response: false,
+        }).target,
+      };
     }
-
-    const target = await this.routingService.resolveTargetThread(request);
-    const followUpTarget =
-      request.is_response && this.shouldCreateFollowUpTarget(request.intent)
-        ? {
-            thread_id: await this.routingService.resolveTargetThread({
-              ...request,
-              is_response: false,
-            }),
-            rule_applied: RoutingRule.ProactiveNarrowest,
-            reason: "Future proactive follow-up target derived from Rule 2.",
-          }
-        : undefined;
-    return {
-      target: {
-        thread_id: target,
-        rule_applied: request.is_response
-          ? RoutingRule.ResponseInPlace
-          : RoutingRule.ProactiveNarrowest,
-        reason: "Routing service resolved the target thread.",
-      },
-      follow_up_target: followUpTarget,
-    };
+    return decision;
   }
 
   private shouldCreateFollowUpTarget(intent: ClassifierIntent): boolean {

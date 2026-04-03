@@ -95,9 +95,8 @@ export interface EscalationServiceOptions {
 }
 
 function extractQueueItemId(queueItem: StackQueueItem): string {
-  const maybeId = (queueItem as Record<string, unknown>).id;
-  if (typeof maybeId === "string" && maybeId.length > 0) {
-    return maybeId;
+  if (queueItem.id) {
+    return queueItem.id;
   }
   return `q_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }

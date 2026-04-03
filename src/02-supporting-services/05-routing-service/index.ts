@@ -33,7 +33,7 @@ function toResponsibleAdultIdForPet(entityId: string): string | null {
     return null;
   }
 
-  const routesTo = (petEntity as { routes_to?: string[] }).routes_to;
+  const routesTo = petEntity.routes_to;
   if (!Array.isArray(routesTo) || routesTo.length === 0) {
     return null;
   }

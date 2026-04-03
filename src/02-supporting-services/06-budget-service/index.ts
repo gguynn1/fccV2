@@ -197,7 +197,7 @@ export class RedisBudgetService implements BudgetService {
   }
 
   private resolvePriority(queue_item: StackQueueItem): DispatchPriority {
-    const maybePriority = (queue_item as Record<string, unknown>).priority;
+    const maybePriority = queue_item.priority;
     if (maybePriority === DispatchPriority.Immediate) {
       return DispatchPriority.Immediate;
     }

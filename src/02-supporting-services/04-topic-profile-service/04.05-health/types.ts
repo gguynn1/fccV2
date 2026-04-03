@@ -27,7 +27,7 @@ export interface HealthProfile {
   medications: Medication[];
   allergies: string[];
   providers: HealthProvider[];
-  upcoming_appointments: Array<string | HealthAppointment>;
+  upcoming_appointments: HealthAppointment[];
   notes: string[];
 }
 

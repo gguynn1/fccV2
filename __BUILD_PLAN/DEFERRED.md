@@ -40,13 +40,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolve at:** step-33+ (dedicated seed-import elimination refactoring, alongside D-03)
 - **Action:** Accept entity/thread configuration via constructor injection from the State Service or system configuration loaded at boot. Remove the seed import.
 
-### D-07 — HealthProfile.upcoming_appointments union type
-
-- **Identified:** step-15 review
-- **Severity:** Medium
-- **Description:** `src/02-supporting-services/04-topic-profile-service/04.05-health/types.ts` defines `upcoming_appointments: Array<string | HealthAppointment>`. The union type forces every consumer to use runtime type guards before accessing appointment fields, propagating type unsafety to the Worker, composition logic, and state validation.
-- **Resolve at:** step-24+ (health Worker integration, when health state is read/written)
-- **Action:** Migrate to `HealthAppointment[]` as the single type. Update any seed data that uses plain strings to use `HealthAppointment` objects.
+### D-07 — ~~HealthProfile.upcoming_appointments union type~~ MOVED TO RESOLVED (R-22)
 
 ### D-08 — Routing and budget services import seed config at runtime
 
@@ -64,13 +58,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolve at:** step-33+ (dedicated enum migration refactoring)
 - **Action:** Move `EntityType`, `DispatchPriority`, `QueueItemSource`, and `QueueItemType` to `src/types.ts`. Update all imports across the codebase to reference the shared location.
 
-### D-10 — Unsafe type casts in routing, budget, and escalation services
-
-- **Identified:** step-24–27 review (updated step-29–32 review)
-- **Severity:** Medium
-- **Description:** Three services use `as` casts to access properties not on the declared types: routing service casts entity to `{ routes_to?: string[] }` (line 36), budget service casts `StackQueueItem` to `Record<string, unknown>` for `.priority` (line 200), escalation service casts `StackQueueItem` to `Record<string, unknown>` for `.id` (line 98). Steps 29-32 added `id` and `priority` to `StackQueueItem` (partially addressing the issue) but the routing service pet entity cast and escalation service cast remain. The Worker's `resolveRoutingDecision` also introduces a duck-typing cast (see D-13).
-- **Resolve at:** step-33+ (type cleanup refactoring)
-- **Action:** Add `routes_to` to the pet entity type definition. Remove remaining `as` casts in routing and escalation services. Update escalation service to use `queueItem.id` directly.
+### D-10 — ~~Unsafe type casts in routing, budget, and escalation services~~ MOVED TO RESOLVED (R-23)
 
 ### D-11 — Worker and Data Ingest import systemConfig from seed at runtime
 
@@ -88,13 +76,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolve at:** step-33+ (alongside D-09 enum migration)
 - **Action:** After D-09 moves these enums to `src/types.ts`, update data ingest imports to reference the shared location.
 
-### D-13 — resolveRoutingDecision uses duck-typing cast
-
-- **Identified:** step-29–32 review
-- **Severity:** Low
-- **Description:** `src/01-service-stack/05-worker/index.ts` line 1072: `const maybeRichRouting = this.routingService as RoutingService & { resolveRoutingDecision?: ... }`. This casts the routing service to check for an optional method, bypassing the type system. If `resolveRoutingDecision` is expected on the routing service, it should be declared on the `RoutingService` interface.
-- **Resolve at:** step-33+ (when RoutingService interface is finalized)
-- **Action:** Add `resolveRoutingDecision` to the `RoutingService` interface or restructure the Worker to use only declared methods.
+### D-13 — ~~resolveRoutingDecision uses duck-typing cast~~ MOVED TO RESOLVED (R-24)
 
 ---
 
@@ -432,3 +414,24 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolved:** same session
 - **Description:** `confirmationTypeForAction()` used `systemConfig.confirmation_gates.always_require_approval[0]` and `[1]` to select confirmation types. Array reordering would silently break behavior.
 - **Fix:** Replaced with direct `ConfirmationActionType.FinancialAction` and `ConfirmationActionType.SendingOnBehalf` enum references. Added `ConfirmationActionType` import.
+
+### R-22 — D-07: HealthProfile.upcoming_appointments union type
+
+- **Identified:** step-15 review
+- **Resolved:** step-29–32 review (reassessment)
+- **Description:** `upcoming_appointments: Array<string | HealthAppointment>` forced runtime type guards on every consumer. Audit confirmed no code or seed data uses plain strings — all usages are `HealthAppointment[]` or empty arrays.
+- **Fix:** Changed type to `HealthAppointment[]` in `04.05-health/types.ts`.
+
+### R-23 — D-10: Unsafe type casts in routing, budget, escalation, and state services
+
+- **Identified:** step-24–27 review
+- **Resolved:** step-29–32 review (reassessment)
+- **Description:** Four services used `as` casts to access properties that now exist on the declared types. Steps 29-32 added `id?: string` and `priority?: DispatchPriority` to `StackQueueItem`, and `Entity` already declared `routes_to?: string[]`.
+- **Fix:** Removed all four casts: routing service `petEntity` cast (line 36), budget service `queue_item` cast for `.priority` (line 200), escalation service `extractQueueItemId` cast (line 98), state service `extractQueueItemId` cast (line 122). All now use direct property access.
+
+### R-24 — D-13: resolveRoutingDecision duck-typing cast
+
+- **Identified:** step-29–32 review
+- **Resolved:** same session (reassessment)
+- **Description:** Worker cast `routingService` to `RoutingService & { resolveRoutingDecision?: ... }` to check for an optional method. The method already existed on `StaticRoutingService` but was not declared on the `RoutingService` interface.
+- **Fix:** Added `resolveRoutingDecision(request: RoutingRequest): RoutingDecision` to the `RoutingService` interface. Removed the cast, the fallback path (~20 lines), and the unused `RoutingRule` runtime import from the Worker. Method changed from async to sync.

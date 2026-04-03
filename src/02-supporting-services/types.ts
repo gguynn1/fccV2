@@ -19,7 +19,7 @@ import type { DispatchPriority } from "../01-service-stack/06-action-router/type
 import type { DataIngestState } from "./02-data-ingest-service/types.js";
 import type { SystemState } from "./03-state-service/types.js";
 import type { TopicProfileConfig } from "./04-topic-profile-service/types.js";
-import type { Thread, ThreadHistory } from "./05-routing-service/types.js";
+import type { RoutingDecision, Thread, ThreadHistory } from "./05-routing-service/types.js";
 import type { OutboundBudgetTracker } from "./06-budget-service/types.js";
 import type { ActiveEscalation, EscalationStatus } from "./07-escalation-service/types.js";
 import type {
@@ -82,6 +82,7 @@ export interface RoutingRequest {
 export interface RoutingService {
   getThreadDefinitions(): Promise<Thread[]>;
   resolveTargetThread(request: RoutingRequest): Promise<string>;
+  resolveRoutingDecision(request: RoutingRequest): RoutingDecision;
 }
 
 export interface BudgetDecision {

@@ -119,10 +119,10 @@ function validateStateSlices(state: SystemState): void {
 }
 
 function extractQueueItemId(queueItem: StackQueueItem): string {
-  const maybeId = (queueItem as Record<string, unknown>).id;
-  return typeof maybeId === "string" && maybeId.length > 0
-    ? maybeId
-    : `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  if (queueItem.id) {
+    return queueItem.id;
+  }
+  return `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function createDefaultStateSnapshot(now: Date): SystemState {
