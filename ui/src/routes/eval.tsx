@@ -12,7 +12,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useEvalMarkdown, useEvalOverview, useEvalRun, useStartEvalRun } from "@/hooks/use-eval";
+import {
+  useEvalMarkdown,
+  useEvalOverview,
+  useEvalRun,
+  useGenerateScenarioSet,
+  useStartEvalRun,
+} from "@/hooks/use-eval";
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -45,6 +51,7 @@ export function EvalRoute() {
   const [selectedScenarioSet, setSelectedScenarioSet] = useState("default");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const startRunMutation = useStartEvalRun();
+  const generateScenarioSetMutation = useGenerateScenarioSet();
 
   const effectiveRunId =
     selectedRunId ?? overviewQuery.data?.active_run_id ?? overviewQuery.data?.runs[0]?.id ?? null;
@@ -93,40 +100,70 @@ export function EvalRoute() {
         <CardHeader>
           <CardTitle>Run Controls</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4 md:flex-row md:items-end">
-          <div className="w-full max-w-xs space-y-2">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Scenario set</p>
-            <Select
-              value={selectedScenarioSet}
-              onChange={(event) => setSelectedScenarioSet(event.target.value)}
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end">
+            <div className="w-full max-w-xs space-y-2">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Scenario set</p>
+              <Select
+                value={selectedScenarioSet}
+                onChange={(event) => setSelectedScenarioSet(event.target.value)}
+              >
+                {overviewQuery.data.scenario_sets.map((scenarioSet) => (
+                  <option key={scenarioSet.name} value={scenarioSet.name}>
+                    {scenarioSet.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                generateScenarioSetMutation.mutate();
+              }}
+              disabled={generateScenarioSetMutation.isPending}
             >
-              {overviewQuery.data.scenario_sets.map((scenarioSet) => (
-                <option key={scenarioSet.name} value={scenarioSet.name}>
-                  {scenarioSet.label}
-                </option>
-              ))}
-            </Select>
+              {generateScenarioSetMutation.isPending
+                ? "Generating Scenario Set..."
+                : "Generate Scenario Set"}
+            </Button>
+            <Button
+              onClick={() => {
+                startRunMutation.mutate(selectedScenarioSet, {
+                  onSuccess: (response) => {
+                    setSelectedRunId(response.run_id);
+                  },
+                });
+              }}
+              disabled={startRunMutation.isPending || overviewQuery.data.active_run_id !== null}
+            >
+              {overviewQuery.data.active_run_id ? "Run In Progress" : "Start Sequential Run"}
+            </Button>
+            {overviewQuery.data.active_run_id && (
+              <Badge variant="secondary">
+                Active: {overviewQuery.data.active_run_id.slice(0, 16)}
+              </Badge>
+            )}
           </div>
-          <Button
-            onClick={() => {
-              startRunMutation.mutate(selectedScenarioSet, {
-                onSuccess: (response) => {
-                  setSelectedRunId(response.run_id);
-                },
-              });
-            }}
-            disabled={startRunMutation.isPending || overviewQuery.data.active_run_id !== null}
-          >
-            {overviewQuery.data.active_run_id ? "Run In Progress" : "Start Sequential Run"}
-          </Button>
-          {overviewQuery.data.active_run_id && (
-            <Badge variant="secondary">
-              Active: {overviewQuery.data.active_run_id.slice(0, 16)}
-            </Badge>
-          )}
-          {startRunMutation.error && (
-            <p className="text-sm text-destructive">{startRunMutation.error.message}</p>
-          )}
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Scenario set scaffolds are generated into `eval/scenarios/generated/`. Finish editing
+              the file, then register it in `eval/scenarios/index.ts` to make it runnable.
+            </p>
+            <p>Authoring guide: `eval/scenarios/SCENARIO_SETS.md`</p>
+            {generateScenarioSetMutation.data && (
+              <p className="text-foreground">
+                Created `{generateScenarioSetMutation.data.file_path}` as `
+                {generateScenarioSetMutation.data.scenario_set_name}`. Guide: `
+                {generateScenarioSetMutation.data.guide_path}`
+              </p>
+            )}
+            {generateScenarioSetMutation.error && (
+              <p className="text-destructive">{generateScenarioSetMutation.error.message}</p>
+            )}
+            {startRunMutation.error && (
+              <p className="text-destructive">{startRunMutation.error.message}</p>
+            )}
+          </div>
         </CardContent>
       </Card>
 

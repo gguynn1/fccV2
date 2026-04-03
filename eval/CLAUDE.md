@@ -7,6 +7,8 @@ This folder contains the current eval implementation. It is a local sequential r
 - `cli.ts` is the entrypoint used by `npm run eval`, `npm run eval:run`, and `npm run eval:coverage`.
 - `runners/sequential-runner.ts` runs one scenario at a time, persists JSON run state, appends structured logs, and writes the final markdown artifact.
 - `scenarios/` contains the current scenario schema and the default scenario set.
+- `scenarios/SCENARIO_SETS.md` explains how to author realistic scenario sets and where generated scaffolds should live.
+- `scenarios/generate-set.ts` creates UI-generated scaffolds in `eval/scenarios/generated/`.
 - `tuner/diagnose.ts` decides whether a failure is prompt-fixable or needs investigation.
 - `tuner/correct.ts` generates an embedded prompt suggestion for prompt-fixable failures.
 - `reporting/write-run-artifacts.ts` writes `eval/results/<run-id>.json` and `eval/results/<run-id>.prompt.md`.
@@ -28,5 +30,6 @@ This folder contains the current eval implementation. It is a local sequential r
 ## Editing Guidance
 
 - Treat `eval/results/` as generated output.
+- Treat `eval/scenarios/generated/` as editable scaffolding, then register finished sets in `eval/scenarios/index.ts`.
 - Prefer changing scenario definitions, runner logic, tuner logic, or artifact generation instead of editing generated files.
 - Do not describe this implementation as full pipeline eval unless the code actually runs the real pipeline.

@@ -8,6 +8,12 @@ interface EvalScenarioSetSummary {
   label: string;
 }
 
+export interface GeneratedScenarioSetResult {
+  scenario_set_name: string;
+  file_path: string;
+  guide_path: string;
+}
+
 export interface EvalRunRecord {
   id: string;
   scenario_set: string;
@@ -109,6 +115,54 @@ export function getEvalScenarioSets(): EvalScenarioSetSummary[] {
   return scenarioSets;
 }
 
+function parseJsonFromCommandOutput(output: string): Record<string, unknown> {
+  const trimmed = output.trim();
+
+  try {
+    return JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    const firstBrace = trimmed.indexOf("{");
+    const lastBrace = trimmed.lastIndexOf("}");
+
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+      throw new Error("Eval CLI did not return JSON output.");
+    }
+
+    return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>;
+  }
+}
+
+async function runEvalCliJson(args: string[]): Promise<Record<string, unknown>> {
+  const child = spawn(getNpmExecutable(), ["--silent", "run", ...args], {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  const stdoutChunks: Buffer[] = [];
+  const stderrChunks: Buffer[] = [];
+
+  child.stdout.on("data", (chunk: Buffer) => {
+    stdoutChunks.push(chunk);
+  });
+  child.stderr.on("data", (chunk: Buffer) => {
+    stderrChunks.push(chunk);
+  });
+
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    child.on("error", reject);
+    child.on("exit", (code) => resolve(code ?? 1));
+  });
+
+  if (exitCode !== 0) {
+    throw new Error(
+      Buffer.concat(stderrChunks).toString("utf8").trim() || "Eval CLI command failed.",
+    );
+  }
+
+  return parseJsonFromCommandOutput(Buffer.concat(stdoutChunks).toString("utf8"));
+}
+
 export function getActiveEvalRunId(): string | null {
   for (const [runId, child] of activeRuns.entries()) {
     if (child.exitCode === null && !child.killed) {
@@ -159,4 +213,14 @@ export async function startEvalRun(scenarioSet: string): Promise<{ run_id: strin
   child.stderr.resume();
 
   return { run_id: runId };
+}
+
+export async function generateScenarioSet(): Promise<GeneratedScenarioSetResult> {
+  const result = await runEvalCliJson(["eval:generate-set", "--"]);
+
+  return {
+    scenario_set_name: String(result.scenario_set_name),
+    file_path: String(result.file_path),
+    guide_path: String(result.guide_path),
+  };
 }

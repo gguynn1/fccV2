@@ -7,6 +7,13 @@ export interface EvalScenarioSetSummary {
   label: string;
 }
 
+export interface GenerateScenarioSetResponse {
+  ok: true;
+  scenario_set_name: string;
+  file_path: string;
+  guide_path: string;
+}
+
 export interface EvalScenarioLogEvent {
   seq: number;
   timestamp: string;
@@ -108,5 +115,15 @@ export function useStartEvalRun() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "eval"] });
     },
+  });
+}
+
+export function useGenerateScenarioSet() {
+  return useMutation({
+    mutationFn: () =>
+      adminFetch<GenerateScenarioSetResponse>("/eval/scenario-sets/generate", {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
   });
 }

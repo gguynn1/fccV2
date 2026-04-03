@@ -11,6 +11,7 @@
     "eval": "tsx eval/cli.ts watch",
     "eval:run": "tsx eval/cli.ts run",
     "eval:coverage": "tsx eval/cli.ts coverage",
+    "eval:generate-set": "tsx eval/cli.ts generate-set",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "start": "node dist/server.js",

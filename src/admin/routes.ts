@@ -9,6 +9,7 @@ import { ThreadType } from "../02-supporting-services/05-routing-service/types.j
 import { ConfirmationActionType } from "../02-supporting-services/08-confirmation-service/types.js";
 import { applyRuntimeSystemConfig } from "../config/runtime-system-config.js";
 import {
+  generateScenarioSet,
   getActiveEvalRunId,
   getEvalRun,
   getEvalRunMarkdown,
@@ -334,6 +335,23 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
       active_run_id: getActiveEvalRunId(),
       runs,
     };
+  });
+
+  fastify.post("/eval/scenario-sets/generate", async (request, reply) => {
+    evalStartPayloadSchema.parse(request.body ?? {});
+
+    try {
+      const result = await generateScenarioSet();
+      return {
+        ok: true,
+        ...result,
+      };
+    } catch (error: unknown) {
+      return reply.code(500).send({
+        error: "eval_scenario_set_generation_failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   fastify.post("/eval/runs", async (request, reply) => {

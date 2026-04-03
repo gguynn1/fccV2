@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 import { runSequentialEval } from "./runners/sequential-runner.js";
+import { generateScenarioSetScaffold } from "./scenarios/generate-set.js";
 import { listScenarioSets } from "./scenarios/index.js";
 
 interface ParsedArgs {
   command: string;
   run_id: string;
   scenario_set: string;
+  set_name?: string;
   step_delay_ms?: number;
 }
 
@@ -32,6 +34,11 @@ function parseArgs(argv: string[]): ParsedArgs {
       index += 1;
       continue;
     }
+    if (token === "--set-name" && next) {
+      parsed.set_name = next;
+      index += 1;
+      continue;
+    }
     if (token === "--step-delay-ms" && next) {
       parsed.step_delay_ms = Number(next);
       index += 1;
@@ -46,6 +53,15 @@ async function main(): Promise<void> {
 
   if (args.command === "list") {
     process.stdout.write(`${JSON.stringify({ scenario_sets: listScenarioSets() }, null, 2)}\n`);
+    return;
+  }
+
+  if (args.command === "generate-set") {
+    const result = await generateScenarioSetScaffold({
+      repo_root: process.cwd(),
+      requested_name: args.set_name,
+    });
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }
 
