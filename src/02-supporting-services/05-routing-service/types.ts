@@ -22,6 +22,12 @@ export interface ThreadMessage {
   escalation_ref?: string;
 }
 
+export interface ContextTransitionPolicy {
+  switch_on_new_topic: boolean;
+  idle_reset_minutes: number;
+  explicit_switch_signals: string[];
+}
+
 export interface ThreadHistory {
   active_topic_context: string;
   last_activity: Date;

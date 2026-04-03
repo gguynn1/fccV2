@@ -194,6 +194,7 @@ export const systemState: SystemState = {
         topic: TopicKey.Chores,
         item_ref: "chore_001",
         profile: EscalationLevel.High,
+        responsible_entity: "participant_3",
         concerning: ["participant_3"],
         current_step: 2,
         history: [
@@ -863,6 +864,7 @@ export const systemState: SystemState = {
         type: ConfirmationActionType.SendingOnBehalf,
         action: "Send draft reply to Mark and Dana (business inquiry)",
         requested_by: "participant_2",
+        requested_in_thread: "participant_2_private",
         result: ConfirmationResult.NotYetApproved,
         requested_at: new Date("2026-04-01T15:00:00-07:00"),
       },

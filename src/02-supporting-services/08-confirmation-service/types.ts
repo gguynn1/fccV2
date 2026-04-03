@@ -22,10 +22,11 @@ export interface Confirmation {
   type: ConfirmationActionType;
   action: string;
   requested_by: string;
-  requested_in_thread?: string;
+  requested_in_thread: string;
   requested_at: Date;
   expires_at?: Date;
   expired_at?: Date;
+  resolved_in_thread?: string;
   status?: string;
   result?: ConfirmationResult;
 }

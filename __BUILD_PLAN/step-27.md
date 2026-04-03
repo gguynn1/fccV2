@@ -4,7 +4,7 @@
 
 ## What to Build
 
-- `src/02-supporting-services/07-escalation-service/types.ts` — escalation state types, step types, accountability level types
+- `src/02-supporting-services/07-escalation-service/types.ts` — escalation state types, step types, accountability level types, `EscalationReassignmentPolicy` (Reset/Transfer/Cancel — what happens to active escalation when the responsible entity changes), `responsible_entity` field on `ActiveEscalation`
 - `src/02-supporting-services/07-escalation-service/index.ts` — EscalationService implementation with XState v5 state machines
 - Four escalation profiles: HIGH (chores, finances — multi-step with thread widening), MEDIUM (school, health, calendar, travel — follow-up + digest flag), LOW (relationship, pets, family status, maintenance — send once then disappear), NONE (grocery, vendors, business, meals — no follow-up)
 - Timed escalation steps via BullMQ/Redis scheduling
@@ -28,4 +28,4 @@ XState v5 state machines, BullMQ/Redis scheduling (AOF required), SQLite persist
 
 ## Acceptance Criteria
 
-All four profiles implemented, timed steps fire correctly, downtime recovery advances missed steps, silence never equals approval, XState machines model all paths
+All four profiles implemented, timed steps fire correctly, downtime recovery advances missed steps, silence never equals approval, XState machines model all paths, reassignment policy applied correctly per profile (HIGH=reset, MEDIUM=transfer, LOW/NONE=cancel)

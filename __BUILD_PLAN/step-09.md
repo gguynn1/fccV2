@@ -11,7 +11,8 @@ Build the LLM-powered topic and intent classification service.
 - Claude API integration for topic classification
 - Reads message content plus recent thread context for disambiguation
 - Structured output validation with Zod
-- Disambiguation handling for: meals vs grocery, maintenance vs vendors, maintenance vs chores, business vs vendors
+- **Topic disambiguation** handling for: meals vs grocery, maintenance vs vendors, maintenance vs chores, business vs vendors
+- **Intent disambiguation** handling for: cancellation vs completion (future vs past event), request vs update (new vs existing item), cancellation vs update (remove entirely vs change details), query vs request (asking about state vs asking to create)
 - Context-aware classification: same message may classify differently based on thread history
 
 ## Dependencies

@@ -5,8 +5,10 @@
 ## What to Build
 
 - Verify/update processing flow documentation
-- Document full flow: Transport → Identity → Queue → Worker (Classifier + entity resolution + supporting service calls) → Action Router
-- Document stale catch-up after downtime
+- Document full flow: Transport → Identity → Queue → Worker (Classifier + entity resolution + action resolution + supporting service calls) → Action Router
+- Document the **clarification loop**: when action resolution fails (ambiguous intent, ambiguous reference, multiple matches, missing required field), the Worker sends a clarification question to the participant's thread instead of proceeding. The response re-enters the Queue with `clarification_of` linking it to the original item. Document how the Worker resumes processing when the clarification response arrives.
+- Document stale catch-up after downtime, including recovery ordering for conflicting queued items (state-changing actions take precedence over informational actions)
+- Document idempotency: queue items carry an `idempotency_key` for deduplication on enqueue and during startup backlog processing
 - Cross-check with all implemented services
 
 ### Pipeline Order Clarification
@@ -28,6 +30,8 @@ Markdown, ASCII diagrams.
 ## Acceptance Criteria
 
 - Full processing flow documented accurately
-- Stale catch-up described
+- Clarification loop documented with diagram
+- Stale catch-up and recovery ordering described
+- Idempotency mechanism described
 
 ---

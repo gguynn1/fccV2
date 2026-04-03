@@ -30,3 +30,22 @@ export interface CalendarEvent {
 export interface CalendarState {
   events: CalendarEvent[];
 }
+
+export interface CalendarQueryFilters {
+  date_range?: { start: Date; end: Date };
+  concerning?: string[];
+  status?: CalendarEventStatus[];
+}
+
+export type CalendarAction =
+  | {
+      type: "create_event";
+      title: string;
+      date_start: Date;
+      date_end?: Date;
+      location?: string;
+      concerning: string[];
+    }
+  | { type: "reschedule_event"; event_id: string; new_start: Date; new_end?: Date }
+  | { type: "cancel_event"; event_id: string; reason?: string }
+  | { type: "query_events"; filters?: CalendarQueryFilters };

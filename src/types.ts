@@ -43,6 +43,13 @@ export enum ClassifierIntent {
   ForwardedData = "forwarded_data",
 }
 
+export enum ClarificationReason {
+  AmbiguousIntent = "ambiguous_intent",
+  AmbiguousReference = "ambiguous_reference",
+  MissingRequiredField = "missing_required_field",
+  MultipleMatches = "multiple_matches",
+}
+
 export enum InputMethod {
   Text = "text",
   Image = "image",

@@ -4,7 +4,7 @@
 
 ## What to Build
 
-- `src/02-supporting-services/04-topic-profile-service/04.01-calendar/types.ts` — Calendar-specific types: appointments, reschedules, conflict checks, follow-ups, date/time normalization
+- `src/02-supporting-services/04-topic-profile-service/04.01-calendar/types.ts` — Calendar-specific types: appointments, reschedules, conflict checks, follow-ups, date/time normalization, and the `CalendarAction` discriminated union (create_event, reschedule_event, cancel_event, query_events). `reschedule_event` requires `event_id` — this enforces ID retention at the type level. When a reschedule can't resolve to a single event (e.g., two events at 3pm), the worker produces a `ClarificationRequest` instead of a `CalendarAction`.
 - `src/02-supporting-services/04-topic-profile-service/04.01-calendar/profile.ts` — Calendar behavior profile: precise and logistical tone, structured confirmation format, event-driven initiative, medium escalation, cross-topic to CalDAV endpoint
 - Conflict detection for overlapping appointments
 - Reminder and post-appointment follow-up scheduling via BullMQ

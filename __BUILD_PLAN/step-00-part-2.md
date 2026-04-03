@@ -6,9 +6,9 @@
 
 This establishes the shared vocabulary, configuration interfaces, state interfaces, and seed data infrastructure that every service depends on.
 
-- `src/types.ts` — shared enums: TopicKey (14 topics), EscalationLevel, GrocerySection, ClassifierIntent, InputMethod. Only enums used across the 01↔02 service boundary live here. Service-scoped enums (DispatchPriority, EntityType, etc.) live in their owning service's `types.ts`.
+- `src/types.ts` — shared enums: TopicKey (14 topics), EscalationLevel, GrocerySection, ClassifierIntent, ClarificationReason, InputMethod. Only enums used across the 01↔02 service boundary live here. Service-scoped enums (DispatchPriority, EntityType, CollisionPrecedence, etc.) live in their owning service's `types.ts`.
 - `src/index.ts` — barrel exports + `SystemConfig` interface + `SystemState` interface
-- `src/_seed/system-config.ts` — complete system definition with all entities (anonymized: participant_1, participant_2, participant_3, pet), threads, 14 topic behavior profiles, dispatch rules, confirmation gates, input recognition with disambiguation rules, data ingest sources, daily rhythm, worker processing sequence, escalation profiles
+- `src/_seed/system-config.ts` — complete system definition with all entities (anonymized: participant_1, participant_2, participant_3, pet), threads, 14 topic behavior profiles, dispatch rules (with collision precedence policy), confirmation gates, input recognition with topic AND intent disambiguation rules, data ingest sources, daily rhythm, worker processing sequence, escalation profiles
 - `src/_seed/system-state.ts` — representative mid-day runtime snapshot with queue state, budget tracker, escalation status, per-topic records across all 14 topics, confirmations, thread histories, digest history
 - Database bootstrapping logic — `--seed` flag support that reads seed files and populates SQLite tables
 - Environment variable validation module — fail fast on startup with a clear error listing any missing required env vars (`ANTHROPIC_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_IDENTITY`, `REDIS_URL`, `DATABASE_PATH`)

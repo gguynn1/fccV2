@@ -29,3 +29,16 @@ export interface VendorRecord {
 export interface VendorsState {
   records: VendorRecord[];
 }
+
+export type VendorAction =
+  | { type: "add_vendor"; name: string; vendor_type: string; contact: string; managed_by: string }
+  | {
+      type: "log_job";
+      vendor_id: string;
+      description: string;
+      date: Date;
+      cost?: number;
+      status?: VendorJobStatus;
+    }
+  | { type: "update_job_status"; vendor_id: string; job_index: number; status: VendorJobStatus }
+  | { type: "query_vendors"; vendor_type?: string };

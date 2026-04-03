@@ -20,6 +20,9 @@ Each numbered folder is a bounded service. A service owns its behavior, its type
 - All inbound data enters through the Queue — human messages, scheduled events, external data. No exceptions.
 - The Worker pulls one item at a time, calls supporting services, then hands the result to the Action Router.
 - Action Router decides: Dispatch (send now via Transport), Hold (batch via Scheduler), or Store (save via State).
+- If the Worker cannot resolve a typed action (ambiguous reference, ambiguous intent, missing required field), it sends a clarification request to the participant instead of proceeding. The participant's response re-enters the Queue linked to the original item.
+- The Worker processes one item at a time, sequentially. Two near-simultaneous inputs are ordered by queue timestamp. The second item always sees the state left by the first. This provides natural conflict resolution: last-processed-wins. No locking, no optimistic concurrency — sequential processing is the concurrency model.
+- Cross-topic side-effect items (e.g., Meals→Grocery) use a deterministic idempotency key derived from `${source_item_id}:${target_topic}`. If the source item is retried, the side-effect item deduplicates against the existing one.
 - Adding a new data source feeds the Queue. It never requires changes to dispatch logic.
 
 ## Messaging Invariants

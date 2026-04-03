@@ -48,3 +48,9 @@ export interface ChoresState {
   active: ActiveChore[];
   completed_recent: CompletedChore[];
 }
+
+export type ChoreAction =
+  | { type: "assign_chore"; task: string; assigned_to: string; due: Date }
+  | { type: "complete_chore"; chore_id: string }
+  | { type: "cancel_chore"; chore_id: string }
+  | { type: "query_chores"; assigned_to?: string; status?: ChoreStatus };

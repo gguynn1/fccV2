@@ -18,7 +18,7 @@ alwaysApply: false
 ## Rules
 
 - Every `types.ts` MUST have a sibling `CLAUDE.md`. No orphaned type files.
-- Shared enums (`TopicKey`, `ClassifierIntent`, `EscalationLevel`, `GrocerySection`, `InputMethod`) live in `src/types.ts` because no single service owns them.
+- Shared enums (`TopicKey`, `ClassifierIntent`, `EscalationLevel`, `GrocerySection`, `ClarificationReason`, `InputMethod`) live in `src/types.ts` because no single service owns them.
 - If an enum is used across the 01↔02 boundary, it belongs in `src/types.ts` — not in a leaf service.
 - Leaf types import shared enums via `import type` from `src/types.ts` (relative path).
 - The one legitimate cross-tree import: state-service (02) imports `QueueState` from queue (01), because state aggregates everything.

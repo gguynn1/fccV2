@@ -31,3 +31,8 @@ export interface StudentRecord {
 export interface SchoolState {
   students: StudentRecord[];
 }
+
+export type SchoolAction =
+  | { type: "add_assignment"; entity: string; title: string; due_date: Date; source: string }
+  | { type: "complete_assignment"; assignment_id: string }
+  | { type: "query_school"; entity?: string; status?: AssignmentStatus };

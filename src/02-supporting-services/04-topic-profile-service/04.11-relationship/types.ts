@@ -22,3 +22,7 @@ export interface RelationshipState {
   next_nudge_eligible: Date;
   nudge_history: NudgeHistoryEntry[];
 }
+
+export type RelationshipAction =
+  | { type: "respond_to_nudge"; acknowledged: boolean }
+  | { type: "query_nudge_history"; nudge_type?: NudgeType };

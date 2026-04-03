@@ -33,3 +33,14 @@ export interface Trip {
 export interface TravelState {
   trips: Trip[];
 }
+
+export type TravelAction =
+  | { type: "create_trip"; name: string; dates: { start: Date; end: Date }; travelers: string[] }
+  | {
+      type: "update_trip";
+      trip_id: string;
+      changes: Partial<Pick<Trip, "name" | "dates" | "travelers" | "notes">>;
+    }
+  | { type: "cancel_trip"; trip_id: string }
+  | { type: "update_checklist"; trip_id: string; item: string; status: ChecklistItemStatus }
+  | { type: "query_trips"; status?: TripStatus };

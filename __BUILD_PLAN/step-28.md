@@ -4,7 +4,7 @@
 
 ## What to Build
 
-- `src/02-supporting-services/08-confirmation-service/types.ts` — confirmation record types (pending, resolved, expired), gate types
+- `src/02-supporting-services/08-confirmation-service/types.ts` — confirmation record types (pending, resolved, expired), gate types. `requested_in_thread` is required (not optional) — confirmations are thread-bound. `resolved_in_thread` tracks where the approval/rejection came from. Approvals from a different thread than `requested_in_thread` must be rejected.
 - `src/02-supporting-services/08-confirmation-service/index.ts` — ConfirmationService implementation
 - Three confirmation gate categories: sending on behalf, financial actions, system changes
 - Confirmation flow: present in originating thread → wait for response → approve/reject/expire
@@ -27,4 +27,4 @@ SQLite via State Service, BullMQ delayed jobs for expiry timers (Redis AOF requi
 
 ## Acceptance Criteria
 
-All three gate types enforced, approval/rejection/expiry flows work, expired confirmations never auto-execute, downtime recovery handles passed expiry
+All three gate types enforced, approval/rejection/expiry flows work, expired confirmations never auto-execute, downtime recovery handles passed expiry, approvals from a different thread than `requested_in_thread` are rejected

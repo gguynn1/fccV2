@@ -10,6 +10,8 @@ import {
   DataIngestSourceType,
   WorkerAction,
   WorkerService,
+  CollisionPrecedence,
+  EscalationReassignmentPolicy,
 } from "../index.js";
 
 export const systemConfig: SystemConfig = {
@@ -476,6 +478,15 @@ export const systemConfig: SystemConfig = {
     collision_avoidance: {
       description:
         "Before dispatching any outbound, check what else is pending or recently sent for the same person or thread. Batch if possible. Space out if not. Never stack multiple messages back to back.",
+      precedence_order: [
+        CollisionPrecedence.SafetyAndHealth,
+        CollisionPrecedence.TimeSensitiveDeadline,
+        CollisionPrecedence.ActiveConversation,
+        CollisionPrecedence.ScheduledReminder,
+        CollisionPrecedence.ProactiveOutbound,
+      ],
+      same_precedence_strategy:
+        "When multiple items share the same precedence level, batch them into a single combined message. If batching is not possible (different threads), send the most time-sensitive first and hold others for the next quiet window.",
     },
   },
 
@@ -545,6 +556,32 @@ export const systemConfig: SystemConfig = {
         },
       ],
     },
+    intent_disambiguation: {
+      description:
+        "Guidance for the classifier when the participant's intent could match multiple ClassifierIntent values.",
+      rules: [
+        {
+          close_intents: ["cancellation", "completion"],
+          guidance:
+            "If the event or item is in the future and has not occurred yet, the participant wants to cancel it (Cancellation). If the event has already happened or the task has been performed, the participant is reporting it done (Completion). 'I'm done with the dentist' after the appointment time → Completion. 'I'm done with the dentist' before the appointment → Cancellation. When still ambiguous, ask for clarification.",
+        },
+        {
+          close_intents: ["request", "update"],
+          guidance:
+            "If no matching item exists in state, treat as a new Request. If a matching item already exists, treat as an Update to that item. 'Schedule a dentist appointment' when none exists → Request. 'Move the dentist to Thursday' when one exists → Update. If multiple items match, request clarification before proceeding.",
+        },
+        {
+          close_intents: ["cancellation", "update"],
+          guidance:
+            "If the participant wants to remove or stop something entirely → Cancellation. If they want to change details but keep it → Update. 'Cancel the dentist' → Cancellation. 'Move the dentist to Thursday' → Update. 'Never mind about the dentist' → Cancellation.",
+        },
+        {
+          close_intents: ["query", "request"],
+          guidance:
+            "If the participant is asking about existing state → Query. If they are asking the system to create or do something new → Request. 'What's on the calendar Thursday?' → Query. 'Add a dentist appointment Thursday' → Request. 'Do we have anything Thursday?' → Query.",
+        },
+      ],
+    },
   },
 
   data_ingest: {
@@ -605,6 +642,13 @@ export const systemConfig: SystemConfig = {
       },
     },
     default_state: "quiet",
+    digest_eligibility: {
+      exclude_already_dispatched: true,
+      exclude_stale: true,
+      staleness_threshold_hours: 24,
+      suppress_repeats_from_previous_digest: true,
+      include_unresolved_from_yesterday: true,
+    },
   },
 
   worker: {
@@ -672,6 +716,7 @@ export const systemConfig: SystemConfig = {
         "escalate to broader thread so others can see",
         "flag as unresolved in next digest",
       ],
+      on_reassignment: EscalationReassignmentPolicy.Reset,
     },
     medium: {
       label: "Medium Accountability",
@@ -681,6 +726,7 @@ export const systemConfig: SystemConfig = {
         "one follow-up reminder",
         "flag in digest — no thread escalation unless hard deadline is imminent",
       ],
+      on_reassignment: EscalationReassignmentPolicy.Transfer,
     },
     low: {
       label: "Low Accountability",
@@ -696,11 +742,13 @@ export const systemConfig: SystemConfig = {
         "maybe try again in a few days with something different",
         "never pressure, never escalate, never follow up",
       ],
+      on_reassignment: EscalationReassignmentPolicy.Cancel,
     },
     none: {
       label: "No Escalation",
       applies_to: [TopicKey.Grocery, TopicKey.Vendors, TopicKey.Business, TopicKey.Meals],
       steps: ["send once or store silently", "no follow-up"],
+      on_reassignment: EscalationReassignmentPolicy.Cancel,
     },
   },
 

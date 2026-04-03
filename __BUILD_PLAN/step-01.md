@@ -7,8 +7,10 @@
 Define the TypeScript interfaces and type contracts that govern how services in the core pipeline communicate. No runtime implementation yet — just the type-level contracts.
 
 - `src/01-service-stack/types.ts` — stack-level contracts for transport input/output, identity resolution result, classification result, queue item schema, worker decision object, action router result (dispatch/hold/store discriminated union)
-- Ensure queue items carry: source, content, concerning (entity list), target_thread, created_at (required); topic (TopicKey) and intent (ClassifierIntent) are optional at enqueue — phone-originated items arrive without classification, the Worker classifies after dequeue; Data Ingest and Scheduler items may arrive pre-classified
+- Ensure queue items carry: source, content, concerning (entity list), target_thread, created_at (required); topic (TopicKey) and intent (ClassifierIntent) are optional at enqueue — phone-originated items arrive without classification, the Worker classifies after dequeue; Data Ingest and Scheduler items may arrive pre-classified. Queue items also carry optional `idempotency_key` (content-based fingerprint for deduplication) and `clarification_of` (links response to the original item when this is a clarification reply).
 - Ensure action results use discriminated unions for dispatch/hold/store outcomes
+- Ensure the action router `CollisionPolicy` defines a strict `precedence_order` (CollisionPrecedence enum) and a `same_precedence_strategy` for tie-breaking when multiple immediate items compete
+- Worker types include a `ClarificationRequest` interface for when action resolution cannot proceed (ambiguous intent, ambiguous reference, multiple matches, missing required field)
 - Service interface definitions that the worker will call
 
 ## Dependencies

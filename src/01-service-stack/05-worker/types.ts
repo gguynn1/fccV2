@@ -1,3 +1,5 @@
+import type { ClarificationReason } from "../../types.js";
+
 export enum WorkerAction {
   ClassifyTopic = "classify_topic",
   IdentifyEntities = "identify_entities",
@@ -28,4 +30,36 @@ export interface WorkerStep {
 
 export interface WorkerConfig {
   processing_sequence: WorkerStep[];
+}
+
+export interface ClarificationRequest {
+  reason: ClarificationReason;
+  message_to_participant: string;
+  options?: string[];
+  original_queue_item_id: string;
+  context: Record<string, unknown>;
+}
+
+export interface ProcessingTraceStep {
+  step: number;
+  action: WorkerAction;
+  service?: WorkerService;
+  input_summary: string;
+  output_summary: string;
+  duration_ms: number;
+}
+
+export type ProcessingOutcome =
+  | "dispatched"
+  | "held"
+  | "stored"
+  | "clarification_requested"
+  | "dropped_stale";
+
+export interface ProcessingTrace {
+  queue_item_id: string;
+  started_at: Date;
+  completed_at: Date;
+  outcome: ProcessingOutcome;
+  steps: ProcessingTraceStep[];
 }

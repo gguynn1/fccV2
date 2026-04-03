@@ -384,3 +384,118 @@ Cost Management
 - Cache deterministic inputs — same message + same prompt + same state = same classification, no need to re-call.
 - Incremental runs: only re-run scenarios affected by a prompt change (the coverage matrix tracks which scenarios test which prompts).
 - Full regression runs before candidate promotion.
+
+Probe Quantification Layer
+
+Add a risk-weighted scoring layer on top of pass/fail so broad robustness probes (permissions, leakage, recovery, collision, idempotency) can be measured consistently over time.
+
+This does not replace deterministic scenario assertions. It summarizes risk posture and promotion readiness.
+
+Probe Families
+
+Each scenario can belong to one or more probe families:
+- permissions
+- thread_leakage
+- context_drift
+- cross_topic_side_effect_safety
+- confirmation_edge_cases
+- race_conditions
+- digest_correctness
+- escalation_reassignment
+- schema_evolution_resilience
+- observability_auditability
+- idempotency
+- outage_recovery
+- collision_policy
+
+Probe Family Metadata
+
+Each family has static weights and dynamic run metrics:
+
+  ProbeFamily {
+    key: string
+    severity: 1 | 2 | 3 | 4 | 5
+    blast_radius: 1 | 2 | 3 | 4 | 5
+    detectability_penalty: 1 | 2 | 3
+    scenario_ids: string[]
+  }
+
+  ProbeRunMetrics {
+    pass_rate: number               // 0..1
+    deterministic_pass_rate: number // subset requiring exact checks
+    regression_stability: number    // 0..1 after full rerun
+  }
+
+Scoring Formulas
+
+For each probe family:
+
+  FRI (Family Risk Index) = (1 - pass_rate) * severity * blast_radius * detectability_penalty
+
+  FCI (Family Confidence Index) = pass_rate * regression_stability
+
+Overall:
+
+  max_risk = sum(severity * blast_radius * detectability_penalty for all families)
+  total_risk = sum(FRI for all families)
+
+  OPH (Overall Probe Health, 0..100) = 100 * (1 - total_risk / max_risk)
+
+Interpretation:
+- Higher FRI means bigger unresolved risk.
+- Higher FCI means behavior is both passing and stable under regression.
+- OPH is the top-level "how safe are we" metric for this probe layer.
+
+Suggested Initial Weights
+
+- idempotency: severity 5, blast_radius 5, detectability_penalty 3
+- outage_recovery: severity 5, blast_radius 5, detectability_penalty 2
+- thread_leakage: severity 5, blast_radius 4, detectability_penalty 2
+- permissions: severity 5, blast_radius 4, detectability_penalty 2
+- confirmation_edge_cases: severity 4, blast_radius 4, detectability_penalty 2
+- collision_policy: severity 4, blast_radius 5, detectability_penalty 2
+- cross_topic_side_effect_safety: severity 4, blast_radius 5, detectability_penalty 2
+- race_conditions: severity 4, blast_radius 4, detectability_penalty 2
+- escalation_reassignment: severity 4, blast_radius 3, detectability_penalty 2
+- digest_correctness: severity 3, blast_radius 4, detectability_penalty 2
+- schema_evolution_resilience: severity 3, blast_radius 4, detectability_penalty 1
+- context_drift: severity 3, blast_radius 3, detectability_penalty 1
+- observability_auditability: severity 3, blast_radius 5, detectability_penalty 2
+
+Promotion Gates Using Probe Scores
+
+Candidates are promotion-eligible only when all are true:
+- OPH >= 92
+- No family has FRI > 1.0
+- Critical families (idempotency, outage_recovery, thread_leakage, permissions, confirmation_edge_cases):
+  - deterministic_pass_rate == 1.0
+  - regression_stability >= 0.98
+- Negative scenarios remain 100% pass.
+
+Report Shape
+
+Each eval run writes a probe summary artifact:
+
+  {
+    "overall_probe_health": 0,
+    "total_risk": 0,
+    "max_risk": 0,
+    "families": {
+      "idempotency": {
+        "pass_rate": 0,
+        "deterministic_pass_rate": 0,
+        "regression_stability": 0,
+        "family_risk_index": 0,
+        "family_confidence_index": 0
+      }
+    },
+    "blockers": []
+  }
+
+How It Fits the Existing Loop
+
+- Scenario suite executes as usual.
+- Deterministic and qualitative scorers produce per-scenario outcomes.
+- Outcomes roll up into probe families.
+- Tuner may improve prompts, but promotion requires meeting probe gates.
+- Coverage matrix should show both topic/step coverage and probe-family coverage gaps.

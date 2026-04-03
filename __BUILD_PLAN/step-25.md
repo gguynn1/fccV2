@@ -4,7 +4,7 @@
 
 ## What to Build
 
-- `src/02-supporting-services/05-routing-service/types.ts` — routing decision types, thread target types
+- `src/02-supporting-services/05-routing-service/types.ts` — routing decision types, thread target types, `ContextTransitionPolicy` (when `active_topic_context` resets: on new topic classification, after idle timeout, on explicit switch signals)
 - `src/02-supporting-services/05-routing-service/index.ts` — RoutingService implementation
 - Two routing rules: Rule 1 (responses stay in context — reply in same thread), Rule 2 (proactive messages route to narrowest appropriate thread)
 - Thread map lookup from system configuration

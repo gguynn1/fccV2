@@ -49,3 +49,20 @@ export interface MaintenanceState {
   assets: MaintenanceAsset[];
   items: MaintenanceItem[];
 }
+
+export type MaintenanceAction =
+  | { type: "log_maintenance"; item_id: string; performed_by: string; cost?: number; notes: string }
+  | {
+      type: "add_asset";
+      asset_type: MaintenanceAssetType;
+      name: string;
+      details: Record<string, string>;
+    }
+  | {
+      type: "add_item";
+      asset_id: string;
+      task: string;
+      interval: MaintenanceInterval;
+      responsible: string;
+    }
+  | { type: "query_maintenance"; asset_type?: MaintenanceAssetType; status?: MaintenanceStatus };

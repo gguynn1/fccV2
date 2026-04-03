@@ -6,10 +6,10 @@
 
 Build the single intake point that accepts items from every source: human messages, ingest events, and scheduled triggers.
 
-- `src/01-service-stack/04-queue/types.ts` — queue item schema with source, content, concerning (entity list), target_thread, created_at (required), and topic (TopicKey), intent (ClassifierIntent) — both optional at enqueue, set by the Worker's Classifier call after dequeue; may be pre-populated by Data Ingest or Scheduler items
+- `src/01-service-stack/04-queue/types.ts` — queue item schema with source, content, concerning (entity list), target_thread, created_at (required), and topic (TopicKey), intent (ClassifierIntent) — both optional at enqueue, set by the Worker's Classifier call after dequeue; may be pre-populated by Data Ingest or Scheduler items. Also carries optional `idempotency_key` (content-based fingerprint) and `clarification_of` (links a response to the original queue item when this is a clarification reply).
 - `src/01-service-stack/04-queue/index.ts` — BullMQ queue setup with producer and consumer interfaces
 - Zod validation before enqueue and before worker consumption
-- Idempotency safeguards for duplicate items
+- Idempotency safeguards using `idempotency_key`: before enqueue, check for an existing item with the same key in the pending queue. On startup after downtime, deduplicate backlog items with matching keys — keep the most recent, discard duplicates.
 - Stale detection on startup: items past their relevance window are logged silently, never dispatched
 - Dead-letter queue for items that exhaust retries
 - pino logging on enqueue, dequeue, retry, and dead-letter events

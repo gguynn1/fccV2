@@ -31,3 +31,14 @@ export interface MealsState {
   planned: MealPlan[];
   dietary_notes: DietaryNote[];
 }
+
+export type MealAction =
+  | { type: "plan_meal"; date: Date; meal_type: MealType; description: string; planned_by: string }
+  | {
+      type: "update_meal";
+      meal_plan_id: string;
+      changes: Partial<Pick<MealPlan, "description" | "meal_type" | "date">>;
+    }
+  | { type: "skip_meal"; meal_plan_id: string }
+  | { type: "add_dietary_note"; entity: string; note: string }
+  | { type: "query_plans"; date_range?: { start: Date; end: Date } };

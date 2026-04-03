@@ -33,3 +33,15 @@ export interface HealthProfile {
 export interface HealthState {
   profiles: HealthProfile[];
 }
+
+export type HealthAction =
+  | {
+      type: "add_appointment";
+      entity: string;
+      provider_type: HealthProviderType;
+      date: Date;
+      location?: string;
+    }
+  | { type: "log_visit"; entity: string; provider_type: HealthProviderType; notes: string }
+  | { type: "update_medication"; entity: string; medication: Medication }
+  | { type: "query_health"; entity?: string };

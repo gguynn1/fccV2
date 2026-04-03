@@ -3,6 +3,11 @@ export interface TopicDisambiguationRule {
   guidance: string;
 }
 
+export interface IntentDisambiguationRule {
+  close_intents: string[];
+  guidance: string;
+}
+
 export interface InputRecognition {
   text: { description: string };
   structured_choice: { description: string; formats: string[] };
@@ -17,5 +22,9 @@ export interface InputRecognition {
   topic_disambiguation: {
     description: string;
     rules: TopicDisambiguationRule[];
+  };
+  intent_disambiguation: {
+    description: string;
+    rules: IntentDisambiguationRule[];
   };
 }

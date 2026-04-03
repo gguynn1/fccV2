@@ -8,10 +8,17 @@ export enum EscalationStepAction {
   Resolved = "resolved",
 }
 
+export enum EscalationReassignmentPolicy {
+  Reset = "reset",
+  Transfer = "transfer",
+  Cancel = "cancel",
+}
+
 export interface EscalationProfile {
   label: string;
   applies_to: TopicKey[];
   steps: string[];
+  on_reassignment: EscalationReassignmentPolicy;
 }
 
 export interface EscalationHistoryEntry {
@@ -26,6 +33,7 @@ export interface ActiveEscalation {
   topic: TopicKey;
   item_ref: string;
   profile: EscalationLevel;
+  responsible_entity: string;
   concerning: string[];
   current_step: number;
   history: EscalationHistoryEntry[];

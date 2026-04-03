@@ -43,6 +43,8 @@ export interface PendingQueueItem {
   created_at: Date;
   hold_until?: Date;
   status?: QueuePendingStatus;
+  idempotency_key?: string;
+  clarification_of?: string;
 }
 
 export interface DispatchedQueueItem {
