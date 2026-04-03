@@ -1,0 +1,127 @@
+{
+  "current_step": "step-01",
+  "status_notes": {
+    "step-00-part-1": {
+      "updated_at": "2026-04-03T13:55:03Z",
+      "checks_completed": [
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed",
+        "redis-cli ping returned PONG",
+        "redis appendonly is yes",
+        "ngrok is installed and available",
+        "runtime dependencies installed (fastify, bullmq, better-sqlite3, zod, pino, xstate, imapflow, twilio, @anthropic-ai/sdk)"
+      ],
+      "waiting_on": ["Twilio toll-free verification approval (submission is in progress)"],
+      "deferred_by_user": [
+        "IMAP inbox credential setup in .env (IMAP_HOST, IMAP_USER, IMAP_PASSWORD)"
+      ],
+      "imap_deferred_until": "step-29",
+      "safe_resume_checklist": [
+        "Twilio toll-free verification status changes from pending to approved",
+        "Set IMAP_HOST to real provider host",
+        "Set IMAP_USER and IMAP_PASSWORD to app-specific credentials",
+        "Re-run step-00-part-1 Setup Gate checks",
+        "Mark step-00-part-1 complete and continue to step-00-part-2"
+      ],
+      "next_action": "When Twilio verification is approved and IMAP credentials are ready, re-check Setup Gate and mark step-00-part-1 complete."
+    },
+    "step-00-part-2": {
+      "updated_at": "2026-04-03T13:58:35Z",
+      "checks_completed": [
+        "shared enums and system interfaces compile",
+        "seed files compile with zero errors against current type system",
+        "environment validation module added with clear missing-variable errors",
+        "npm run start:seed writes seeded data into SQLite",
+        "seed tables verified with one config row and one state row"
+      ],
+      "deferred_by_user": [
+        "Twilio toll-free verification approval still pending (non-blocking for step-00-part-2)",
+        "IMAP inbox credentials deferred until later setup window"
+      ],
+      "next_action": "Proceed to step-00-part-3 (application entry point and process lifecycle)."
+    },
+    "step-00-part-3": {
+      "updated_at": "2026-04-03T14:03:41Z",
+      "checks_completed": [
+        "application entry point implemented in src/server.ts",
+        "start script points to node dist/server.js",
+        "startup initializes env, sqlite wal, redis aof check, fastify, worker, scheduler",
+        "startup catch-up sequence runs before worker processing starts",
+        "SIGTERM lifecycle verified with clean shutdown logs for fastify, worker, scheduler, sqlite, and redis connections",
+        "launchd plist files created for redis, ngrok, app, and sqlite backup"
+      ],
+      "requires_manual_verification": [
+        "load launchd agents with launchctl and confirm running pids",
+        "verify launchd auto-restart behavior after killing node process",
+        "verify auto-start after machine reboot with automatic login enabled",
+        "confirm macOS power settings (prevent sleep, restart after power failure)",
+        "confirm scheduled sqlite backup runs and include redis aof files in backup scope"
+      ],
+      "deferred_by_user": [
+        "Twilio toll-free verification approval still pending",
+        "IMAP credentials still deferred; listener currently skips when placeholders are present"
+      ],
+      "next_action": "Proceed to step-01."
+    }
+  },
+  "steps": {
+    "step-00-part-1": { "status": "complete", "completed_at": "2026-04-03T13:55:03Z" },
+    "step-00-part-2": { "status": "complete", "completed_at": "2026-04-03T13:58:35Z" },
+    "step-00-part-3": { "status": "complete", "completed_at": "2026-04-03T14:03:41Z" },
+    "step-01": { "status": "pending" },
+    "step-02": { "status": "pending" },
+    "step-03": { "status": "pending" },
+    "step-04": { "status": "pending" },
+    "step-05": { "status": "pending" },
+    "step-06": { "status": "pending" },
+    "step-07": { "status": "pending" },
+    "step-08": { "status": "pending" },
+    "step-09": { "status": "pending" },
+    "step-10": { "status": "pending" },
+    "step-11": { "status": "pending" },
+    "step-12": { "status": "pending" },
+    "step-13": { "status": "pending" },
+    "step-14": { "status": "pending" },
+    "step-15": { "status": "pending" },
+    "step-16": { "status": "pending" },
+    "step-17": { "status": "pending" },
+    "step-18": { "status": "pending" },
+    "step-19": { "status": "pending" },
+    "step-20": { "status": "pending" },
+    "step-21": { "status": "pending" },
+    "step-22": { "status": "pending" },
+    "step-23": { "status": "pending" },
+    "step-24": { "status": "pending" },
+    "step-25": { "status": "pending" },
+    "step-26": { "status": "pending" },
+    "step-27": { "status": "pending" },
+    "step-28": { "status": "pending" },
+    "step-29": { "status": "pending" },
+    "step-30": { "status": "pending" },
+    "step-31": { "status": "pending" },
+    "step-32": { "status": "pending" },
+    "step-33": { "status": "pending" },
+    "step-34": { "status": "pending" },
+    "step-35": { "status": "pending" },
+    "step-36": { "status": "pending" },
+    "step-37": { "status": "pending" },
+    "step-38": { "status": "pending" },
+    "step-39": { "status": "pending" },
+    "step-40": { "status": "pending" },
+    "step-41": { "status": "pending" },
+    "step-42": { "status": "pending" },
+    "step-43": { "status": "pending" },
+    "step-44": { "status": "pending" },
+    "step-45": { "status": "pending" },
+    "step-46": { "status": "pending" },
+    "step-47": { "status": "pending" },
+    "step-48": { "status": "pending" },
+    "step-49": { "status": "pending" },
+    "step-50": { "status": "pending" },
+    "step-51": { "status": "pending" },
+    "step-52": { "status": "pending" },
+    "step-53": { "status": "pending" },
+    "step-54": { "status": "pending" }
+  }
+}

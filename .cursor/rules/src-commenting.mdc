@@ -1,0 +1,26 @@
+---
+description: Comment quality requirements for src code
+globs: "src/**/*.ts"
+alwaysApply: false
+---
+
+# Source Commenting Standard
+
+Code in `src/` must be understandable without reading implementation details line-by-line.
+
+- Add comments for non-obvious intent, trade-offs, invariants, and sequencing.
+- Prefer short "why" comments over "what this line does" comments.
+- Add a brief comment before multi-step logic, state transitions, or retry/backoff flows.
+- Document assumptions and failure behavior at integration boundaries (Redis, SQLite, IMAP, webhooks).
+- Keep comments current; update or remove stale comments in the same change.
+
+## Required Cases
+
+- Queue ordering, idempotency, or stale-reconciliation behavior.
+- Escalation/confirmation gate logic.
+- Any branch where incorrect behavior could dispatch the wrong outbound action.
+
+## Avoid
+
+- Obvious narration comments.
+- Large comment blocks that duplicate type names or function names.

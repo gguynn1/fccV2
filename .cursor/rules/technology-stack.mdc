@@ -27,6 +27,7 @@ Email (IMAP via imapflow) connects to existing family inboxes — no new subscri
 | Escalation state machines | XState v5                                                                               |
 | Validation                | Zod                                                                                     |
 | Logging                   | pino (structured JSON)                                                                  |
+| Environment config        | dotenv (loads `.env` into `process.env` at startup)                                     |
 | Testing                   | Vitest                                                                                  |
 
 ## Tunnel

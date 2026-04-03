@@ -10,10 +10,11 @@
     "lint:fix": "eslint . --fix && prettier --write .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "start": "node dist/index.js",
-    "start:seed": "node dist/index.js --seed",
-    "dev": "node --watch dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node dist/server.js",
+    "start:seed": "node dist/bootstrap.js --seed",
+    "dev": "tsx watch src/server.ts",
+    "ngrok:auth": "set -a; . ./.env; set +a; if [ -z \"$NGROK_AUTHTOKEN\" ]; then echo \"NGROK_AUTHTOKEN is missing in .env\"; exit 1; fi; ngrok config add-authtoken \"$NGROK_AUTHTOKEN\"",
+    "test": "vitest run --passWithNoTests"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +22,7 @@
   "description": "",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.5.0",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
@@ -28,7 +30,21 @@
     "eslint-plugin-import-x": "^4.16.2",
     "eslint-plugin-unused-imports": "^4.4.1",
     "prettier": "^3.8.1",
+    "tsx": "^4.20.6",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.0"
+    "typescript-eslint": "^8.58.0",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
+    "better-sqlite3": "^12.8.0",
+    "bullmq": "^5.73.0",
+    "dotenv": "^17.4.0",
+    "fastify": "^5.8.4",
+    "imapflow": "^1.2.18",
+    "pino": "^10.3.1",
+    "twilio": "^5.13.1",
+    "xstate": "^5.30.0",
+    "zod": "^4.3.6"
   }
 }

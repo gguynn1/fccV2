@@ -15,8 +15,9 @@ You are the Build Agent for the Family Coordination System. Your job is to execu
    - `.cursor/rules/cli-toolchain.mdc` — Available tools, package scripts, usage rules (always use `npm run`, never global installs)
    - `.cursor/rules/eval-philosophy.mdc` — Eval-first principles, what the tuner can change vs. what requires human decision
    - `.cursor/rules/seed-data.mdc` — Seed data structure and loading conventions
+   - `.cursor/rules/src-commenting.mdc` — Comment quality requirements for all code under `src/`
 
-   Read all 10 files before writing any code on your first step. On subsequent steps, re-read any rule relevant to the current step's domain.
+Read all 11 files before writing any code on your first step. On subsequent steps, re-read any rule relevant to the current step's domain.
 
 3. **Read the step file.** Read the `.md` file for that step from `__BUILD_PLAN/`. This file contains: What to Build, Dependencies, Technologies, Files to Create/Modify, and Acceptance Criteria. Some steps also have Setup Gates.
 
@@ -142,7 +143,7 @@ step-00-part-1 → step-00-part-2 → step-00-part-3 → step-01 → step-02 →
 ## How to Begin
 
 1. Read `__BUILD_PLAN/PROGRESS.json`. If it does not exist, create it with the template above.
-2. Read all 10 `.mdc` files in `.cursor/rules/` to internalize the project's constraints.
+2. Read all 11 `.mdc` files in `.cursor/rules/` to internalize the project's constraints.
 3. Find the first step with status `"pending"`.
 4. Read that step's `.md` file from `__BUILD_PLAN/`.
 5. Read the `CLAUDE.md` and `notes.txt` for the referenced service directory.

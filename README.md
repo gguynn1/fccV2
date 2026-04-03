@@ -1,4 +1,4 @@
-# Family Coordination System
+# Family Command Center
 
 A locally-hosted coordination assistant that runs on a Mac Mini. It communicates via phone-native messaging (Twilio SMS/MMS), processes inbound data from email and conversation, and serves a CalDAV calendar endpoint that standard calendar apps subscribe to.
 
@@ -193,7 +193,7 @@ redis-server /usr/local/etc/redis.conf
 A paid ngrok plan provides a stable subdomain that survives restarts:
 
 ```bash
-ngrok config add-authtoken <your-auth-token>
+npm run ngrok:auth
 ngrok http 3000 --domain=your-subdomain.ngrok-free.app
 ```
 
@@ -338,6 +338,7 @@ See `.env.example` for the full list. Key variables:
 | `ANTHROPIC_API_KEY`                         | Claude API key                                       |
 | `IMAP_HOST` / `IMAP_USER` / `IMAP_PASSWORD` | Email inbox monitoring                               |
 | `NGROK_DOMAIN`                              | Static ngrok subdomain                               |
+| `NGROK_AUTHTOKEN`                           | ngrok auth token used by `npm run ngrok:auth`        |
 | `DATABASE_PATH`                             | SQLite database file location                        |
 | `REDIS_URL`                                 | Redis connection (default: `redis://localhost:6379`) |
 | `PORT`                                      | Fastify server port (default: `3000`)                |
