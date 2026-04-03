@@ -42,6 +42,7 @@ import {
   createConfirmationService,
   type BullConfirmationService,
 } from "./02-supporting-services/08-confirmation-service/index.js";
+import { createSchedulerService } from "./02-supporting-services/index.js";
 import { adminRoutes } from "./admin/routes.js";
 import { initializeDatabase } from "./bootstrap.js";
 import { applyRuntimeSystemConfig, runtimeSystemConfig } from "./config/runtime-system-config.js";
@@ -51,7 +52,7 @@ import { toRedisConnection } from "./lib/redis.js";
 const logger = pino({ name: "fcc-server" });
 
 interface SchedulerHandle {
-  stop: () => void;
+  stop: () => Promise<void>;
 }
 
 interface RuntimeHandles {
@@ -107,6 +108,7 @@ async function runStaleCatchUp(
   escalationService: XStateEscalationService,
   confirmationService: BullConfirmationService,
   budgetService: RedisBudgetService,
+  schedulerService: ReturnType<typeof createSchedulerService>,
 ): Promise<void> {
   // This runs before worker startup so old backlog state can be reconciled safely.
   logger.info("Startup catch-up: begin stale queue reconciliation.");
@@ -121,16 +123,19 @@ async function runStaleCatchUp(
     "Startup catch-up: queue snapshot collected before worker start.",
   );
   const now = new Date();
-  const [queueReconciliation, escalationRecovery, confirmationRecovery] = await Promise.all([
-    queueService.reconcileStartup(stateService),
-    escalationService.reconcileOnStartup(now),
-    confirmationService.reconcileOnStartup(now),
-  ]);
+  const [queueReconciliation, escalationRecovery, confirmationRecovery, schedulerRecovery] =
+    await Promise.all([
+      queueService.reconcileStartup(stateService),
+      escalationService.reconcileOnStartup(now),
+      confirmationService.reconcileOnStartup(now),
+      schedulerService.recoverMissedWindowsDetailed(now),
+    ]);
   await Promise.all([
     ...escalationRecovery.map((item) => queueService.enqueue(item)),
     ...confirmationRecovery.notifications.map((notification) =>
       queueService.enqueue(notification.queue_item),
     ),
+    ...schedulerRecovery.produced.map((item) => queueService.enqueue(item)),
     budgetService.getBudgetTracker(),
   ]);
   logger.info(queueReconciliation, "Startup catch-up: queue reconciliation completed.");
@@ -143,23 +148,13 @@ async function runStaleCatchUp(
     "Startup catch-up: confirmation expiry reconciliation completed.",
   );
   logger.info("Startup catch-up: budget counter reconstruction check completed.");
-  logger.info("Startup catch-up: scheduler relevance check placeholder completed.");
-}
-
-function startScheduler(): SchedulerHandle {
-  const timer = setInterval(() => {
-    logger.debug("Scheduler heartbeat.");
-  }, 60_000);
-
-  timer.unref();
-  logger.info("Scheduler service initialized.");
-
-  return {
-    stop: () => {
-      clearInterval(timer);
-      logger.info("Scheduler service stopped.");
+  logger.info(
+    {
+      recovered_items: schedulerRecovery.produced.length,
+      skipped_stale_windows: schedulerRecovery.skipped_stale,
     },
-  };
+    "Startup catch-up: scheduler reconciliation completed.",
+  );
 }
 
 function requestArrivedViaTunnel(request: FastifyRequest): boolean {
@@ -218,10 +213,13 @@ async function createRuntime(): Promise<RuntimeHandles> {
   });
 
   fastify.get("/health", () => ({ ok: true }));
+  const caldavPort = Number(env.CALDAV_PORT || "3001");
+
   await fastify.register(adminRoutes, {
     prefix: "/api/admin",
     queue_service: queueService,
     state_service: stateService,
+    caldav_port: caldavPort,
   });
 
   const adminDistPath = resolve(process.cwd(), "ui/dist");
@@ -258,7 +256,6 @@ async function createRuntime(): Promise<RuntimeHandles> {
 
   // CalDAV runs on a separate port, accessible only on the local network.
   // No ngrok tunnel — unauthenticated calendar data stays off the public internet.
-  const caldavPort = Number(env.CALDAV_PORT || "3001");
   const caldavServer = Fastify({ loggerInstance: logger as FastifyBaseLogger });
   caldavServer.addHttpMethod("PROPFIND", { hasBody: true });
   caldavServer.addHttpMethod("REPORT", { hasBody: true });
@@ -306,6 +303,20 @@ async function createRuntime(): Promise<RuntimeHandles> {
       mailbox: env.IMAP_MAILBOX,
     },
   });
+  const schedulerService = createSchedulerService({
+    redis_url: env.REDIS_URL,
+    timezone: runtimeSystemConfig.system.timezone,
+    daily_rhythm: runtimeSystemConfig.daily_rhythm,
+    state_service: stateService,
+    logger,
+  });
+  await schedulerService.start();
+  const schedulerWorker = schedulerService.registerWorker(async (_event, items) => {
+    if (items.length === 0) {
+      return;
+    }
+    await Promise.all(items.map((item) => queueService.enqueue(item)));
+  });
 
   // Reconcile stale queue/scheduler state before any new work is pulled.
   await runStaleCatchUp(
@@ -315,6 +326,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
     escalationService,
     confirmationService,
     budgetService,
+    schedulerService,
   );
 
   const workerService = createWorker({
@@ -343,7 +355,6 @@ async function createRuntime(): Promise<RuntimeHandles> {
   );
   await worker.pause(true);
 
-  const scheduler = startScheduler();
   const imapClient = await dataIngestService.startMonitoring();
 
   return {
@@ -352,7 +363,13 @@ async function createRuntime(): Promise<RuntimeHandles> {
     queue,
     queueService,
     worker,
-    scheduler,
+    scheduler: {
+      stop: async () => {
+        await schedulerWorker.close();
+        await schedulerService.stop();
+        logger.info("Scheduler service stopped.");
+      },
+    },
     imapClient,
     stateService,
     budgetService,
@@ -389,7 +406,7 @@ function registerShutdown(runtime: RuntimeHandles): void {
         logger.info("IMAP connection closed.");
       }
 
-      runtime.scheduler.stop();
+      await runtime.scheduler.stop();
       await runtime.confirmationService.close();
       await runtime.budgetService.close();
       await runtime.transportLayer.close();

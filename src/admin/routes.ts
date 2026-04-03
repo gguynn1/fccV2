@@ -135,6 +135,7 @@ const evalStartPayloadSchema = z.object({
 export interface AdminRoutesOptions {
   queue_service: BullQueueService;
   state_service: SqliteStateService;
+  caldav_port: number;
 }
 
 function requestArrivedViaTunnel(request: FastifyRequest): boolean {
@@ -198,6 +199,16 @@ async function saveConfig(
 
 export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, options, done) => {
   fastify.addHook("onRequest", rejectTunnelAccess);
+
+  fastify.get("/system", () => {
+    return {
+      caldav: {
+        port: options.caldav_port,
+        path: "/caldav",
+        local_only: true,
+      },
+    };
+  });
 
   fastify.get("/config", async () => {
     const config = await options.state_service.getSystemConfig();

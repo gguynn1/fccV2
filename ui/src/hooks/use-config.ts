@@ -25,7 +25,7 @@ export function useUpdateConfig() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: Partial<ConfigPayload>) =>
+    mutationFn: (payload: ConfigPayload) =>
       adminFetch("/config", {
         method: "PUT",
         body: JSON.stringify(payload),

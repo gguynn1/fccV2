@@ -1,4 +1,4 @@
-import { Queue } from "bullmq";
+import { Queue, Worker, type Job } from "bullmq";
 import { pino, type Logger } from "pino";
 
 import { type PendingQueueItem } from "../../01-service-stack/04-queue/types.js";
@@ -44,6 +44,22 @@ function parseClockToToday(time: string, now: Date): Date {
   );
 }
 
+function formatClock(date: Date): string {
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${hour}:${minute}`;
+}
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+}
+
+interface SchedulerTickWindow {
+  type: ScheduledEventType.MorningDigest | ScheduledEventType.EveningCheckin;
+  due_at: Date;
+  entity_ids: string[];
+}
+
 export class BullSchedulerService {
   private readonly queue: Queue<ScheduledEvent>;
 
@@ -67,31 +83,32 @@ export class BullSchedulerService {
 
   public async start(): Promise<void> {
     await this.queue.waitUntilReady();
+    await this.queue.obliterate({ force: true });
     await this.queue.add(
-      "morning_digest",
+      "morning_digest_tick",
       {
-        id: "morning_digest",
+        id: "morning_digest_tick",
         type: ScheduledEventType.MorningDigest,
         due_at: new Date(),
         payload: { timezone: this.timezone },
       },
       {
         repeat: {
-          pattern: "0 0 7 * * *",
+          pattern: "0 * * * * *",
         },
       },
     );
     await this.queue.add(
-      "evening_checkin",
+      "evening_checkin_tick",
       {
-        id: "evening_checkin",
+        id: "evening_checkin_tick",
         type: ScheduledEventType.EveningCheckin,
         due_at: new Date(),
         payload: { timezone: this.timezone },
       },
       {
         repeat: {
-          pattern: "0 0 20 * * *",
+          pattern: "0 * * * * *",
         },
       },
     );
@@ -104,8 +121,59 @@ export class BullSchedulerService {
   }
 
   public async produceScheduledItems(reference_time: Date): Promise<PendingQueueItem[]> {
+    const dueEntityIds = this.resolveDueEntityIds(ScheduledEventType.MorningDigest, reference_time);
+    if (dueEntityIds.length === 0) {
+      return [];
+    }
+    return this.produceScheduledItemsForWindow({
+      type: ScheduledEventType.MorningDigest,
+      due_at: reference_time,
+      entity_ids: dueEntityIds,
+    });
+  }
+
+  public registerWorker(
+    processor: (event: ScheduledEvent, items: PendingQueueItem[]) => Promise<void>,
+  ): Worker<ScheduledEvent> {
+    return new Worker<ScheduledEvent>(
+      SCHEDULER_JOB_QUEUE,
+      async (job: Job<ScheduledEvent>) => {
+        const event = this.toScheduledEvent(job.data, job.timestamp);
+        const items = await this.produceScheduledItemsForEvent(event);
+        await processor(event, items);
+      },
+      {
+        connection: this.queue.opts.connection,
+        concurrency: 1,
+      },
+    );
+  }
+
+  public async produceScheduledItemsForEvent(event: ScheduledEvent): Promise<PendingQueueItem[]> {
+    if (
+      event.type !== ScheduledEventType.MorningDigest &&
+      event.type !== ScheduledEventType.EveningCheckin
+    ) {
+      return [];
+    }
+    const dueAt = this.toEventDueAt(event);
+    const dueEntityIds = this.resolveDueEntityIds(event.type, dueAt);
+    if (dueEntityIds.length === 0) {
+      return [];
+    }
+    return this.produceScheduledItemsForWindow({
+      type: event.type,
+      due_at: dueAt,
+      entity_ids: dueEntityIds,
+    });
+  }
+
+  public async produceScheduledItemsForWindow(
+    window: SchedulerTickWindow,
+  ): Promise<PendingQueueItem[]> {
     const state = await this.stateService.getSystemState();
     const eligibility = this.dailyRhythm.digest_eligibility;
+    const relevantEntityIds = new Set(window.entity_ids);
     const dispatchedIds = new Set(
       eligibility.exclude_already_dispatched
         ? state.queue.recently_dispatched.map((item) => item.id)
@@ -120,10 +188,22 @@ export class BullSchedulerService {
     );
 
     const staleThresholdMs = eligibility.staleness_threshold_hours * 60 * 60 * 1000;
-    const items: PendingQueueItem[] = [];
+    const items = new Map<string, PendingQueueItem>();
     for (const pendingItem of state.queue.pending) {
+      if (!pendingItem.hold_until || pendingItem.hold_until.getTime() > window.due_at.getTime()) {
+        continue;
+      }
+      if (
+        !this.isRelevantToEntities(
+          pendingItem.concerning,
+          pendingItem.target_thread,
+          relevantEntityIds,
+        )
+      ) {
+        continue;
+      }
       if (eligibility.exclude_stale) {
-        const age = reference_time.getTime() - pendingItem.created_at.getTime();
+        const age = window.due_at.getTime() - pendingItem.created_at.getTime();
         if (age > staleThresholdMs) {
           continue;
         }
@@ -135,20 +215,32 @@ export class BullSchedulerService {
         continue;
       }
 
-      items.push({
+      items.set(pendingItem.id, {
         ...pendingItem,
-        id: `sched_${pendingItem.id}_${reference_time.getTime()}`,
         source: QueueItemSource.ScheduledTrigger,
         type: QueueItemType.Outbound,
-        created_at: reference_time,
+        created_at: window.due_at,
+        hold_until: undefined,
+        idempotency_key: `scheduled_release:${pendingItem.id}:${window.type}:${formatClock(
+          window.due_at,
+        )}`,
       });
     }
 
-    if (eligibility.include_unresolved_from_yesterday) {
+    if (
+      window.type === ScheduledEventType.MorningDigest &&
+      eligibility.include_unresolved_from_yesterday
+    ) {
+      const todayStart = startOfLocalDay(window.due_at).getTime();
       const unresolvedYesterday = state.queue.recently_dispatched
-        .filter((item) => item.response_received !== true)
+        .filter(
+          (item) =>
+            item.response_received !== true &&
+            item.dispatched_at.getTime() < todayStart &&
+            this.isThreadRelevantToEntities(item.target_thread, relevantEntityIds),
+        )
         .map<PendingQueueItem>((item) => ({
-          id: `sched_unresolved_${item.id}_${reference_time.getTime()}`,
+          id: `sched_unresolved_${item.id}_${window.due_at.getTime()}`,
           source: QueueItemSource.ScheduledTrigger,
           type: QueueItemType.Outbound,
           topic: item.topic,
@@ -157,59 +249,45 @@ export class BullSchedulerService {
           content: item.content,
           priority: DispatchPriority.Batched,
           target_thread: item.target_thread,
-          created_at: reference_time,
+          created_at: window.due_at,
+          idempotency_key: `scheduled_unresolved:${item.id}:${window.type}:${window.due_at
+            .toISOString()
+            .slice(0, 10)}`,
         }));
-      items.push(...unresolvedYesterday);
+      for (const item of unresolvedYesterday) {
+        items.set(item.id, item);
+      }
     }
 
-    return items;
+    return [...items.values()];
   }
 
   public async reconcileDowntime(since: Date, until: Date): Promise<PendingQueueItem[]> {
-    const recovered = await this.recoverMissedWindows(until);
+    const windows = this.collectDueWindows(since, until).filter((window) =>
+      this.isWindowRelevant(until, window.due_at, 4),
+    );
+    const recovered = (
+      await Promise.all(windows.map((window) => this.produceScheduledItemsForWindow(window)))
+    ).flat();
+    const deduped = this.dedupeById(recovered);
     this.logger.info(
-      { since: since.toISOString(), until: until.toISOString(), recovered: recovered.length },
+      { since: since.toISOString(), until: until.toISOString(), recovered: deduped.length },
       "Scheduler downtime reconciliation completed.",
     );
-    return recovered;
+    return deduped;
   }
 
   public async recoverMissedWindows(now: Date): Promise<PendingQueueItem[]> {
-    const morningTime = this.dailyRhythm.morning_digest.times.default ?? "07:00";
-    const eveningTime = this.dailyRhythm.evening_checkin.times.default ?? "20:00";
-    const morningBoundary = parseClockToToday(morningTime, now);
-    const eveningBoundary = parseClockToToday(eveningTime, now);
-
-    const recovery: PendingQueueItem[] = [];
-    if (now > morningBoundary && this.isWindowRelevant(now, morningBoundary, 4)) {
-      recovery.push(...(await this.produceScheduledItems(now)));
-    } else if (now > morningBoundary) {
-      this.logger.info("Morning digest window is stale; startup recovery skipped.");
-    }
-
-    if (now > eveningBoundary && this.isWindowRelevant(now, eveningBoundary, 4)) {
-      recovery.push(...(await this.produceScheduledItems(now)));
-    } else if (now > eveningBoundary) {
-      this.logger.info("Evening check-in window is stale; startup recovery skipped.");
-    }
-
-    return recovery;
+    const dayStart = startOfLocalDay(now);
+    return this.reconcileDowntime(dayStart, now);
   }
 
   public async recoverMissedWindowsDetailed(now: Date): Promise<SchedulerStartupRecoveryResult> {
     const items = await this.recoverMissedWindows(now);
-    const morningTime = this.dailyRhythm.morning_digest.times.default ?? "07:00";
-    const eveningTime = this.dailyRhythm.evening_checkin.times.default ?? "20:00";
-    const morningBoundary = parseClockToToday(morningTime, now);
-    const eveningBoundary = parseClockToToday(eveningTime, now);
-
-    let staleSkipped = 0;
-    if (now > morningBoundary && !this.isWindowRelevant(now, morningBoundary, 4)) {
-      staleSkipped += 1;
-    }
-    if (now > eveningBoundary && !this.isWindowRelevant(now, eveningBoundary, 4)) {
-      staleSkipped += 1;
-    }
+    const dayStart = startOfLocalDay(now);
+    const staleSkipped = this.collectDueWindows(dayStart, now).filter(
+      (window) => !this.isWindowRelevant(now, window.due_at, 4),
+    ).length;
 
     return { produced: items, skipped_stale: staleSkipped };
   }
@@ -223,6 +301,89 @@ export class BullSchedulerService {
   private isWindowRelevant(now: Date, window: Date, maxHoursPast: number): boolean {
     const elapsedMs = now.getTime() - window.getTime();
     return elapsedMs <= maxHoursPast * 60 * 60 * 1000;
+  }
+
+  private collectDueWindows(since: Date, until: Date): SchedulerTickWindow[] {
+    const windows = new Map<string, SchedulerTickWindow>();
+    for (const type of [
+      ScheduledEventType.MorningDigest,
+      ScheduledEventType.EveningCheckin,
+    ] as const) {
+      const block =
+        type === ScheduledEventType.MorningDigest
+          ? this.dailyRhythm.morning_digest
+          : this.dailyRhythm.evening_checkin;
+      for (const [entityId, time] of Object.entries(block.times)) {
+        if (time === null) {
+          continue;
+        }
+        const dueAt = parseClockToToday(time, until);
+        if (dueAt < since || dueAt > until) {
+          continue;
+        }
+        const key = `${type}:${time}`;
+        const existing = windows.get(key);
+        if (existing) {
+          existing.entity_ids.push(entityId);
+          continue;
+        }
+        windows.set(key, {
+          type,
+          due_at: dueAt,
+          entity_ids: [entityId],
+        });
+      }
+    }
+    return [...windows.values()];
+  }
+
+  private dedupeById(items: PendingQueueItem[]): PendingQueueItem[] {
+    return [...new Map(items.map((item) => [item.id, item])).values()];
+  }
+
+  private resolveDueEntityIds(
+    type: ScheduledEventType.MorningDigest | ScheduledEventType.EveningCheckin,
+    referenceTime: Date,
+  ): string[] {
+    const block =
+      type === ScheduledEventType.MorningDigest
+        ? this.dailyRhythm.morning_digest
+        : this.dailyRhythm.evening_checkin;
+    const clock = formatClock(referenceTime);
+    return Object.entries(block.times)
+      .filter(([, time]) => time === clock)
+      .map(([entityId]) => entityId);
+  }
+
+  private toScheduledEvent(payload: ScheduledEvent, timestamp: number): ScheduledEvent {
+    return {
+      ...payload,
+      due_at: payload.due_at instanceof Date ? payload.due_at : new Date(timestamp),
+    };
+  }
+
+  private toEventDueAt(event: ScheduledEvent): Date {
+    return event.due_at instanceof Date ? event.due_at : new Date();
+  }
+
+  private isRelevantToEntities(
+    concerning: string[],
+    targetThread: string,
+    entityIds: Set<string>,
+  ): boolean {
+    return (
+      concerning.some((entityId) => entityIds.has(entityId)) ||
+      this.isThreadRelevantToEntities(targetThread, entityIds)
+    );
+  }
+
+  private isThreadRelevantToEntities(targetThread: string, entityIds: Set<string>): boolean {
+    if (targetThread.endsWith("_private")) {
+      const participantId = targetThread.replace(/_private$/u, "");
+      return entityIds.has(participantId);
+    }
+    const thread = runtimeSystemConfig.threads.find((candidate) => candidate.id === targetThread);
+    return thread?.participants.some((entityId) => entityIds.has(entityId)) ?? false;
   }
 
   private inferConcerningFromThread(threadId: string): string[] {

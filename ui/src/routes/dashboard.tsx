@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboard } from "@/hooks/use-dashboard";
 
@@ -61,13 +62,17 @@ export function DashboardRoute() {
     return <p className="text-sm text-muted-foreground">Loading dashboard…</p>;
   }
 
-  const { queue, escalations, confirmations, dispatches, budget } = data;
+  const { queue, escalations, confirmations, dispatches, budget, config, system } = data;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
 
   const queueDepth = queue.depth.waiting + queue.depth.delayed + queue.depth.active;
   const dlqDepth = queue.depth.dead_letter;
   const activeEscalations = escalations.active.length;
   const pendingConfirmations = confirmations.pending.length;
-  const dispatchedToday = dispatches.recent.length;
+  const dispatchedToday = dispatches.recent.filter(
+    (dispatch) => new Date(dispatch.dispatched_at) >= startOfToday,
+  ).length;
 
   const budgetCap = budget.dispatch.outbound_budget.max_unprompted_per_person_per_day;
 
@@ -89,6 +94,15 @@ export function DashboardRoute() {
   const budgetUsageRatio = budgetCap > 0 ? dispatchedToday / budgetCap : 0;
   const budgetVariant: "success" | "warning" | "destructive" =
     budgetUsageRatio >= 1 ? "destructive" : budgetUsageRatio >= 0.75 ? "warning" : "success";
+
+  const caldavEndpoint = (() => {
+    const baseUrl = new URL(window.location.origin);
+    baseUrl.port = String(system.caldav.port);
+    baseUrl.pathname = system.caldav.path;
+    baseUrl.search = "";
+    baseUrl.hash = "";
+    return baseUrl.toString();
+  })();
 
   return (
     <div className="space-y-6">
@@ -135,6 +149,42 @@ export function DashboardRoute() {
 
         <StatusCard title="Budget Cap" value={`${budgetCap}/person/day`} to="/budget" />
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-base">CalDAV Endpoint</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Subscribe from a calendar app on the local network. This endpoint is not exposed
+              through the tunnel.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={() => void navigator.clipboard.writeText(caldavEndpoint)}
+          >
+            Copy URL
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Assistant Identifier
+            </p>
+            <p className="break-all rounded-md border bg-muted/30 px-3 py-2 font-mono text-xs">
+              {config.assistant.messaging_identity}
+            </p>
+          </div>
+          <p className="break-all rounded-md border bg-muted/30 px-3 py-2 font-mono text-xs">
+            {caldavEndpoint}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Port {system.caldav.port} • {system.caldav.local_only ? "Local network only" : "Public"}
+          </p>
+        </CardContent>
+      </Card>
 
       {dlqDepth > 0 && (
         <Card className="border-red-600/40">

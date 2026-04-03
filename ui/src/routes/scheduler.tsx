@@ -10,15 +10,13 @@ import {
   type SchedulerResponse,
 } from "@/hooks/use-scheduler";
 
-function DigestBlock({
-  title,
-  block,
-  onTimeChange,
-}: {
+export interface DigestBlockProps {
   title: string;
   block: { description: string; times: Record<string, string | null> };
   onTimeChange: (entity: string, time: string | null) => void;
-}) {
+}
+
+function DigestBlock({ title, block, onTimeChange }: DigestBlockProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -189,7 +187,10 @@ export function SchedulerRoute() {
           <CardTitle>Default State</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm">{rhythm.default_state}</p>
+          <EditableCell
+            value={rhythm.default_state}
+            onSave={(value) => saveRhythm({ default_state: value })}
+          />
         </CardContent>
       </Card>
     </div>

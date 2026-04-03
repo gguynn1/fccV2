@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -13,14 +14,14 @@ import {
 } from "@/hooks/use-topics";
 
 const ESCALATION_LEVELS = ["high", "medium", "low", "none"] as const;
+const CONFIRMATION_ACTIONS = ["sending_on_behalf", "financial_action", "system_change"] as const;
 
-function TopicCard({
-  config,
-  onUpdate,
-}: {
+export interface TopicCardProps {
   config: TopicConfigPayload;
   onUpdate: (patch: Partial<TopicConfigPayload>) => void;
-}) {
+}
+
+function TopicCard({ config, onUpdate }: TopicCardProps) {
   const isEnabled = config.behavior?.enabled !== "false";
 
   return (
@@ -130,6 +131,26 @@ export function TopicsRoute() {
     [data, mutation],
   );
 
+  const toggleApprovalGate = useCallback(
+    (action: string) => {
+      if (!data) return;
+      const nextSet = new Set(data.confirmation_gates.always_require_approval);
+      if (nextSet.has(action)) {
+        nextSet.delete(action);
+      } else {
+        nextSet.add(action);
+      }
+      mutation.mutate({
+        ...data,
+        confirmation_gates: {
+          ...data.confirmation_gates,
+          always_require_approval: [...nextSet],
+        },
+      });
+    },
+    [data, mutation],
+  );
+
   if (isLoading || !data) {
     return <p className="text-sm text-muted-foreground">Loading topics…</p>;
   }
@@ -160,10 +181,20 @@ export function TopicsRoute() {
             <div>
               <p className="text-xs text-muted-foreground mb-1">Always Require Approval</p>
               <div className="flex flex-wrap gap-1">
-                {data.confirmation_gates.always_require_approval.map((a) => (
-                  <Badge key={a} variant="secondary" className="text-xs">
-                    {a.replace(/_/g, " ")}
-                  </Badge>
+                {CONFIRMATION_ACTIONS.map((action) => (
+                  <Button
+                    key={action}
+                    type="button"
+                    size="sm"
+                    variant={
+                      data.confirmation_gates.always_require_approval.includes(action)
+                        ? "default"
+                        : "outline"
+                    }
+                    onClick={() => toggleApprovalGate(action)}
+                  >
+                    {action.replace(/_/g, " ")}
+                  </Button>
                 ))}
               </div>
             </div>

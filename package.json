@@ -15,6 +15,7 @@
     "eval:generate-set": "tsx eval/cli.ts generate-set",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "backup:local": "./scripts/sqlite-backup.sh",
     "start": "node dist/server.js",
     "start:seed": "node dist/bootstrap.js --seed",
     "dev": "tsx watch src/server.ts",

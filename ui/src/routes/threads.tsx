@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -12,13 +13,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useConfig, useUpdateConfig } from "@/hooks/use-config";
-import { useEntities, useUpdateEntities } from "@/hooks/use-entities";
+import { useEntities } from "@/hooks/use-entities";
 
 export function ThreadsRoute() {
   const { data: entitiesData, isLoading: entitiesLoading } = useEntities();
   const { data: configData, isLoading: configLoading } = useConfig();
   const updateConfig = useUpdateConfig();
-  const updateEntities = useUpdateEntities();
 
   const saveThreadField = useCallback(
     (threadId: string, field: string, value: string) => {
@@ -31,9 +31,34 @@ export function ThreadsRoute() {
     [configData, updateConfig],
   );
 
+  const saveSystemField = useCallback(
+    (field: "timezone" | "locale" | "version", value: string) => {
+      if (!configData) return;
+      updateConfig.mutate({
+        ...configData,
+        system: { ...configData.system, [field]: value },
+      });
+    },
+    [configData, updateConfig],
+  );
+
+  const saveAssistantField = useCallback(
+    (field: "messaging_identity" | "description" | "name", value: string) => {
+      if (!configData) return;
+      updateConfig.mutate({
+        ...configData,
+        assistant: {
+          ...configData.assistant,
+          [field]: field === "name" ? value || null : value,
+        },
+      });
+    },
+    [configData, updateConfig],
+  );
+
   const toggleParticipant = useCallback(
     (threadId: string, entityId: string, isMember: boolean) => {
-      if (!configData || !entitiesData) return;
+      if (!configData) return;
       const nextThreads = configData.threads.map((t) => {
         if (t.id !== threadId) return t;
         const participants = isMember
@@ -42,17 +67,8 @@ export function ThreadsRoute() {
         return { ...t, participants };
       });
       updateConfig.mutate({ ...configData, threads: nextThreads });
-
-      const entity = entitiesData.entities.find((e) => e.id === entityId);
-      if (entity?.routes_to !== undefined) {
-        const nextEntities = entitiesData.entities.map((e) => {
-          if (e.id !== entityId) return e;
-          return e;
-        });
-        updateEntities.mutate(nextEntities);
-      }
     },
-    [configData, entitiesData, updateConfig, updateEntities],
+    [configData, updateConfig],
   );
 
   if (entitiesLoading || configLoading || !entitiesData || !configData) {
@@ -65,7 +81,69 @@ export function ThreadsRoute() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Threads</h2>
-        <p className="text-sm text-muted-foreground">Thread membership and configuration.</p>
+        <p className="text-sm text-muted-foreground">
+          System config, assistant identity, and thread membership.
+        </p>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>System</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">Timezone</p>
+              <EditableCell
+                value={configData.system.timezone}
+                onSave={(value) => saveSystemField("timezone", value)}
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">Locale</p>
+              <EditableCell
+                value={configData.system.locale}
+                onSave={(value) => saveSystemField("locale", value)}
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">Version</p>
+              <EditableCell
+                value={configData.system.version}
+                onSave={(value) => saveSystemField("version", value)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Assistant</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">Messaging Identity</p>
+              <EditableCell
+                value={configData.assistant.messaging_identity}
+                onSave={(value) => saveAssistantField("messaging_identity", value)}
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">Name</p>
+              <EditableCell
+                value={configData.assistant.name ?? ""}
+                onSave={(value) => saveAssistantField("name", value)}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <p className="mb-1 text-xs text-muted-foreground">Description</p>
+              <EditableCell
+                value={configData.assistant.description}
+                onSave={(value) => saveAssistantField("description", value)}
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -102,16 +180,15 @@ export function ThreadsRoute() {
                       {entityIds.map((eId) => {
                         const isMember = thread.participants.includes(eId);
                         return (
-                          <button
+                          <Button
                             key={eId}
                             type="button"
+                            size="sm"
+                            variant={isMember ? "default" : "outline"}
                             onClick={() => toggleParticipant(thread.id, eId, !isMember)}
-                            className="cursor-pointer"
                           >
-                            <Badge variant={isMember ? "default" : "outline"} className="text-xs">
-                              {eId}
-                            </Badge>
-                          </button>
+                            {eId}
+                          </Button>
                         );
                       })}
                     </div>

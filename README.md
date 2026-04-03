@@ -109,7 +109,16 @@ npm run ui:preview     # Preview production build locally
 
 # Infrastructure
 npm run ngrok:auth     # Configure ngrok auth token from .env
+npm run backup:local   # Snapshot SQLite + Redis AOF into data/backups/
 ```
+
+### Practical Setup Notes
+
+- Keep only one `npm run dev`, one `npm run ui:dev`, and one `ngrok` session running at a time. Duplicate backend watchers will fight for port `3000`, and duplicate ngrok sessions on the same static URL will fail with `ERR_NGROK_334`.
+- The app requires `ANTHROPIC_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_IDENTITY`, `REDIS_URL`, and `DATABASE_PATH` to start. If Twilio or IMAP are not ready yet, placeholder Twilio values are enough for local admin, CalDAV, build, and eval work.
+- IMAP is optional for local development. If IMAP credentials are missing, startup logs a deferred-monitoring message and continues.
+- Build the UI before testing `/admin` from the Fastify server: `npm run ui:build`. The dev server at `npm run ui:dev` is only for local frontend development.
+- The app rejects forwarded-header requests to `/admin` and `/api/admin/*` by design. If you test with `curl`, expect `403` when sending `X-Forwarded-For` or `X-Forwarded-Host`.
 
 Typical first-boot workflow:
 
@@ -149,10 +158,16 @@ redis-server
 ### 4. Start ngrok (development)
 
 ```bash
-ngrok http 3000
+npm run ngrok:auth
+ngrok http 3000 --url=your-subdomain.ngrok-free.dev
 ```
 
-Note the forwarding URL (e.g., `https://abc123.ngrok-free.app`) and configure it as your Twilio webhook URL.
+Notes:
+
+- Newer ngrok versions prefer `--url` instead of `--domain`.
+- If the static endpoint is already online elsewhere, ngrok exits with `ERR_NGROK_334`. Stop the other session first.
+- If ngrok says authentication is required, re-run `npm run ngrok:auth` and verify the authtoken was written to `~/Library/Application Support/ngrok/ngrok.yml`.
+- Configure the public URL as your Twilio webhook only after the local backend is healthy on `http://127.0.0.1:3000/health`.
 
 ### 5. Verify, build, and run
 
@@ -208,10 +223,10 @@ A paid ngrok plan provides a stable subdomain that survives restarts:
 
 ```bash
 npm run ngrok:auth
-ngrok http 3000 --domain=your-subdomain.ngrok-free.app
+ngrok http 3000 --url=your-subdomain.ngrok-free.dev
 ```
 
-Set your Twilio webhook URL to `https://your-subdomain.ngrok-free.app/webhook/twilio` once. It won't change.
+Set your Twilio webhook URL to `https://your-subdomain.ngrok-free.dev/webhook/twilio` once. It won't change.
 
 ### launchd Service Files
 
@@ -259,8 +274,14 @@ Create plist files in `~/Library/LaunchAgents/` so all three processes auto-star
     <string>/opt/homebrew/bin/ngrok</string>
     <string>http</string>
     <string>3000</string>
-    <string>--domain=your-subdomain.ngrok-free.app</string>
+    <string>--url=your-subdomain.ngrok-free.dev</string>
+    <string>--config=/Users/YOU/Library/Application Support/ngrok/ngrok.yml</string>
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/YOU</string>
+  </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
@@ -285,8 +306,8 @@ Create plist files in `~/Library/LaunchAgents/` so all three processes auto-star
   <string>com.fcc.app</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/opt/homebrew/bin/node</string>
-    <string>dist/server.js</string>
+    <string>/path/from-which-node</string>
+    <string>/Users/YOU/Desktop/FCCv2/dist/server.js</string>
   </array>
   <key>WorkingDirectory</key>
   <string>/Users/YOU/Desktop/FCCv2</string>
@@ -307,24 +328,36 @@ Create plist files in `~/Library/LaunchAgents/` so all three processes auto-star
 </plist>
 ```
 
+Notes:
+
+- Do not assume the Node binary is `/opt/homebrew/bin/node`. Use `which node` and put that exact path in the plist. On this machine it resolved to `/usr/local/bin/node`.
+- Use an absolute path to `dist/server.js`, not a relative path.
+- Keep `WorkingDirectory` pointed at the repo root so `dotenv` can load `.env` at startup.
+
 #### Load all services
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.fcc.redis.plist
-launchctl load ~/Library/LaunchAgents/com.fcc.ngrok.plist
-launchctl load ~/Library/LaunchAgents/com.fcc.app.plist
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.fcc.redis.plist
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.fcc.ngrok.plist
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.fcc.app.plist
 ```
 
 #### Check status
 
 ```bash
-launchctl list | grep com.fcc
+launchctl list | rg "com.fcc|redis"
+```
+
+#### Restart a service
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.fcc.app"
 ```
 
 #### Unload (stop) a service
 
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.fcc.app.plist
+launchctl bootout "gui/$(id -u)/com.fcc.app"
 ```
 
 ### Backup
@@ -332,13 +365,37 @@ launchctl unload ~/Library/LaunchAgents/com.fcc.app.plist
 SQLite and Redis data should be backed up regularly:
 
 ```bash
-# SQLite backup (run via cron or launchd on a schedule)
-sqlite3 /path/to/fcc.db ".backup '/path/to/backup/fcc-$(date +%Y%m%d).db'"
-
-# Redis AOF is already persistent; include the appendonly.aof file in backups
+# Project backup helper
+npm run backup:local
 ```
 
+The helper writes a SQLite snapshot and a copy of Redis AOF data into `data/backups/`.
+
+- SQLite snapshot: `data/backups/fcc-YYYYMMDD-HHMMSS.db`
+- Redis AOF copy: `data/backups/redis-aof-YYYYMMDD-HHMMSS/`
+
+If your Redis install stores AOF files somewhere other than `/opt/homebrew/var/db/redis`, update `scripts/sqlite-backup.sh` to match your local layout.
+
 Time Machine covers the full machine. For off-site backup, consider `restic` to an encrypted cloud target (B2, S3).
+
+### Helpful Verification Commands
+
+```bash
+# Backend health
+curl http://127.0.0.1:3000/health
+
+# Admin UI served from Fastify after ui build
+curl -I http://127.0.0.1:3000/admin
+
+# Admin local-only guardrails
+curl -i -H "X-Forwarded-For: 1.2.3.4" http://127.0.0.1:3000/admin
+curl -i -H "X-Forwarded-Host: example.ngrok.app" http://127.0.0.1:3000/api/admin/config
+
+# CalDAV smoke checks
+curl -X PROPFIND http://127.0.0.1:3001/caldav
+curl -X REPORT http://127.0.0.1:3001/caldav
+curl http://127.0.0.1:3001/caldav/events/<event-id>.ics
+```
 
 ## Environment Variables
 
