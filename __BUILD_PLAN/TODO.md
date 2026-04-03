@@ -1,36 +1,10 @@
 # TODO
 
-This file is the single source of truth for remaining work. Historical `step-*.md` plan files were consolidated and removed.
-
-## Current State
-
-Completed:
-
-- Core runtime and infrastructure
-- Queue, scheduler, transport, CalDAV, classifier, and topic profiles
-- Supporting services, worker pipeline, and action router
-- Admin UI and connections documentation
-
-Remaining work is limited to the items below.
-
-## TODO-02 — Close Active Deferred Issues
-
-**Status:** pending
-
-Resolve the open items tracked in `__BUILD_PLAN/DEFERRED.md`:
-
-- D-01 per-topic runtime state validation
-- D-02 admin API config validation hardening
-- D-03 meal-to-grocery extraction placeholder
-- D-04 unused CalDAV type definitions
-- D-05 CalDAV `ctag` derivation
-- D-06 confirmation request typing cleanup
-
-Done means the related code is fixed and each item is removed from `DEFERRED.md`.
+This file is the single source of truth for remaining work.
 
 ## TODO-03 — Complete Manual And External Verification
 
-**Status:** pending
+**Status:** in progress
 
 ### Infrastructure And Credentials
 

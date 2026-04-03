@@ -10,15 +10,28 @@ import type { SystemConfig } from "../../index.js";
 import type { ThreadHistory } from "../05-routing-service/types.js";
 import type { StateService } from "../types.js";
 import {
+  businessStateSchema,
+  calendarStateSchema,
+  choresStateSchema,
   confirmationsStateRecordSchema,
   dataIngestStateRecordSchema,
   digestsStateRecordSchema,
   escalationStatusRecordSchema,
+  familyStatusStateSchema,
+  financesStateSchema,
+  groceryStateSchema,
+  healthStateSchema,
+  maintenanceStateSchema,
+  mealsStateSchema,
   outboundBudgetTrackerRecordSchema,
+  petsStateSchema,
   queueStateRecordSchema,
+  relationshipStateSchema,
+  schoolStateSchema,
   StateSnapshotMode,
   threadHistoryRecordSchema,
-  topicRecordSchema,
+  travelStateSchema,
+  vendorsStateSchema,
   type StateSnapshotEnvelope,
   type SystemState,
 } from "./types.js";
@@ -167,20 +180,20 @@ function validateStateSlices(state: SystemState): void {
   escalationStatusRecordSchema.parse(state.escalation_status);
   outboundBudgetTrackerRecordSchema.parse(state.outbound_budget_tracker);
   dataIngestStateRecordSchema.parse(state.data_ingest_state);
-  topicRecordSchema.parse(state.calendar as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.chores as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.finances as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.grocery as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.health as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.pets as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.school as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.travel as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.vendors as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.business as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.relationship as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.family_status as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.meals as unknown as Record<string, unknown>);
-  topicRecordSchema.parse(state.maintenance as unknown as Record<string, unknown>);
+  calendarStateSchema.parse(state.calendar);
+  choresStateSchema.parse(state.chores);
+  financesStateSchema.parse(state.finances);
+  groceryStateSchema.parse(state.grocery);
+  healthStateSchema.parse(state.health);
+  petsStateSchema.parse(state.pets);
+  schoolStateSchema.parse(state.school);
+  travelStateSchema.parse(state.travel);
+  vendorsStateSchema.parse(state.vendors);
+  businessStateSchema.parse(state.business);
+  relationshipStateSchema.parse(state.relationship);
+  familyStatusStateSchema.parse(state.family_status);
+  mealsStateSchema.parse(state.meals);
+  maintenanceStateSchema.parse(state.maintenance);
   Object.values(state.threads).forEach((thread) => {
     threadHistoryRecordSchema.parse(thread);
   });

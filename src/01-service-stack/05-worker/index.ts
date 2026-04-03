@@ -9,6 +9,7 @@ import {
 } from "../../02-supporting-services/04-topic-profile-service/04.08-travel/types.js";
 import { BusinessLeadStatus } from "../../02-supporting-services/04-topic-profile-service/04.10-business/types.js";
 import { NudgeType } from "../../02-supporting-services/04-topic-profile-service/04.11-relationship/types.js";
+import { extractGroceryItemsFromMealDescription } from "../../02-supporting-services/04-topic-profile-service/04.13-meals/profile.js";
 import { MealType } from "../../02-supporting-services/04-topic-profile-service/04.13-meals/types.js";
 import {
   MaintenanceAssetType,
@@ -1102,13 +1103,18 @@ export class Worker {
     }
     const sourceId = extractQueueItemId(queueItem);
 
-    // Cross-topic items always re-enter the main queue so they get the exact same worker treatment.
-    await Promise.all(
-      profile.cross_topic_connections.map((targetTopic) =>
+    const enqueuePromises: Promise<void>[] = [];
+    for (const targetTopic of profile.cross_topic_connections) {
+      const content = this.buildCrossTopicContent(classification.topic, targetTopic, determined);
+      if (content === null) {
+        continue;
+      }
+
+      enqueuePromises.push(
         this.queueService.enqueue({
           id: `${sourceId}:${targetTopic}`,
           source: QueueItemSource.CrossTopic,
-          content: `${classification.topic} -> ${targetTopic}: ${determined.typed_action.type}`,
+          content,
           concerning: classification.concerning,
           target_thread: queueItem.target_thread,
           created_at: queueItem.created_at,
@@ -1116,8 +1122,25 @@ export class Worker {
           intent: ClassifierIntent.Request,
           idempotency_key: `${sourceId}:${targetTopic}`,
         }),
-      ),
-    );
+      );
+    }
+
+    await Promise.all(enqueuePromises);
+  }
+
+  private buildCrossTopicContent(
+    sourceTopic: TopicKey,
+    targetTopic: TopicKey,
+    determined: DeterminedAction,
+  ): string | null {
+    if (sourceTopic === TopicKey.Meals && targetTopic === TopicKey.Grocery) {
+      const description =
+        "description" in determined.typed_action ? String(determined.typed_action.description) : "";
+      const items = extractGroceryItemsFromMealDescription(description);
+      return items.length > 0 ? items.join(", ") : null;
+    }
+
+    return `${sourceTopic} -> ${targetTopic}: ${determined.typed_action.type}`;
   }
 
   private resolveRoutingDecision(request: {

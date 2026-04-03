@@ -10,6 +10,7 @@ import {
   ConfirmationReplyDecision,
   ConfirmationResult,
   ConfirmationStatus,
+  type ConfirmationActionType,
   type ConfirmationExpiryNotification,
   type ConfirmationGates,
   type ConfirmationHistoryRecord,
@@ -66,12 +67,6 @@ export interface ConfirmationServiceOptions {
   state_service: StateService;
   logger?: Logger;
   timer_queue_name?: string;
-}
-
-interface OpenConfirmationRequest extends ConfirmationRequest {
-  requested_at?: Date;
-  reply_options?: ConfirmationReplyOption[];
-  expiry_message?: string;
 }
 
 interface PendingConfirmationStateUpdate {
@@ -165,28 +160,27 @@ export class BullConfirmationService implements ConfirmationService {
     };
   }
 
-  public requiresConfirmation(type: OpenConfirmationRequest["type"]): boolean {
+  public requiresConfirmation(type: ConfirmationActionType): boolean {
     return this.gates.always_require_approval.includes(type);
   }
 
   public async openConfirmation(request: ConfirmationRequest): Promise<PendingConfirmation> {
     const state = await this.stateService.getSystemState();
-    const incoming = request as OpenConfirmationRequest;
-    const requestedAt = incoming.requested_at ?? new Date();
+    const requestedAt = request.requested_at ?? new Date();
     const expiresAt =
-      incoming.expires_at ?? new Date(requestedAt.getTime() + this.gates.expiry_minutes * 60_000);
+      request.expires_at ?? new Date(requestedAt.getTime() + this.gates.expiry_minutes * 60_000);
     const confirmation: PendingConfirmation = {
       id: buildConfirmationId(requestedAt),
-      type: incoming.type,
-      action: incoming.action,
-      requested_by: incoming.requested_by,
-      requested_in_thread: incoming.requested_in_thread,
+      type: request.type,
+      action: request.action,
+      requested_by: request.requested_by,
+      requested_in_thread: request.requested_in_thread,
       requested_at: requestedAt,
       expires_at: expiresAt,
       status: ConfirmationStatus.Pending,
       result: ConfirmationResult.NotYetApproved,
-      reply_options: normalizeReplyOptions(incoming.reply_options),
-      expiry_message: incoming.expiry_message ?? this.gates.on_expiry,
+      reply_options: normalizeReplyOptions(request.reply_options),
+      expiry_message: request.expiry_message ?? this.gates.on_expiry,
     };
 
     state.confirmations.pending = [

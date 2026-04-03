@@ -18,6 +18,7 @@ import type {
   Confirmation,
   ConfirmationActionType,
   ConfirmationRecoveryResult,
+  ConfirmationReplyOption,
   ConfirmationResult,
   ConfirmationsState,
 } from "./08-confirmation-service/types.js";
@@ -123,6 +124,9 @@ export interface ConfirmationRequest {
   requested_by: string;
   requested_in_thread: string;
   expires_at: Date;
+  requested_at?: Date;
+  reply_options?: ConfirmationReplyOption[];
+  expiry_message?: string;
 }
 
 export interface ConfirmationService {

@@ -1,23 +1,16 @@
 {
-  "plan_version": 2,
+  "plan_version": 3,
   "last_updated": "2026-04-03",
   "plan_state": "active",
-  "current_focus": "TODO-02",
+  "current_focus": "TODO-03",
   "items": {
-    "TODO-02": {
-      "title": "Close active deferred issues",
-      "status": "pending",
-      "notes": ["Resolve the open items tracked in __BUILD_PLAN/DEFERRED.md."]
-    },
     "TODO-03": {
       "title": "Complete manual and external verification",
-      "status": "pending",
+      "status": "in_progress",
       "notes": [
-        "Outstanding external setup and manual verification checks are consolidated in __BUILD_PLAN/TODO.md."
+        "Blocked: Twilio verification, IMAP credentials.",
+        "Unblocked: CalDAV smoke tests, admin UI verification, infrastructure setup (launchd, ngrok, backups, power/login settings)."
       ]
     }
-  },
-  "completed_summary": [
-    "Core runtime, queue, scheduler, transport, CalDAV, classifier, topic profiles, supporting services, worker pipeline, action router, admin UI (code complete, pending production verification in TODO-03), and connections documentation are complete."
-  ]
+  }
 }

@@ -1,13 +1,16 @@
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
-import { EntityType, Permission } from "../01-service-stack/02-identity-service/types.js";
+import { entitySchema } from "../01-service-stack/02-identity-service/types.js";
 import { type BullQueueService } from "../01-service-stack/04-queue/index.js";
 import type { PendingQueueItem } from "../01-service-stack/04-queue/types.js";
+import { CollisionPrecedence } from "../01-service-stack/06-action-router/types.js";
 import { type SqliteStateService } from "../02-supporting-services/03-state-service/index.js";
 import { ThreadType } from "../02-supporting-services/05-routing-service/types.js";
+import { EscalationReassignmentPolicy } from "../02-supporting-services/07-escalation-service/types.js";
 import { ConfirmationActionType } from "../02-supporting-services/08-confirmation-service/types.js";
 import { applyRuntimeSystemConfig } from "../config/runtime-system-config.js";
+import { EscalationLevel, GrocerySection, TopicKey } from "../types.js";
 import {
   generateScenarioSet,
   getActiveEvalRunId,
@@ -26,40 +29,87 @@ const threadSchema = z.object({
   description: z.string().min(1),
 });
 
+const topicConfigSchema = z.object({
+  label: z.string().min(1),
+  description: z.string().min(1),
+  routing: z.record(z.string(), z.union([z.string(), z.boolean(), z.array(z.string())])),
+  behavior: z.record(z.string(), z.string()),
+  escalation: z.nativeEnum(EscalationLevel),
+  proactive: z.record(z.string(), z.union([z.string(), z.boolean()])).optional(),
+  escalation_ladder: z.record(z.string(), z.union([z.string(), z.boolean(), z.null()])).optional(),
+  confirmation_required: z.boolean().optional(),
+  sections: z.array(z.nativeEnum(GrocerySection)).optional(),
+  cross_topic_connections: z.array(z.nativeEnum(TopicKey)).optional(),
+  confirmation_required_for_sends: z.boolean().optional(),
+  follow_up_quiet_period_days: z.number().optional(),
+  on_ignored: z.string().optional(),
+  minimum_gap_between_nudges: z.string().optional(),
+  status_expiry: z.string().optional(),
+  grocery_linking: z.boolean().optional(),
+});
+
+const escalationProfileSchema = z.object({
+  label: z.string().min(1),
+  applies_to: z.array(z.nativeEnum(TopicKey)),
+  steps: z.array(z.string()),
+  on_reassignment: z.nativeEnum(EscalationReassignmentPolicy),
+});
+
+const digestScheduleBlockSchema = z.object({
+  description: z.string().min(1),
+  times: z.record(z.string(), z.union([z.string(), z.null()])),
+});
+
+const digestEligibilitySchema = z.object({
+  exclude_already_dispatched: z.boolean(),
+  exclude_stale: z.boolean(),
+  staleness_threshold_hours: z.number(),
+  suppress_repeats_from_previous_digest: z.boolean(),
+  include_unresolved_from_yesterday: z.boolean(),
+});
+
+const dailyRhythmSchema = z.object({
+  morning_digest: digestScheduleBlockSchema,
+  evening_checkin: digestScheduleBlockSchema,
+  default_state: z.string().min(1),
+  digest_eligibility: digestEligibilitySchema,
+});
+
+const outboundBudgetSchema = z.object({
+  max_unprompted_per_person_per_day: z.number().int().positive(),
+  max_messages_per_thread_per_hour: z.number().int().positive(),
+  batch_window_minutes: z.number().int().nonnegative(),
+  description: z.string().min(1),
+});
+
+const collisionPolicySchema = z.object({
+  description: z.string().min(1),
+  precedence_order: z.array(z.nativeEnum(CollisionPrecedence)),
+  same_precedence_strategy: z.string().min(1),
+});
+
 const entitiesPayloadSchema = z.object({
-  entities: z.array(
-    z
-      .object({
-        id: z.string().min(1),
-        type: z.nativeEnum(EntityType),
-        name: z.string().min(1),
-        messaging_identity: z.string().nullable(),
-        permissions: z.array(z.nativeEnum(Permission)),
-      })
-      .passthrough(),
-  ),
+  entities: z.array(entitySchema),
 });
 
 const configPayloadSchema = z.object({
-  system: z
-    .object({
-      timezone: z.string().min(1),
-      locale: z.string().min(1),
-      version: z.string().min(1),
-    })
-    .passthrough(),
+  system: z.object({
+    timezone: z.string().min(1),
+    locale: z.string().min(1),
+    version: z.string().min(1),
+  }),
   assistant: z.object({
     messaging_identity: z.string().min(1),
     name: z.string().nullable(),
     description: z.string().min(1),
   }),
   threads: z.array(threadSchema),
-  daily_rhythm: z.record(z.string(), z.unknown()),
+  daily_rhythm: dailyRhythmSchema,
 });
 
 const topicsPayloadSchema = z.object({
-  topics: z.record(z.string(), z.unknown()),
-  escalation_profiles: z.record(z.string(), z.unknown()),
+  topics: z.record(z.string(), topicConfigSchema),
+  escalation_profiles: z.record(z.string(), escalationProfileSchema),
   confirmation_gates: z.object({
     always_require_approval: z.array(z.nativeEnum(ConfirmationActionType)),
     expiry_minutes: z.number().int().positive(),
@@ -69,13 +119,13 @@ const topicsPayloadSchema = z.object({
 
 const budgetPayloadSchema = z.object({
   dispatch: z.object({
-    outbound_budget: z.record(z.string(), z.unknown()),
-    collision_avoidance: z.record(z.string(), z.unknown()),
+    outbound_budget: outboundBudgetSchema,
+    collision_avoidance: collisionPolicySchema,
   }),
 });
 
 const schedulerPayloadSchema = z.object({
-  daily_rhythm: z.record(z.string(), z.unknown()),
+  daily_rhythm: dailyRhythmSchema,
 });
 
 const evalStartPayloadSchema = z.object({
@@ -164,8 +214,8 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     const nextConfig = structuredClone(await options.state_service.getSystemConfig());
     nextConfig.system = payload.system;
     nextConfig.assistant = payload.assistant;
-    nextConfig.threads = payload.threads as typeof nextConfig.threads;
-    nextConfig.daily_rhythm = payload.daily_rhythm as unknown as typeof nextConfig.daily_rhythm;
+    nextConfig.threads = payload.threads;
+    nextConfig.daily_rhythm = payload.daily_rhythm;
     await saveConfig(options.state_service, nextConfig);
     return {
       ok: true,
@@ -189,7 +239,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
   fastify.put("/entities", async (request) => {
     const payload = entitiesPayloadSchema.parse(request.body);
     const nextConfig = structuredClone(await options.state_service.getSystemConfig());
-    nextConfig.entities = payload.entities as typeof nextConfig.entities;
+    nextConfig.entities = payload.entities;
     await saveConfig(options.state_service, nextConfig);
     return {
       ok: true,
@@ -212,8 +262,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     nextConfig.topics = payload.topics as typeof nextConfig.topics;
     nextConfig.escalation_profiles =
       payload.escalation_profiles as typeof nextConfig.escalation_profiles;
-    nextConfig.confirmation_gates =
-      payload.confirmation_gates as typeof nextConfig.confirmation_gates;
+    nextConfig.confirmation_gates = payload.confirmation_gates;
     await saveConfig(options.state_service, nextConfig);
     return {
       ok: true,
@@ -236,10 +285,8 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
   fastify.put("/budget", async (request) => {
     const payload = budgetPayloadSchema.parse(request.body);
     const nextConfig = structuredClone(await options.state_service.getSystemConfig());
-    nextConfig.dispatch.outbound_budget = payload.dispatch
-      .outbound_budget as unknown as typeof nextConfig.dispatch.outbound_budget;
-    nextConfig.dispatch.collision_avoidance = payload.dispatch
-      .collision_avoidance as unknown as typeof nextConfig.dispatch.collision_avoidance;
+    nextConfig.dispatch.outbound_budget = payload.dispatch.outbound_budget;
+    nextConfig.dispatch.collision_avoidance = payload.dispatch.collision_avoidance;
     await saveConfig(options.state_service, nextConfig);
     return {
       ok: true,
@@ -260,7 +307,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
   fastify.put("/scheduler", async (request) => {
     const payload = schedulerPayloadSchema.parse(request.body);
     const nextConfig = structuredClone(await options.state_service.getSystemConfig());
-    nextConfig.daily_rhythm = payload.daily_rhythm as unknown as typeof nextConfig.daily_rhythm;
+    nextConfig.daily_rhythm = payload.daily_rhythm;
     await saveConfig(options.state_service, nextConfig);
     return {
       ok: true,

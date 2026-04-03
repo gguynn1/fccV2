@@ -46,7 +46,319 @@ export const threadHistoryRecordSchema = z.object({
   recent_messages: z.array(z.unknown()),
 });
 
-export const topicRecordSchema = z.record(z.string(), z.unknown());
+const zodDateField = z.union([z.date(), z.string()]);
+const zodNullableDate = z.union([z.date(), z.string(), z.null()]);
+const zodNullableString = z.union([z.string(), z.null()]);
+
+export const calendarStateSchema = z.object({
+  events: z.array(
+    z
+      .object({
+        id: z.string(),
+        title: z.string(),
+        concerning: z.array(z.string()),
+        topic: z.string(),
+        status: z.string(),
+        created_by: z.string(),
+        created_at: zodDateField,
+      })
+      .passthrough(),
+  ),
+});
+
+export const choresStateSchema = z.object({
+  active: z.array(
+    z
+      .object({
+        id: z.string(),
+        task: z.string(),
+        assigned_to: z.string(),
+        assigned_by: z.string(),
+        assigned_in_thread: z.string(),
+        due: zodDateField,
+        status: z.string(),
+        escalation_step: z.number(),
+      })
+      .passthrough(),
+  ),
+  completed_recent: z.array(
+    z
+      .object({
+        id: z.string(),
+        task: z.string(),
+        assigned_to: z.string(),
+        completed_at: zodDateField,
+        completed_via: z.string(),
+        response: z.string(),
+      })
+      .passthrough(),
+  ),
+});
+
+export const financesStateSchema = z.object({
+  bills: z.array(
+    z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        amount: z.number(),
+        due_date: zodDateField,
+        status: z.string(),
+        reminder_sent: z.boolean(),
+        recurring: z.string(),
+      })
+      .passthrough(),
+  ),
+  expenses_recent: z.array(
+    z
+      .object({
+        id: z.string(),
+        description: z.string(),
+        amount: z.number(),
+        date: zodDateField,
+        logged_by: z.string(),
+        logged_via: z.string(),
+        confirmed: z.boolean(),
+      })
+      .passthrough(),
+  ),
+  savings_goals: z.array(
+    z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        target: z.number(),
+        current: z.number(),
+        percent: z.number(),
+        deadline: zodNullableDate,
+        pace_status: z.string(),
+      })
+      .passthrough(),
+  ),
+});
+
+export const groceryStateSchema = z.object({
+  list: z.array(
+    z
+      .object({
+        id: z.string(),
+        item: z.string(),
+        section: z.string(),
+        added_by: z.string(),
+        added_at: zodDateField,
+      })
+      .passthrough(),
+  ),
+  recently_purchased: z.array(
+    z
+      .object({
+        item: z.string(),
+        purchased_by: z.string(),
+        purchased_at: zodDateField,
+      })
+      .passthrough(),
+  ),
+});
+
+export const healthStateSchema = z.object({
+  profiles: z.array(
+    z
+      .object({
+        entity: z.string(),
+        medications: z.array(z.unknown()),
+        allergies: z.array(z.string()),
+        providers: z.array(z.unknown()),
+        upcoming_appointments: z.array(z.unknown()),
+        notes: z.array(z.string()),
+      })
+      .passthrough(),
+  ),
+});
+
+export const petsStateSchema = z.object({
+  profiles: z.array(
+    z
+      .object({
+        entity: z.string(),
+        species: z.string(),
+        vet: zodNullableString,
+        last_vet_visit: zodDateField,
+        medications: z.array(z.unknown()),
+        care_log_recent: z.array(z.unknown()),
+        upcoming: z.array(z.string()),
+        notes: z.array(z.string()),
+      })
+      .passthrough(),
+  ),
+});
+
+export const schoolStateSchema = z.object({
+  students: z.array(
+    z
+      .object({
+        entity: z.string(),
+        assignments: z.array(z.unknown()),
+        completed_recent: z.array(z.unknown()),
+      })
+      .passthrough(),
+  ),
+  communications: z.array(z.unknown()).optional(),
+});
+
+export const travelStateSchema = z.object({
+  trips: z.array(
+    z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        dates: z.object({ start: zodDateField, end: zodDateField }),
+        travelers: z.array(z.string()),
+        status: z.string(),
+        checklist: z.array(z.unknown()),
+        budget_link: zodNullableString,
+        notes: z.array(z.string()),
+      })
+      .passthrough(),
+  ),
+});
+
+export const vendorsStateSchema = z.object({
+  records: z.array(
+    z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        type: z.string(),
+        jobs: z.array(z.unknown()),
+        contact: z.string(),
+        managed_by: z.string(),
+        follow_up_pending: z.boolean(),
+      })
+      .passthrough(),
+  ),
+});
+
+export const businessStateSchema = z.object({
+  profiles: z.array(
+    z
+      .object({
+        entity: z.string(),
+        business_type: z.string(),
+        business_name: z.string(),
+        follow_up_quiet_period_days: z.number(),
+      })
+      .passthrough(),
+  ),
+  leads: z.array(
+    z
+      .object({
+        id: z.string(),
+        owner: z.string(),
+        inquiry_date: zodDateField,
+        last_contact: zodDateField,
+        draft_reply: zodNullableString,
+        notes: z.union([z.string(), z.array(z.string())]),
+      })
+      .passthrough(),
+  ),
+});
+
+export const relationshipStateSchema = z.object({
+  last_nudge: z
+    .object({
+      date: zodDateField,
+      thread: z.string(),
+      content: z.string(),
+      response_received: z.boolean(),
+    })
+    .passthrough(),
+  next_nudge_eligible: zodDateField,
+  nudge_history: z.array(z.unknown()),
+  cooldown_days: z.number().optional(),
+  quiet_window: z
+    .object({
+      is_busy_period: z.boolean(),
+      is_stressful_period: z.boolean(),
+    })
+    .optional(),
+  framework_grounding: z
+    .object({
+      ifs: z.boolean(),
+      emotionally_focused: z.boolean(),
+      attachment_based: z.boolean(),
+    })
+    .optional(),
+});
+
+export const familyStatusStateSchema = z.object({
+  current: z.array(
+    z
+      .object({
+        entity: z.string(),
+        status: z.string(),
+        updated_at: zodDateField,
+        expires_at: zodDateField,
+      })
+      .passthrough(),
+  ),
+  freshness_window: z
+    .object({
+      expires_after_minutes: z.number(),
+    })
+    .optional(),
+});
+
+export const mealsStateSchema = z.object({
+  planned: z.array(
+    z
+      .object({
+        id: z.string(),
+        date: zodDateField,
+        meal_type: z.string(),
+        description: z.string(),
+        planned_by: z.string(),
+        status: z.string(),
+      })
+      .passthrough(),
+  ),
+  dietary_notes: z.array(
+    z
+      .object({
+        entity: z.string(),
+        note: z.string(),
+        added_at: zodDateField,
+      })
+      .passthrough(),
+  ),
+});
+
+export const maintenanceStateSchema = z.object({
+  assets: z.array(
+    z
+      .object({
+        id: z.string(),
+        type: z.string(),
+        name: z.string(),
+        details: z.record(z.string(), z.string()),
+      })
+      .passthrough(),
+  ),
+  items: z.array(
+    z
+      .object({
+        id: z.string(),
+        asset_id: z.string(),
+        task: z.string(),
+        interval: z.string(),
+        last_performed: zodNullableDate,
+        next_due: zodNullableDate,
+        responsible: z.string(),
+        status: z.string(),
+        history: z.array(z.unknown()),
+      })
+      .passthrough(),
+  ),
+});
 
 export const outboundBudgetTrackerRecordSchema = z.object({
   date: z.union([z.string(), z.date()]),
