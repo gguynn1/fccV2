@@ -4,7 +4,7 @@ This guide explains how to create scenario sets for the eval runner, where they 
 
 ## Where Scenario Sets Live
 
-- Runnable scenario sets are registered in `eval/scenarios/index.ts`.
+- Runnable scenario sets are discovered from `eval/scenarios/default.ts` and `eval/scenarios/generated/*.ts`.
 - Reusable scenario definitions live in `.ts` files under `eval/scenarios/`.
 - UI-generated scaffolds are written to `eval/scenarios/generated/`.
 
@@ -12,8 +12,7 @@ Recommended workflow:
 
 1. Generate a scaffold from the Eval page.
 2. Edit the generated file until the scenarios reflect real application behavior.
-3. Import that scenario set into `eval/scenarios/index.ts`.
-4. Run `npm run eval:run` against the new set.
+3. Run `npm run eval:run` against the new set.
 
 ## What A Valid Scenario Looks Like
 
@@ -89,26 +88,14 @@ export const myScenarios: EvalScenarioDefinition[] = [
 ];
 ```
 
-## Registering A Runnable Set
+## Making A Set Runnable
 
-Generated scaffolds are not automatically runnable. To make one available in the Eval page and CLI:
+Generated scaffolds are automatically runnable as soon as they exist in `eval/scenarios/generated/` and export:
 
-1. Import it into `eval/scenarios/index.ts`.
-2. Add a new entry to the `scenarioSets` array.
+- `<baseName>Name` as the scenario set name
+- `<baseName>Scenarios` as `EvalScenarioDefinition[]`
 
-Example registration pattern:
-
-```ts
-import { myScenarios, myScenarioSetName } from "./generated/my-scenario-set.js";
-
-const scenarioSets: EvalScenarioSet[] = [
-  {
-    name: myScenarioSetName,
-    label: "My Scenario Set",
-    scenarios: myScenarios,
-  },
-];
-```
+The eval loader scans every generated `.ts` file and adds discovered sets to the CLI and Eval page.
 
 ## What The UI Generator Does
 
@@ -119,6 +106,6 @@ That scaffold:
 - uses valid seeded entities and threads
 - uses realistic application messages
 - follows the `EvalScenarioDefinition` shape
-- is meant to be edited and then registered in `eval/scenarios/index.ts`
+- is meant to be edited and then run directly (no manual registration)
 
 It is a starting point, not an automatically trusted scenario suite.

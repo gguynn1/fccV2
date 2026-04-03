@@ -147,7 +147,7 @@ export function EvalRoute() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>
               Scenario set scaffolds are generated into `eval/scenarios/generated/`. Finish editing
-              the file, then register it in `eval/scenarios/index.ts` to make it runnable.
+              the file and it becomes runnable automatically.
             </p>
             <p>Authoring guide: `eval/scenarios/SCENARIO_SETS.md`</p>
             {generateScenarioSetMutation.data && (

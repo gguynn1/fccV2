@@ -15,6 +15,7 @@ import {
   getEvalRunMarkdown,
   getEvalScenarioSets,
   listEvalRuns,
+  refreshEvalScenarioSets,
   startEvalRun,
 } from "./eval-runs.js";
 
@@ -328,7 +329,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
   });
 
   fastify.get("/eval", async () => {
-    const [runs] = await Promise.all([listEvalRuns()]);
+    const [runs] = await Promise.all([listEvalRuns(), refreshEvalScenarioSets()]);
 
     return {
       scenario_sets: getEvalScenarioSets(),

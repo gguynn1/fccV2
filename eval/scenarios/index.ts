@@ -1,3 +1,7 @@
+import { existsSync, readdirSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 import type { EvalScenarioDefinition } from "../types.js";
 import { defaultScenarios, defaultScenarioSetName } from "./default.js";
 
@@ -7,12 +11,75 @@ export interface EvalScenarioSet {
   scenarios: EvalScenarioDefinition[];
 }
 
+const generatedDirectory = join(dirname(fileURLToPath(import.meta.url)), "generated");
+
+function toLabel(name: string): string {
+  return name
+    .split("-")
+    .filter(Boolean)
+    .map((segment) => `${segment[0]?.toUpperCase() ?? ""}${segment.slice(1)}`)
+    .join(" ");
+}
+
+function extractScenarioSets(
+  scenarioModule: Record<string, unknown>,
+  fileName: string,
+): EvalScenarioSet[] {
+  const discoveredSets: EvalScenarioSet[] = [];
+  const fallbackName = basename(fileName, ".ts");
+
+  for (const [exportName, exportValue] of Object.entries(scenarioModule)) {
+    if (!exportName.endsWith("Scenarios") || !Array.isArray(exportValue)) {
+      continue;
+    }
+
+    const baseName = exportName.slice(0, -"Scenarios".length);
+    const setNameExport = scenarioModule[`${baseName}Name`];
+    const setName = typeof setNameExport === "string" ? setNameExport : fallbackName;
+
+    discoveredSets.push({
+      name: setName,
+      label: toLabel(setName),
+      scenarios: exportValue as EvalScenarioDefinition[],
+    });
+  }
+
+  return discoveredSets;
+}
+
+async function loadGeneratedScenarioSets(): Promise<EvalScenarioSet[]> {
+  if (!existsSync(generatedDirectory)) {
+    return [];
+  }
+
+  const generatedFiles = readdirSync(generatedDirectory)
+    .filter((fileName) => fileName.endsWith(".ts"))
+    .sort((a, b) => a.localeCompare(b));
+
+  const generatedScenarioSets: EvalScenarioSet[] = [];
+
+  for (const fileName of generatedFiles) {
+    const absolutePath = join(generatedDirectory, fileName);
+
+    try {
+      const scenarioModule = (await import(pathToFileURL(absolutePath).href)) as Record<string, unknown>;
+      generatedScenarioSets.push(...extractScenarioSets(scenarioModule, fileName));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`Skipping generated scenario set "${fileName}": ${message}\n`);
+    }
+  }
+
+  return generatedScenarioSets;
+}
+
 const scenarioSets: EvalScenarioSet[] = [
   {
     name: defaultScenarioSetName,
     label: "Default",
     scenarios: defaultScenarios,
   },
+  ...(await loadGeneratedScenarioSets()),
 ];
 
 export function listScenarioSets(): Array<Pick<EvalScenarioSet, "name" | "label">> {

@@ -42,7 +42,9 @@ export interface EvalRunRecord {
 }
 
 const activeRuns = new Map<string, ChildProcessWithoutNullStreams>();
-const scenarioSets: EvalScenarioSetSummary[] = [{ name: "default", label: "Default" }];
+const defaultScenarioSets: EvalScenarioSetSummary[] = [{ name: "default", label: "Default" }];
+let scenarioSets: EvalScenarioSetSummary[] = [...defaultScenarioSets];
+let scenarioSetRefreshPromise: Promise<void> | null = null;
 
 function getResultsDirectory(): string {
   return resolve(process.cwd(), "eval/results");
@@ -115,6 +117,20 @@ export function getEvalScenarioSets(): EvalScenarioSetSummary[] {
   return scenarioSets;
 }
 
+function toScenarioSetSummary(value: unknown): EvalScenarioSetSummary | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (typeof candidate.name !== "string" || typeof candidate.label !== "string") {
+    return null;
+  }
+
+  return { name: candidate.name, label: candidate.label };
+}
+
 function parseJsonFromCommandOutput(output: string): Record<string, unknown> {
   const trimmed = output.trim();
 
@@ -161,6 +177,34 @@ async function runEvalCliJson(args: string[]): Promise<Record<string, unknown>> 
   }
 
   return parseJsonFromCommandOutput(Buffer.concat(stdoutChunks).toString("utf8"));
+}
+
+export async function refreshEvalScenarioSets(): Promise<void> {
+  if (scenarioSetRefreshPromise) {
+    await scenarioSetRefreshPromise;
+    return;
+  }
+
+  scenarioSetRefreshPromise = (async () => {
+    try {
+      const result = await runEvalCliJson(["eval:list"]);
+      const parsedScenarioSets = Array.isArray(result.scenario_sets)
+        ? result.scenario_sets
+            .map((entry) => toScenarioSetSummary(entry))
+            .filter((entry): entry is EvalScenarioSetSummary => entry !== null)
+        : [];
+
+      scenarioSets = parsedScenarioSets.length > 0 ? parsedScenarioSets : [...defaultScenarioSets];
+    } catch {
+      scenarioSets = [...defaultScenarioSets];
+    }
+  })();
+
+  try {
+    await scenarioSetRefreshPromise;
+  } finally {
+    scenarioSetRefreshPromise = null;
+  }
 }
 
 export function getActiveEvalRunId(): string | null {
@@ -217,6 +261,7 @@ export async function startEvalRun(scenarioSet: string): Promise<{ run_id: strin
 
 export async function generateScenarioSet(): Promise<GeneratedScenarioSetResult> {
   const result = await runEvalCliJson(["eval:generate-set", "--"]);
+  await refreshEvalScenarioSets();
 
   return {
     scenario_set_name: String(result.scenario_set_name),
