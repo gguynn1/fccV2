@@ -83,6 +83,22 @@ export function EvalRoute() {
     ];
   }, [selectedRun]);
 
+  const supersedingRun = useMemo(() => {
+    if (!selectedRun || !overviewQuery.data) {
+      return null;
+    }
+
+    const sameSetRuns = overviewQuery.data.runs.filter(
+      (run) => run.scenario_set === selectedRun.scenario_set && run.id !== selectedRun.id,
+    );
+
+    const newer = sameSetRuns.find(
+      (run) => new Date(run.started_at).getTime() > new Date(selectedRun.started_at).getTime(),
+    );
+
+    return newer ?? null;
+  }, [selectedRun, overviewQuery.data]);
+
   if (overviewQuery.isLoading || !overviewQuery.data) {
     return <p className="text-sm text-muted-foreground">Loading eval runner…</p>;
   }
@@ -209,6 +225,40 @@ export function EvalRoute() {
 
       {selectedRun && (
         <>
+          <Card>
+            <CardContent className="flex flex-wrap items-center gap-4 pt-6">
+              <p className="text-sm font-medium">
+                Run: <span className="font-mono text-xs">{selectedRun.id}</span>
+              </p>
+              <Badge variant={toStatusVariant(selectedRun.status)}>{selectedRun.status}</Badge>
+              {supersedingRun && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedRunId(supersedingRun.id)}
+                >
+                  Superseded by {supersedingRun.id.slice(0, 20)}...
+                </Button>
+              )}
+              <div className="ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    startRunMutation.mutate(selectedRun.scenario_set, {
+                      onSuccess: (response) => {
+                        setSelectedRunId(response.run_id);
+                      },
+                    });
+                  }}
+                  disabled={startRunMutation.isPending || overviewQuery.data.active_run_id !== null}
+                >
+                  Re-run This Set
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 lg:grid-cols-5">
             {summaryEntries.map((entry) => (
               <Card key={entry.label}>
@@ -232,6 +282,7 @@ export function EvalRoute() {
                   <TableRow>
                     <TableHead>Scenario</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Topic</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Failures</TableHead>
                     <TableHead>Suggestion</TableHead>
@@ -248,6 +299,9 @@ export function EvalRoute() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={toStatusVariant(scenario.status)}>{scenario.status}</Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {scenario.expected?.topic ?? "—"}
                       </TableCell>
                       <TableCell>{scenario.category}</TableCell>
                       <TableCell className="text-xs">

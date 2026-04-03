@@ -1,0 +1,30 @@
+---
+description: The system only processes messages from known participants — all others are silently dropped
+alwaysApply: true
+---
+
+# Closed Participant Boundary
+
+The system is a closed communication surface. Only messages from messaging identities that map to a configured entity are processed. Every other sender is silently dropped at the transport layer — no response, no error, no acknowledgment, no enqueue.
+
+## Invariants
+
+- **Non-participants are invisible.** If a messaging identity does not match a configured entity, the inbound message is logged at `warn` level and answered with empty TwiML (`<Response></Response>`). The system never enqueues, classifies, or dispatches anything for an unknown sender.
+- **No error responses to strangers.** Returning an HTTP error (4xx/5xx) to the messaging provider causes retries and confirms the number is active. Unknown senders always receive a 200 with empty TwiML — indistinguishable from a legitimate no-reply.
+- **No data leakage.** A non-participant must never receive any content — not an error message, not a "wrong number" reply, not a system status. The system behaves as if it does not exist.
+- **Transport-level enforcement.** The participant gate runs in the webhook route handler, after signature validation but before any normalization, classification, or enqueue. It is the first logical check after authentication.
+- **Applies to all messaging integrations.** This boundary is not Twilio-specific. Any future transport integration (email inbound, alternative messaging provider) must enforce the same closed-participant check before processing.
+
+## Implementation
+
+The transport layer maintains a map of `messaging_identity → entity_id` built from `runtimeSystemConfig.entities` at startup. The `isKnownParticipant` check is a simple map lookup — O(1), no database call, no external service.
+
+## Logging
+
+Blocked messages are logged at `warn` level with the sender identity. This provides an audit trail for unexpected contact attempts without creating noise in normal operation. The log entry must never include message content from the unknown sender.
+
+## What This Does NOT Cover
+
+- **Twilio signature validation** is a separate, earlier check. An invalid signature gets a 403 before the participant gate runs.
+- **Tunnel exposure guardrails** (admin UI, CalDAV local-only) are separate network-level controls documented in `hosting-model.mdc`.
+- **Entity permissions** (what a known participant can do) are enforced downstream by the worker. The participant gate only answers: "Should we process this at all?"

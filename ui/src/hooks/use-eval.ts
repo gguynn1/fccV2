@@ -31,6 +31,13 @@ export interface EvalScenarioRecord {
   raw_outcome: string;
   started_at: string | null;
   completed_at: string | null;
+  expected: {
+    topic: string;
+    intent: string;
+    target_thread: string;
+    priority: string;
+    confirmation_required: boolean;
+  };
   failures: Array<{
     field: string;
     message: string;

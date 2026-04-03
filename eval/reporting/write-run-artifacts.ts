@@ -22,10 +22,17 @@ function quoteForPrompt(value: string): string {
   return value.replaceAll('"""', '\\"\\"\\"');
 }
 
-function toLikelyFiles(scenario: EvalRunState["scenarios"][number]): string[] {
+function scenarioSourceFile(scenarioSet: string): string {
+  if (scenarioSet.startsWith("generated-")) {
+    return `eval/scenarios/generated/${scenarioSet}.ts`;
+  }
+  return "eval/scenarios/default.ts";
+}
+
+function toLikelyFiles(scenario: EvalRunState["scenarios"][number], scenarioSet: string): string[] {
   const files = new Set<string>();
 
-  files.add("eval/scenarios/default.ts");
+  files.add(scenarioSourceFile(scenarioSet));
 
   for (const failure of scenario.failures) {
     switch (failure.field) {
@@ -52,6 +59,8 @@ function toLikelyFiles(scenario: EvalRunState["scenarios"][number]): string[] {
 
 function buildAgentPrompt(state: EvalRunState): string {
   const failingScenarios = state.scenarios.filter((scenario) => scenario.raw_outcome === "fail");
+  const allPassed = failingScenarios.length === 0;
+  const sourceFile = scenarioSourceFile(state.scenario_set);
 
   const scenarioInstructions = failingScenarios
     .map((scenario) => {
@@ -61,7 +70,7 @@ function buildAgentPrompt(state: EvalRunState): string {
             `- ${failure.field}: expected ${JSON.stringify(failure.expected)}, actual ${JSON.stringify(failure.actual)}`,
         )
         .join("\n");
-      const likelyFiles = toLikelyFiles(scenario)
+      const likelyFiles = toLikelyFiles(scenario, state.scenario_set)
         .map((file) => `- \`${file}\``)
         .join("\n");
       const suggestionLine = scenario.tuner?.candidate
@@ -86,6 +95,41 @@ ${formatLogLines(state, scenario.id)}
     })
     .join("\n");
 
+  const artifactBlock = `Artifact files (read these first):
+- JSON: \`${state.artifacts.json_path}\`
+- Markdown: \`${state.artifacts.markdown_path ?? `eval/results/${state.id}.prompt.md`}\`
+- Scenario source: \`${sourceFile}\``;
+
+  const rerunCommand = `npm run eval:run -- --scenario-set ${state.scenario_set} --run-id ${state.id}`;
+
+  if (allPassed) {
+    return `# Prompt For Cursor Or Claude Code
+
+Copy everything in the block below into your coding agent:
+
+\`\`\`text
+Eval run \`${state.id}\` completed with all ${state.summary.total} scenarios passing.
+
+${artifactBlock}
+
+Run summary:
+- total: ${state.summary.total}
+- passed: ${state.summary.passed}
+
+All scenarios passed. Review the scenario source file (\`${sourceFile}\`) for:
+- edge cases that could be added
+- messages that could be more realistic or varied
+- topics not yet covered by this set
+
+If you add or modify scenarios, re-run with:
+${rerunCommand}
+
+The JSON and markdown artifacts in \`eval/results/\` will be overwritten with the new results.
+The admin UI polls these files — refresh the Eval page to see the updated status.
+\`\`\`
+`;
+  }
+
   return `# Prompt For Cursor Or Claude Code
 
 Copy everything in the block below into your coding agent:
@@ -93,7 +137,10 @@ Copy everything in the block below into your coding agent:
 \`\`\`text
 You are fixing failures from eval run \`${state.id}\` in the repository currently open on disk.
 
+${artifactBlock}
+
 Goal:
+- read the artifact files listed above before making changes
 - decide what is actually wrong
 - identify the smallest correct change
 - make the fix in the right file(s)
@@ -103,7 +150,6 @@ Important context:
 - this eval implementation is the current local sequential runner under \`eval/\`, not a full real-pipeline eval system
 - \`prompt_fix_suggested\` means the eval tuner considered the failure prompt-fixable and embedded a prompt suggestion in the run artifact
 - \`investigation_needed\` means the failure likely needs code-level investigation rather than a prompt-only change
-- generated run artifacts live under \`eval/results/\`
 
 Run summary:
 - total: ${state.summary.total}
@@ -114,11 +160,17 @@ Run summary:
 - regressed: ${state.summary.regressed}
 
 Your task:
-1. Read the failing scenarios listed below.
-2. Inspect the suggested files first.
-3. Decide whether each failure should be fixed in scenario expectations, runner logic, tuner output, or another nearby file.
-4. Implement the fixes.
-5. Re-run the relevant eval command and confirm the result improves without breaking other scenarios.
+1. Read the artifact files listed above.
+2. Read the failing scenarios listed below.
+3. Inspect the suggested files first.
+4. Decide whether each failure should be fixed in scenario expectations, runner logic, tuner output, or another nearby file.
+5. Implement the fixes.
+6. Re-run to verify: ${rerunCommand}
+7. Confirm the result improves without breaking other scenarios.
+
+After fixing:
+- The JSON and markdown artifacts in \`eval/results/\` will be overwritten with the new results.
+- The admin UI polls these files — refresh the Eval page to see the updated status.
 
 Failing scenarios:
 ${quoteForPrompt(scenarioInstructions)}

@@ -62,7 +62,10 @@ async function loadGeneratedScenarioSets(): Promise<EvalScenarioSet[]> {
     const absolutePath = join(generatedDirectory, fileName);
 
     try {
-      const scenarioModule = (await import(pathToFileURL(absolutePath).href)) as Record<string, unknown>;
+      const scenarioModule = (await import(pathToFileURL(absolutePath).href)) as Record<
+        string,
+        unknown
+      >;
       generatedScenarioSets.push(...extractScenarioSets(scenarioModule, fileName));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

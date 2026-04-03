@@ -28,8 +28,290 @@ function toTimestamp(): string {
     .replace(/\.\d{3}Z$/, "z");
 }
 
+interface MessageVariant {
+  message: string;
+  tone_markers: string[];
+}
+
+interface ScenarioTemplate {
+  suffix: string;
+  title: string;
+  category: string;
+  topic: string;
+  intent: string;
+  origin_thread: string;
+  target_thread: string;
+  concerning: string[];
+  priority: string;
+  confirmation_required: boolean;
+  format_markers: string[];
+  variants: MessageVariant[];
+}
+
+const scenarioTemplates: ScenarioTemplate[] = [
+  {
+    suffix: "calendar-query",
+    title: "Calendar query stays in the family thread",
+    category: "classification",
+    topic: "TopicKey.Calendar",
+    intent: "ClassifierIntent.Query",
+    origin_thread: "family",
+    target_thread: "family",
+    concerning: ["participant_1", "participant_2"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: false,
+    format_markers: ["summary"],
+    variants: [
+      { message: "Do we have anything Friday morning?", tone_markers: ["schedule", "friday"] },
+      { message: "What's on the calendar Saturday?", tone_markers: ["schedule", "saturday"] },
+      {
+        message: "Do we have anything scheduled Sunday afternoon?",
+        tone_markers: ["schedule", "sunday"],
+      },
+    ],
+  },
+  {
+    suffix: "grocery-add",
+    title: "Grocery additions remain list-focused in the family thread",
+    category: "routing",
+    topic: "TopicKey.Grocery",
+    intent: "ClassifierIntent.Request",
+    origin_thread: "family",
+    target_thread: "family",
+    concerning: ["participant_1", "participant_2", "participant_3"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: false,
+    format_markers: ["list"],
+    variants: [
+      { message: "Add eggs and yogurt to the list", tone_markers: ["added", "grocery"] },
+      { message: "We need ground beef and bread", tone_markers: ["added", "grocery"] },
+      { message: "Add cereal and bananas to the grocery list", tone_markers: ["added", "grocery"] },
+    ],
+  },
+  {
+    suffix: "finance-confirmation",
+    title: "Financial actions ask for confirmation in the couple thread",
+    category: "confirmation",
+    topic: "TopicKey.Finances",
+    intent: "ClassifierIntent.Request",
+    origin_thread: "couple",
+    target_thread: "couple",
+    concerning: ["participant_1", "participant_2"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: true,
+    format_markers: ["confirm"],
+    variants: [
+      { message: "Pay the water bill on Monday morning", tone_markers: ["approval", "bill"] },
+      { message: "Pay the electric bill tomorrow", tone_markers: ["approval", "bill"] },
+      { message: "Pay the internet bill this Friday", tone_markers: ["approval", "bill"] },
+    ],
+  },
+  {
+    suffix: "business-draft",
+    title: "Business drafts stay in the owner's private thread",
+    category: "composition",
+    topic: "TopicKey.Business",
+    intent: "ClassifierIntent.Request",
+    origin_thread: "participant_2_private",
+    target_thread: "participant_2_private",
+    concerning: ["participant_2"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: false,
+    format_markers: ["reply"],
+    variants: [
+      {
+        message: "Draft a warm reply to the new wedding inquiry",
+        tone_markers: ["warm", "draft", "client"],
+      },
+      {
+        message: "Draft a reply to the new portrait inquiry and keep it warm",
+        tone_markers: ["warm", "draft", "client"],
+      },
+      {
+        message: "Draft a warm reply to the client about pricing",
+        tone_markers: ["warm", "draft", "client"],
+      },
+    ],
+  },
+  {
+    suffix: "vendor-update",
+    title: "Vendor scheduling remains a vendor update",
+    category: "pipeline",
+    topic: "TopicKey.Vendors",
+    intent: "ClassifierIntent.Update",
+    origin_thread: "participant_1_private",
+    target_thread: "participant_1_private",
+    concerning: ["participant_1"],
+    priority: "DispatchPriority.Batched",
+    confirmation_required: false,
+    format_markers: ["record"],
+    variants: [
+      {
+        message: "The electrician can come Thursday afternoon",
+        tone_markers: ["vendor", "thursday"],
+      },
+      { message: "The plumber can come Tuesday morning", tone_markers: ["vendor", "tuesday"] },
+      {
+        message: "The electrician can come Wednesday afternoon",
+        tone_markers: ["vendor", "wednesday"],
+      },
+    ],
+  },
+  {
+    suffix: "school-query",
+    title: "School queries route to the child's private thread",
+    category: "classification",
+    topic: "TopicKey.School",
+    intent: "ClassifierIntent.Query",
+    origin_thread: "family",
+    target_thread: "participant_3_private",
+    concerning: ["participant_3"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: false,
+    format_markers: ["summary"],
+    variants: [
+      { message: "When is the next school field trip?", tone_markers: ["school", "field trip"] },
+      {
+        message: "What homework is due this week from school?",
+        tone_markers: ["school", "homework"],
+      },
+      { message: "When is the school pickup on Friday?", tone_markers: ["school", "pickup"] },
+    ],
+  },
+  {
+    suffix: "health-update",
+    title: "Health updates stay in the participant's private thread",
+    category: "routing",
+    topic: "TopicKey.Health",
+    intent: "ClassifierIntent.Update",
+    origin_thread: "participant_1_private",
+    target_thread: "participant_1_private",
+    concerning: ["participant_1"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: false,
+    format_markers: ["record"],
+    variants: [
+      {
+        message: "The dentist appointment moved to Thursday afternoon",
+        tone_markers: ["appointment", "dentist"],
+      },
+      {
+        message: "The doctor checkup is confirmed for Monday morning",
+        tone_markers: ["appointment", "checkup"],
+      },
+      {
+        message: "Prescription refill is ready at the doctor",
+        tone_markers: ["prescription", "doctor"],
+      },
+    ],
+  },
+  {
+    suffix: "meals-request",
+    title: "Meal planning stays in the family thread",
+    category: "composition",
+    topic: "TopicKey.Meals",
+    intent: "ClassifierIntent.Request",
+    origin_thread: "family",
+    target_thread: "family",
+    concerning: ["participant_1", "participant_2"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: false,
+    format_markers: ["list"],
+    variants: [
+      { message: "What should we eat for dinner tonight?", tone_markers: ["dinner", "meal"] },
+      { message: "Find a recipe for dinner tomorrow", tone_markers: ["recipe", "dinner"] },
+      { message: "Plan a meal for Saturday dinner", tone_markers: ["meal", "dinner"] },
+    ],
+  },
+  {
+    suffix: "chores-request",
+    title: "Chore assignments route to the assignee's thread",
+    category: "pipeline",
+    topic: "TopicKey.Chores",
+    intent: "ClassifierIntent.Request",
+    origin_thread: "family",
+    target_thread: "participant_3_private",
+    concerning: ["participant_3"],
+    priority: "DispatchPriority.Batched",
+    confirmation_required: false,
+    format_markers: ["task"],
+    variants: [
+      { message: "Take out the trash before Thursday morning", tone_markers: ["chore", "trash"] },
+      { message: "Clean your room and tidy up before Friday", tone_markers: ["chore", "clean"] },
+      { message: "Vacuum the living room this weekend", tone_markers: ["chore", "vacuum"] },
+    ],
+  },
+  {
+    suffix: "maintenance-update",
+    title: "Maintenance records stay in the owner's private thread",
+    category: "routing",
+    topic: "TopicKey.Maintenance",
+    intent: "ClassifierIntent.Update",
+    origin_thread: "participant_1_private",
+    target_thread: "participant_1_private",
+    concerning: ["participant_1"],
+    priority: "DispatchPriority.Batched",
+    confirmation_required: false,
+    format_markers: ["record"],
+    variants: [
+      {
+        message: "The oil change is due next Tuesday",
+        tone_markers: ["maintenance", "oil change"],
+      },
+      {
+        message: "Replace the furnace air filter this weekend",
+        tone_markers: ["maintenance", "air filter"],
+      },
+      {
+        message: "Schedule the gutter cleaning for Saturday",
+        tone_markers: ["maintenance", "gutter"],
+      },
+    ],
+  },
+];
+
+function hashSlug(slug: string): number {
+  let hash = 0;
+  for (let i = 0; i < slug.length; i++) {
+    hash = (hash * 31 + slug.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
 function buildScenarioSetFile(slug: string): string {
   const exportBase = toCamelCase(slug);
+  const variantIndex = hashSlug(slug);
+
+  const scenarios = scenarioTemplates.map((template, templateIndex) => {
+    const variant = template.variants[(variantIndex + templateIndex) % template.variants.length];
+    const concerningLiteral = template.concerning.map((c) => `"${c}"`).join(", ");
+    const toneMarkersLiteral = variant.tone_markers.map((m) => `"${m}"`).join(", ");
+    const formatMarkersLiteral = template.format_markers.map((m) => `"${m}"`).join(", ");
+    const notesLine =
+      templateIndex === 0
+        ? `\n    notes: "Generated scaffold. Verify that the message and markers still match the intended behavior.",`
+        : "";
+
+    return `  {
+    id: "${slug}-${template.suffix}",
+    title: "${template.title}",
+    category: "${template.category}",
+    prompt_input: {
+      message: "${variant.message}",
+      concerning: [${concerningLiteral}],
+      origin_thread: "${template.origin_thread}",
+    },
+    expected: {
+      topic: ${template.topic},
+      intent: ${template.intent},
+      target_thread: "${template.target_thread}",
+      priority: ${template.priority},
+      confirmation_required: ${String(template.confirmation_required)},
+      tone_markers: [${toneMarkersLiteral}],
+      format_markers: [${formatMarkersLiteral}],
+    },${notesLine}
+  }`;
+  });
 
   return `import { ClassifierIntent, DispatchPriority, TopicKey } from "../../../src/index.js";
 import type { EvalScenarioDefinition } from "../../types.js";
@@ -38,102 +320,7 @@ import type { EvalScenarioDefinition } from "../../types.js";
 export const ${exportBase}Name = "${slug}";
 
 export const ${exportBase}Scenarios: EvalScenarioDefinition[] = [
-  {
-    id: "${slug}-calendar-query",
-    title: "Calendar query stays in the family thread",
-    category: "classification",
-    prompt_input: {
-      message: "Do we have anything Friday morning?",
-      concerning: ["participant_1", "participant_2"],
-      origin_thread: "family",
-    },
-    expected: {
-      topic: TopicKey.Calendar,
-      intent: ClassifierIntent.Query,
-      target_thread: "family",
-      priority: DispatchPriority.Immediate,
-      confirmation_required: false,
-      tone_markers: ["schedule", "Friday"],
-      format_markers: ["summary"],
-    },
-    notes: "Generated scaffold. Verify that the message and markers still match the intended behavior.",
-  },
-  {
-    id: "${slug}-grocery-add",
-    title: "Grocery additions remain list-focused in the family thread",
-    category: "routing",
-    prompt_input: {
-      message: "Add eggs and yogurt to the list",
-      concerning: ["participant_1", "participant_2", "participant_3"],
-      origin_thread: "family",
-    },
-    expected: {
-      topic: TopicKey.Grocery,
-      intent: ClassifierIntent.Request,
-      target_thread: "family",
-      priority: DispatchPriority.Immediate,
-      confirmation_required: false,
-      tone_markers: ["added", "grocery"],
-      format_markers: ["list"],
-    },
-  },
-  {
-    id: "${slug}-finance-confirmation",
-    title: "Financial actions ask for confirmation in the couple thread",
-    category: "confirmation",
-    prompt_input: {
-      message: "Pay the water bill on Monday morning",
-      concerning: ["participant_1", "participant_2"],
-      origin_thread: "couple",
-    },
-    expected: {
-      topic: TopicKey.Finances,
-      intent: ClassifierIntent.Request,
-      target_thread: "couple",
-      priority: DispatchPriority.Immediate,
-      confirmation_required: true,
-      tone_markers: ["approval", "bill"],
-      format_markers: ["confirm"],
-    },
-  },
-  {
-    id: "${slug}-business-draft",
-    title: "Business drafts stay in the owner's private thread",
-    category: "composition",
-    prompt_input: {
-      message: "Draft a warm reply to the new wedding inquiry",
-      concerning: ["participant_2"],
-      origin_thread: "participant_2_private",
-    },
-    expected: {
-      topic: TopicKey.Business,
-      intent: ClassifierIntent.Request,
-      target_thread: "participant_2_private",
-      priority: DispatchPriority.Immediate,
-      confirmation_required: false,
-      tone_markers: ["warm", "draft", "client"],
-      format_markers: ["reply"],
-    },
-  },
-  {
-    id: "${slug}-vendor-update",
-    title: "Vendor scheduling remains a vendor update",
-    category: "pipeline",
-    prompt_input: {
-      message: "The electrician can come Thursday afternoon",
-      concerning: ["participant_1"],
-      origin_thread: "participant_1_private",
-    },
-    expected: {
-      topic: TopicKey.Vendors,
-      intent: ClassifierIntent.Update,
-      target_thread: "participant_1_private",
-      priority: DispatchPriority.Batched,
-      confirmation_required: false,
-      tone_markers: ["vendor", "Thursday"],
-      format_markers: ["record"],
-    },
-  },
+${scenarios.join(",\n")},
 ];
 `;
 }

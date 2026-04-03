@@ -107,6 +107,15 @@ export class TwilioTransportLayer {
         return { error: "Invalid signature" };
       }
 
+      if (!this.isKnownParticipant(payload.From)) {
+        this.logger.warn(
+          { from: payload.From },
+          "Inbound message from non-participant silently dropped.",
+        );
+        reply.type("text/xml");
+        return "<Response></Response>";
+      }
+
       const normalized = await this.normalizeInboundPayload(payload);
       await queue.enqueue(this.toQueueItem(normalized), {
         attempts: DEFAULT_RETRY.attempts,
@@ -174,6 +183,10 @@ export class TwilioTransportLayer {
       },
       {},
     );
+  }
+
+  private isKnownParticipant(from: string | undefined): boolean {
+    return typeof from === "string" && this.entityIdByIdentity.has(from);
   }
 
   private validateSignature(request: FastifyRequest, payload: FormPayload): boolean {

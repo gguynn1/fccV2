@@ -8,15 +8,15 @@ This folder contains the current eval implementation. It is a local sequential r
 - `runners/sequential-runner.ts` runs one scenario at a time, persists JSON run state, appends structured logs, and writes the final markdown artifact.
 - `scenarios/` contains the current scenario schema and the default scenario set.
 - `scenarios/SCENARIO_SETS.md` explains how to author realistic scenario sets and where generated scaffolds should live.
-- `scenarios/generate-set.ts` creates UI-generated scaffolds in `eval/scenarios/generated/`.
+- `scenarios/generate-set.ts` creates UI-generated scaffolds in `eval/scenarios/generated/` with 10 scenarios covering Calendar, Grocery, Finances, Business, Vendors, School, Health, Meals, Chores, and Maintenance. Each generation varies messages via a hash-based variant selector.
 - `tuner/diagnose.ts` decides whether a failure is prompt-fixable or needs investigation.
 - `tuner/correct.ts` generates an embedded prompt suggestion for prompt-fixable failures.
-- `reporting/write-run-artifacts.ts` writes `eval/results/<run-id>.json` and `eval/results/<run-id>.prompt.md`.
+- `reporting/write-run-artifacts.ts` writes `eval/results/<run-id>.json` and `eval/results/<run-id>.prompt.md`. The `.prompt.md` includes a pasteable prompt with artifact file paths, the scenario source file, the re-run command, and reconciliation instructions. When all scenarios pass, the prompt shifts to coverage-expansion mode.
 
 ## Current Behavior
 
 - Runs are sequential only.
-- The runner uses simple deterministic inference plus seeded config from `src/_seed/system-config.ts`.
+- The runner uses deterministic keyword matching in `inferTopic()` to classify messages into all 14 `TopicKey` values, plus seeded config from `src/_seed/system-config.ts`.
 - The current statuses are `queued`, `running`, `passed`, `prompt_fix_suggested`, `investigation_needed`, `failed`, and `regressed`.
 - `prompt_fix_suggested` means the tuner decided the failure was prompt-fixable and embedded a prompt suggestion in the run artifact.
 - `investigation_needed` means the failure touches structural behavior like topic, routing, priority, or confirmation.

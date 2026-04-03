@@ -61,8 +61,10 @@ function inferTopic(message: string): TopicKey {
   }
   if (
     normalized.includes("portrait inquiry") ||
+    normalized.includes("wedding inquiry") ||
     normalized.includes("client") ||
-    normalized.includes("draft a reply")
+    normalized.includes("draft a reply") ||
+    (normalized.includes("draft") && normalized.includes("inquiry"))
   ) {
     return TopicKey.Business;
   }
@@ -70,9 +72,70 @@ function inferTopic(message: string): TopicKey {
     return TopicKey.Vendors;
   }
   if (
+    normalized.includes("homework") ||
+    normalized.includes("school") ||
+    normalized.includes("field trip") ||
+    normalized.includes("report card") ||
+    normalized.includes("pickup from school")
+  ) {
+    return TopicKey.School;
+  }
+  if (
+    normalized.includes("doctor") ||
+    normalized.includes("dentist") ||
+    normalized.includes("prescription") ||
+    normalized.includes("checkup") ||
+    normalized.includes("physical")
+  ) {
+    return TopicKey.Health;
+  }
+  if (
+    normalized.includes("vet") ||
+    normalized.includes("walk the dog") ||
+    normalized.includes("kibble") ||
+    normalized.includes("pet food")
+  ) {
+    return TopicKey.Pets;
+  }
+  if (
+    normalized.includes("flight") ||
+    normalized.includes("hotel") ||
+    normalized.includes("luggage") ||
+    normalized.includes("pack for the trip") ||
+    normalized.includes("travel")
+  ) {
+    return TopicKey.Travel;
+  }
+  if (
+    normalized.includes("date night") ||
+    normalized.includes("anniversary") ||
+    normalized.includes("couples")
+  ) {
+    return TopicKey.Relationship;
+  }
+  if (
+    normalized.includes("oil change") ||
+    normalized.includes("air filter") ||
+    normalized.includes("furnace") ||
+    normalized.includes("gutter") ||
+    normalized.includes("roof repair")
+  ) {
+    return TopicKey.Maintenance;
+  }
+  if (
+    normalized.includes("chore") ||
+    normalized.includes("clean") ||
+    normalized.includes("take out the trash") ||
+    normalized.includes("tidy") ||
+    normalized.includes("vacuum")
+  ) {
+    return TopicKey.Chores;
+  }
+  if (
     normalized.includes("dinner") ||
     normalized.includes("recipe") ||
-    normalized.includes("meal")
+    normalized.includes("meal") ||
+    normalized.includes("what should we eat")
   ) {
     return TopicKey.Meals;
   }
@@ -80,14 +143,15 @@ function inferTopic(message: string): TopicKey {
     normalized.includes("ground beef") ||
     normalized.includes("milk") ||
     normalized.includes("grocery") ||
-    normalized.startsWith("we need")
+    normalized.startsWith("we need") ||
+    (normalized.startsWith("add ") && normalized.includes("to the list"))
   ) {
     return TopicKey.Grocery;
   }
   if (
     normalized.includes("calendar") ||
-    normalized.includes("appointment") ||
-    normalized.includes("schedule")
+    normalized.includes("schedule") ||
+    normalized.startsWith("do we have anything")
   ) {
     return TopicKey.Calendar;
   }
@@ -124,6 +188,7 @@ function inferTargetThread(topic: TopicKey, input: EvalScenarioDefinition["promp
   switch (topic) {
     case TopicKey.Finances:
     case TopicKey.Relationship:
+    case TopicKey.Travel:
       return "couple";
     case TopicKey.Business:
       return "participant_2_private";
@@ -132,6 +197,9 @@ function inferTargetThread(topic: TopicKey, input: EvalScenarioDefinition["promp
     case TopicKey.Maintenance:
     case TopicKey.Vendors:
       return `${input.concerning[0] ?? "participant_1"}_private`;
+    case TopicKey.School:
+    case TopicKey.Chores:
+      return `${input.concerning[0] ?? "participant_3"}_private`;
     default:
       return input.origin_thread;
   }
@@ -146,9 +214,18 @@ function inferPriority(topic: TopicKey, intent: ClassifierIntent): DispatchPrior
     case TopicKey.Finances:
     case TopicKey.Calendar:
     case TopicKey.Business:
+    case TopicKey.Health:
+    case TopicKey.School:
+    case TopicKey.Meals:
+    case TopicKey.Grocery:
+    case TopicKey.Relationship:
+    case TopicKey.Pets:
+    case TopicKey.Travel:
+    case TopicKey.FamilyStatus:
       return DispatchPriority.Immediate;
     case TopicKey.Vendors:
     case TopicKey.Maintenance:
+    case TopicKey.Chores:
       return DispatchPriority.Batched;
     default:
       return DispatchPriority.Immediate;
@@ -162,10 +239,29 @@ function inferConfirmation(config: SystemConfig, topic: TopicKey): boolean {
   return alwaysRequireApproval && confirmationTopics.has(topic);
 }
 
+function extractTimingPhrase(message: string): string {
+  const normalized = message.toLowerCase();
+  const weekday = normalized.match(
+    /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  )?.[1];
+  const dayPart = normalized.match(/\b(morning|afternoon|evening|tonight)\b/)?.[1];
+
+  if (weekday && dayPart) {
+    return `${weekday} ${dayPart}`;
+  }
+  if (weekday) {
+    return weekday;
+  }
+
+  return "the requested time";
+}
+
 function composeMessage(topic: TopicKey, input: EvalScenarioDefinition["prompt_input"]): string {
+  const timing = extractTimingPhrase(input.message);
+
   switch (topic) {
     case TopicKey.Calendar:
-      return `Schedule summary: Thursday activity from "${input.message}" is ready to review.`;
+      return `Schedule summary: ${timing} activity from "${input.message}" is ready to review.`;
     case TopicKey.Grocery:
       return `Grocery list update: added items from "${input.message}" as a shared list.`;
     case TopicKey.Finances:
@@ -173,7 +269,23 @@ function composeMessage(topic: TopicKey, input: EvalScenarioDefinition["prompt_i
     case TopicKey.Business:
       return `Warm client draft reply prepared for the latest inquiry.`;
     case TopicKey.Vendors:
-      return `Vendor record update: the service visit is noted for Tuesday morning.`;
+      return `Vendor record update: the service visit is noted for ${timing}.`;
+    case TopicKey.School:
+      return `School reminder: "${input.message}" has been noted for ${timing}.`;
+    case TopicKey.Health:
+      return `Health record update: the appointment from "${input.message}" is logged.`;
+    case TopicKey.Meals:
+      return `Meal plan: dinner idea from "${input.message}" added to the meal list.`;
+    case TopicKey.Chores:
+      return `Chore assigned: "${input.message}" added to the task list.`;
+    case TopicKey.Maintenance:
+      return `Maintenance record: "${input.message}" logged for ${timing}.`;
+    case TopicKey.Pets:
+      return `Pet care update: "${input.message}" has been recorded.`;
+    case TopicKey.Travel:
+      return `Travel note: "${input.message}" added to the trip plan.`;
+    case TopicKey.Relationship:
+      return `Couple reminder: "${input.message}" is on the calendar.`;
     default:
       return `Status update recorded for "${input.message}".`;
   }
