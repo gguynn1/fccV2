@@ -2,9 +2,9 @@ Eval and Auto-Tuning Utility
 
 Core Idea
 
-The system's expected behavior is already defined in CLAUDE.md files, topic profiles, and the five-part scenario framework (src/01-service-stack/CLAUDE.md lines 143-169). The eval tool closes the loop: run scenarios, compare actual vs expected, diagnose the failing service, generate a correction, re-run, verify.
+The system's expected behavior is already defined in CLAUDE.md files, topic profiles, cross-topic connections, disambiguation rules, and the five-part scenario framework. The eval tool closes the loop: run scenarios, compare actual vs expected, diagnose the failing service, generate a correction, re-run, verify.
 
-This is not prompt testing in isolation — it is end-to-end behavioral verification of the whole pipeline with an auto-correction feedback loop.
+This is not prompt testing in isolation — it is end-to-end behavioral verification of the whole pipeline with an auto-correction feedback loop. The system is its own teacher. Every failure refines the model.
 
 Where It Lives
 
@@ -12,21 +12,32 @@ eval/                          # Outside src/ — development/ops tool, not runt
 ├── vitest.config.ts           # Separate Vitest config (long timeouts, real API, sequential)
 ├── scenarios/                 # Five-part scenario definitions
 │   ├── schema.ts              # Scenario type: trigger, expected dispatch, input handling, escalation, collision
-│   ├── classification/        # Topic classification scenarios
+│   ├── classification/        # Topic classification scenarios (14 topics, disambiguation edge cases)
 │   ├── routing/               # Thread routing scenarios
 │   ├── composition/           # Message tone/format scenarios
-│   ├── escalation/            # Escalation behavior scenarios
+│   ├── escalation/            # Escalation behavior scenarios (high/medium/low/none profiles)
+│   ├── confirmation/          # Confirmation gate scenarios (financial, send-on-behalf, system change)
+│   ├── cross-topic/           # Cross-topic connection scenarios (meals→grocery, maintenance→vendors, etc.)
+│   ├── multi-turn/            # Conversational context scenarios (thread history influencing classification)
+│   ├── budget/                # Outbound budget, collision avoidance, batching scenarios
+│   ├── recovery/              # Post-downtime reconciliation scenarios (stale items, expired confirmations)
+│   ├── negative/              # Things the system must NOT do (late sends, child exposure to finances, etc.)
 │   └── pipeline/              # Full multi-step end-to-end scenarios
 ├── runners/                   # Execute scenarios through the pipeline
 │   ├── step.runner.ts         # Run a single worker step (classify, route, compose, etc.)
-│   └── pipeline.runner.ts     # Run a full scenario through all 7 worker steps
+│   ├── pipeline.runner.ts     # Run a full single-turn scenario through all 8 worker steps
+│   └── multistep.runner.ts    # Run a multi-step scenario: simulated clock, state accumulation,
+│                              #   multi-participant sequencing, silence/reaction handling
 ├── scorers/                   # Compare actual vs expected
-│   ├── deterministic.ts       # Exact match: TopicKey, thread ID, priority, entity
+│   ├── deterministic.ts       # Exact match: TopicKey, thread ID, priority, entity, confirmation
 │   └── qualitative.ts         # LLM-as-judge: tone, format, helpfulness (Claude scores against the topic profile)
 ├── tuner/                     # Auto-correction engine
 │   ├── diagnose.ts            # Identify which step failed and why
 │   ├── correct.ts             # Generate an improved prompt/config for that step
 │   └── verify.ts              # Re-run the scenario + full regression suite with the candidate
+├── coverage/                  # Coverage tracking
+│   ├── matrix.ts              # Per-topic × per-step coverage assertions
+│   └── gaps.ts                # Identifies untested combinations
 ├── prompts/                   # Prompt templates (versioned)
 │   ├── current/               # Active prompts (symlinked or copied from src/ at runtime)
 │   └── candidates/            # Generated corrections awaiting promotion
@@ -39,12 +50,19 @@ Scenario Suite → Pipeline Runner → Scorer
   ├── all pass → Done (no drift)
   └── failures detected → Diagnoser
         ├── step 1: wrong topic → Corrector
-        ├── step 6: wrong thread → Corrector
-        └── step 5: wrong tone → Corrector
+        ├── step 2: wrong entities → Corrector
+        ├── step 4: wrong priority → Corrector
+        ├── step 5: wrong escalation → Corrector
+        ├── step 6: missed confirmation → Corrector
+        ├── step 7: wrong tone/format → Corrector
+        ├── step 8: wrong thread → Corrector
+        └── cross-topic: missed connection → Corrector
               → candidate prompt → Verifier
                     ├── re-run failed + full suite → Scorer
                     ├── passes all → Candidate for Promotion
-                    └── regression → Corrector (retry)
+                    └── regression → Corrector (retry with max depth)
+
+The loop has a depth limit. If a correction causes regressions and the corrector's second attempt still regresses, it stops and reports the conflict. Some failures require human judgment — the tuner surfaces the tradeoff, it doesn't force a resolution.
 
 Scenario Schema
 
@@ -53,24 +71,36 @@ Mirrors the five-part framework already defined in the architecture, typed in Ty
   EvalScenario {
     id: string
     description: string
+    category: ScenarioCategory           — classification, routing, composition, escalation,
+                                           confirmation, cross_topic, multi_turn, budget,
+                                           recovery, negative, pipeline
     trigger: {
       message: string
-      sender: string           — entity ID (participant_1, etc.)
-      thread: string           — originating thread ID
-      context?: string[]       — recent thread messages for ambiguous inputs
+      sender: string                     — entity ID (participant_1, etc.)
+      thread: string                     — originating thread ID
+      context?: string[]                 — recent thread messages for ambiguous inputs
+      state_overrides?: Partial<SystemState>  — inject specific state for the scenario
     }
     expected: {
       topic: TopicKey
       intent: string
+      entities: string[]
       target_thread: string
       priority: DispatchPriority
-      tone_markers: string[]   — keywords the output should match (e.g., "direct", "factual")
+      tone_markers: string[]             — keywords the output should match
+      format_markers?: string[]          — structural expectations (list, snapshot, prompt, etc.)
       escalation?: EscalationLevel
       confirmation_required?: boolean
+      cross_topic_side_effects?: {       — expected downstream effects
+        topic: TopicKey
+        action: string                   — "add_grocery_items", "create_calendar_event", etc.
+      }[]
+      must_not?: string[]                — things the output must NOT contain or do
     }
     escalation_check?: {
       silence_after_minutes: number
       expected_step: string
+      expected_thread?: string           — does escalation change the thread?
     }
     collision_check?: {
       concurrent_items: string[]
@@ -79,6 +109,188 @@ Mirrors the five-part framework already defined in the architecture, typed in Ty
   }
 
 This imports directly from src/ types — the eval tool shares the system's vocabulary.
+
+Multi-Step Scenario Schema
+
+Single-turn scenarios test individual decisions. Multi-step scenarios test sequences
+where multiple participants interact over time and each step's outcome changes the
+state the next step operates on.
+
+  ScenarioStep {
+    sender: string | null                — entity ID, or null for silence/system-generated events
+    thread: string                       — which thread this message arrives in
+    message: string | null               — the message content, null means silence (no one responds)
+    input_type: "message" | "reaction_positive" | "reaction_negative" | "silence" | "forwarded"
+                                         — what kind of input this step represents
+    delay_minutes: number                — simulated time elapsed since the previous step
+    expected: {
+      system_action: string              — what the system should do ("reply", "escalate", "batch",
+                                           "store_silently", "send_confirmation", "expire_confirmation",
+                                           "advance_escalation", "no_action")
+      topic?: TopicKey                   — if relevant, what topic the system classifies this as
+      target_thread?: string             — where the system's output goes
+      content_markers?: string[]         — keywords/phrases expected in the output
+      must_not?: string[]                — things the output must NOT contain
+      state_mutations?: {                — expected changes to system state after this step
+        key: string                      — dot-path like "chores.active[0].status" or "escalation_status"
+        expected_value: string           — what the state should be after this step
+      }[]
+    }
+  }
+
+  MultiStepScenario {
+    id: string
+    description: string
+    category: ScenarioCategory
+    initial_state: Partial<SystemState>  — starting state for the scenario
+    steps: ScenarioStep[]                — ordered sequence of participant actions + expected responses
+  }
+
+Example multi-step scenarios:
+
+  Chore escalation across participants:
+    Step 1: System sends chore reminder to participant_3 (delay: 0)
+    Step 2: Silence — no response (delay: 60, sender: null, input_type: silence)
+            Expected: system sends follow-up to participant_3
+    Step 3: Silence — still no response (delay: 60, sender: null, input_type: silence)
+            Expected: system escalates to family thread
+    Step 4: participant_2 replies "I'll handle it" in family thread (delay: 15)
+            Expected: system acknowledges, reassigns, notifies participant_3
+
+  Business lead pipeline:
+    Step 1: participant_2 forwards an email inquiry (delay: 0)
+            Expected: system classifies as business, creates lead, drafts reply
+    Step 2: participant_2 reviews draft (delay: 30)
+            Expected: system presents draft with confirmation gate
+    Step 3: participant_2 sends positive reaction (delay: 2, input_type: reaction_positive)
+            Expected: system dispatches the draft, updates lead status to awaiting_reply
+    Step 4: Silence from client (delay: 2880, input_type: silence)
+            Expected: system nudges participant_2 about follow-up due
+
+  Concurrent family coordination:
+    Step 1: participant_1 messages "what's for dinner?" in family thread (delay: 0)
+            Expected: classified as meals, checks meal plan state
+    Step 2: participant_2 replies "maybe tacos?" in family thread (delay: 5)
+            Expected: system suggests adding ingredients to grocery list
+    Step 3: participant_3 messages "add milk" in family thread (delay: 2)
+            Expected: classified as grocery (not meals), added to list
+    Step 4: participant_1 replies "tacos works, add the stuff" (delay: 3)
+            Expected: system adds taco ingredients to grocery list (cross-topic: meals→grocery)
+
+  Confirmation expiry:
+    Step 1: System presents financial confirmation to participant_1 (delay: 0)
+    Step 2: Silence — no response (delay: 6, input_type: silence)
+            Expected: confirmation expired, system notifies participant_1, never auto-executes
+    Step 3: participant_1 messages "yes do it" (delay: 2)
+            Expected: system says confirmation expired, offers to reissue
+
+The multi-step runner manages a simulated clock. Each step advances time by delay_minutes.
+State accumulates across steps — step 3 sees the state that steps 1 and 2 produced.
+The runner validates expected outputs AND state_mutations at each step before proceeding.
+
+Scenario Categories and What They Test
+
+Classification (14 topics × multiple inputs each)
+  Every topic needs scenarios for: clear-cut input, ambiguous input, thread-context-dependent input.
+  The disambiguation rules define the critical edge cases:
+    - Meals vs Grocery: "What should we have for dinner?" vs "We need ground beef"
+    - Maintenance vs Vendors: "When was the oil changed?" vs "The plumber is coming Tuesday"
+    - Maintenance vs Chores: "Change the furnace filter" vs "Take out the trash"
+    - Business vs Vendors: "I got a new portrait inquiry" vs "The electrician can come Thursday"
+  Each disambiguation rule produces at minimum 4 scenarios: 2 clear examples per side.
+  Context-sensitive scenarios: the same message classified differently based on thread history.
+
+Routing (thread selection + audience)
+  Private vs shared thread routing per topic.
+  Business routing: owner-scoped (participant_2's photography leads → their private thread).
+  Escalation routing: does the thread widen when escalation advances?
+  Proactive routing: does the system pick the narrowest appropriate thread?
+
+Composition (tone + format + initiative)
+  Every topic's behavior profile produces a distinct voice.
+  Business composition adapts per business_type (photography drafts vs other business types).
+  Relationship composition draws on framework grounding without being clinical.
+  Negative: finances never leak into a child entity's thread.
+
+Escalation (4 profiles × topic coverage)
+  High: chores and finances get multi-step escalation with thread widening.
+  Medium: school, health, calendar, travel get follow-up + digest flag.
+  Low: relationship, pets, family status, maintenance get one try then silence.
+  None: grocery, vendors, business, meals get no follow-up.
+  Timing: escalation steps fire at configured intervals, not early, not late.
+
+Confirmation (3 gate types)
+  Financial actions always require confirmation.
+  Sending on behalf always requires confirmation.
+  System changes always require confirmation.
+  Expiry: an unresolved confirmation expires and the system notifies, never auto-executes.
+  Reaction handling: positive reaction approves, negative reaction rejects.
+
+Cross-Topic (declared connections)
+  Meals → Grocery: meal plan generates grocery list items.
+  Maintenance → Vendors: maintenance item references vendor history.
+  Maintenance → Finances: maintenance cost logs as expense.
+  Maintenance → Calendar: scheduled maintenance creates calendar event.
+  Health → Calendar: health appointment creates calendar event.
+  Pets → Calendar: vet appointment creates calendar event.
+  Business → Finances: business income/expense tracking.
+  Business → Calendar: business appointments on calendar.
+  Travel → Calendar, Pets, Finances, Grocery: trip prep touches multiple topics.
+
+Multi-Turn and Multi-Participant (MultiStepScenario)
+  Uses the multi-step schema. These are the scenarios that prove the system handles real family life.
+  Chore escalation: reminder → silence → follow-up → silence → thread escalation → another entity handles it.
+  Business lead pipeline: inquiry forwarded → draft staged → reaction approval → send → follow-up cycle.
+  Meal planning: question → suggestion → cross-topic grocery addition → confirmation.
+  Maintenance + vendor handoff: overdue alert → entity says "call the plumber" → vendor record created.
+  Concurrent inputs: two entities messaging about different topics in the same thread within minutes.
+  Thread context shifts: a message about groceries in the middle of a meal planning conversation.
+  Confirmation expiry: gate presented → silence → expiry notification → entity tries to approve late.
+  Recovery after downtime: system comes back, finds stale items and expired confirmations, handles each correctly.
+
+Budget and Collision
+  Outbound budget limits: max unprompted messages per person per day.
+  Thread rate limiting: max messages per thread per hour.
+  Batching: multiple items within the batch window combine into one message.
+  Collision avoidance: immediate-priority item goes out while batched items hold.
+
+Recovery (post-downtime)
+  Stale items: a morning digest at 2pm is adapted or skipped, never sent as-is.
+  Expired confirmations: marked expired, user notified, never auto-executed.
+  Escalation reconciliation: timers that expired during downtime advance, don't fire the missed step.
+  Budget reconstruction: if Redis counters are lost, reconstruct from SQLite records.
+
+Negative (things the system must NOT do)
+  Never send financial information to a child entity's thread.
+  Never auto-execute an expired confirmation.
+  Never dispatch a stale item as-is after downtime.
+  Never escalate a low-accountability topic.
+  Never follow up on a relationship nudge that was ignored.
+  Never expose one entity's business leads to another entity.
+  Never send more unprompted messages than the budget allows.
+
+Coverage Matrix
+
+Every TopicKey must have scenarios covering:
+  - At least one classification scenario
+  - At least one routing scenario
+  - At least one composition scenario
+  - The correct escalation profile behavior
+  - All declared cross_topic_connections exercised
+  - At least one negative scenario (what the topic must NOT do)
+
+Every disambiguation rule must have:
+  - At least 2 scenarios per side (4 minimum per rule)
+  - At least 1 context-dependent scenario
+
+Every worker step (1-8) must be tested in isolation AND as part of full pipeline runs.
+
+Every escalation profile (high, medium, low, none) must have at least one multi-step scenario
+  that walks through the full escalation sequence including silence and participant handoff.
+
+Every confirmation gate type must have a multi-step scenario covering: approval, rejection, and expiry.
+
+The coverage tracker (eval/coverage/) computes this matrix and reports gaps. No topic ships without full coverage.
 
 Vitest Configuration
 
@@ -93,6 +305,7 @@ Run with: npx vitest --config eval/vitest.config.ts
 Package.json scripts:
   "eval": "vitest --config eval/vitest.config.ts"
   "eval:run": "vitest run --config eval/vitest.config.ts"
+  "eval:coverage": "vitest run --config eval/vitest.config.ts -- coverage"
 
 Scoring
 
@@ -102,21 +315,25 @@ Deterministic (pass/fail, no ambiguity):
 - Priority matches expected DispatchPriority.
 - Entities involved match expected set.
 - Confirmation required matches expected boolean.
+- Cross-topic side effects match expected actions.
+- must_not assertions: output does NOT contain forbidden content.
 
 Qualitative (LLM-as-judge):
 - A second Claude call scores the generated message against the topic profile's tone/format/initiative spec from the CLAUDE.md.
 - Rubric: "Given this topic profile, does this message match the expected tone? Score 1-5 with reasoning."
 - Threshold: score >= 4 passes, 3 = warning, <= 2 = failure.
+- Business topic scoring includes business_type-aware tone matching.
 
 Auto-Correction (the Tuner)
 
 When a scenario fails, the tuner:
 1. Diagnoses which worker step produced the wrong output (classify? route? compose?) by running each step in isolation and checking outputs.
-2. Generates a correction by calling Claude with: "Here is the current prompt for [step]. Here is the input. Here is the actual output. Here is the expected output. The topic profile says [tone/behavior]. Suggest a specific change to the prompt that would produce the correct output."
+2. Generates a correction by calling Claude with: "Here is the current prompt for [step]. Here is the input. Here is the actual output. Here is the expected output. The topic profile says [tone/behavior]. The disambiguation rules say [guidance]. Suggest a specific change to the prompt that would produce the correct output."
 3. Applies the correction to a candidate copy of the prompt (never modifies src/ directly).
 4. Re-runs the failed scenario with the candidate prompt.
 5. Runs the full regression suite to make sure the fix doesn't break other scenarios.
-6. Reports the candidate: what changed, which scenario it fixes, regression results.
+6. If the fix causes regressions, retries with the regression context included (max 2 attempts).
+7. Reports the candidate: what changed, which scenario it fixes, regression results, and any unresolved conflicts.
 
 Candidates live in eval/prompts/candidates/. Promotion to src/ is a manual step — the developer reviews the candidate, agrees with the change, and copies it into the runtime prompt.
 
@@ -129,17 +346,40 @@ The system's behavior is governed by three things the tuner can adjust:
 
 The tuner generates candidates for any of these. It does NOT modify runtime code, routing logic, or escalation state machines — those are code changes, not model refinements.
 
+What does NOT get tuned (requires human decision):
+- Adding or removing topics.
+- Changing escalation profiles or confirmation gates.
+- Modifying thread structure or entity permissions.
+- Changing cross-topic connection declarations.
+- Modifying disambiguation rules (the rules themselves are specification, not prompt).
+
 Integration with Existing Architecture
 
-- eval/ imports types from src/ (TopicKey, DispatchPriority, Entity, etc.) but never modifies src/.
+- eval/ imports types from src/ (TopicKey, DispatchPriority, Entity, SystemState, etc.) but never modifies src/.
 - Scenarios encode the same five-part structure documented in src/01-service-stack/CLAUDE.md.
 - The ScenarioTesting interface already in src/index.ts can be extended to reference eval scenario IDs.
 - Topic profile CLAUDE.md files serve as the behavioral spec that the qualitative scorer judges against.
+- Disambiguation rules in system-config.ts inform the scenario generator for edge-case classification tests.
+- Cross-topic connections in system-config.ts define which side-effect scenarios must exist.
+- state_overrides in scenarios allow injecting specific system state (e.g., a maintenance item that's overdue, a business lead awaiting follow-up) without modifying the base state snapshot.
+
+Scenario Generation
+
+Scenarios can be authored manually or generated. The generator combines:
+- A random TopicKey
+- A trigger type (human message, scheduled event, email parse, internal state change)
+- A participant set (which entity, which thread)
+- A complication (no response, conflicting events, multi-step, rescheduled, ambiguous input, concurrent scenarios, cross-topic side effect, downtime recovery)
+
+The generated scenario includes expected outputs derived from the topic config, routing rules, escalation profile, and behavior profile. A human reviews generated scenarios before they enter the suite — the generator proposes, the developer approves.
 
 Cost Management
 
-- Real Claude API calls cost money. Each scenario = 1-3 API calls (classify + compose + maybe judge).
-- A full suite of 50 scenarios ~ 150 calls ~ $0.50-2.00 per run (depending on model).
-- Tuning runs multiply this by the number of candidate variants.
-- Use claude-haiku for scoring/judging calls (cheap, fast) and claude-sonnet for the actual pipeline calls.
-- Cache deterministic inputs — same message + same prompt = same classification, no need to re-call.
+- Real Claude API calls cost money. Each single-turn scenario = 1-3 API calls (classify + compose + maybe judge).
+- Each multi-step scenario = N steps × 1-3 API calls per step. A 4-step escalation scenario ~ 8-12 calls.
+- A full suite of ~200 single-turn + ~30 multi-step scenarios ~ 600-900 calls per run.
+- Tuning runs multiply this by the number of candidate variants and retries.
+- Use the cheapest capable model for scoring/judging calls and the production model for actual pipeline calls.
+- Cache deterministic inputs — same message + same prompt + same state = same classification, no need to re-call.
+- Incremental runs: only re-run scenarios affected by a prompt change (the coverage matrix tracks which scenarios test which prompts).
+- Full regression runs before candidate promotion.

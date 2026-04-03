@@ -12,7 +12,7 @@ export enum QueueItemSource {
   ForwardedMessage = "forwarded_message",
   ImageAttachment = "image_attachment",
   EmailMonitor = "email_monitor",
-  CalendarSync = "calendar_sync",
+  InternalStateChange = "internal_state_change",
   ScheduledTrigger = "scheduled_trigger",
 }
 
