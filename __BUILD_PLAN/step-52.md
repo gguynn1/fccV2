@@ -1,16 +1,17 @@
-# Step 52 — Outbound Flow Documentation
+# Step 52 — Worker-Service Integration Flow Documentation
 
-> Source: src/03-connections/03-outbound-flow/notes.txt
+> Source: src/03-connections/02-processing-flow/02.3-worker-service-integration/notes.txt
 
 ## What to Build
 
-- Verify/update outbound flow documentation
-- Document three paths: Dispatch → Transport, Hold → Scheduler, Store → State
-- Document priority mapping: immediate / batched / silent
+- Verify/update Worker → supporting service integration documentation
+- Document all eight service call steps in sequence
+- Verify no direct service-to-service runtime imports documented
+- Cross-check with actual worker implementation
 
 ## Dependencies
 
-Steps 37–40 (Action Router and its three outcomes).
+Steps 30–36 (Worker and all its integrations).
 
 ## Technologies
 
@@ -18,11 +19,11 @@ Markdown, ASCII diagrams.
 
 ## Files to Create/Modify
 
-- `src/03-connections/03-outbound-flow/CLAUDE.md` (verify/update)
+- `src/03-connections/02-processing-flow/02.3-worker-service-integration/CLAUDE.md` (verify/update)
 
 ## Acceptance Criteria
 
-- Three outbound paths documented accurately
-- Priority mapping correct
+- All eight steps documented with correct service mapping
+- No cross-service imports shown in documentation
 
 ---

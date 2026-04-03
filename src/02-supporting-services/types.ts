@@ -6,3 +6,125 @@ export * from "./05-routing-service/types.js";
 export * from "./06-budget-service/types.js";
 export * from "./07-escalation-service/types.js";
 export * from "./08-confirmation-service/types.js";
+
+import type { ClassifierIntent, TopicKey } from "../types.js";
+import type {
+  ActionRouterResult,
+  CollisionPolicy,
+  StackClassificationResult,
+  StackQueueItem,
+  WorkerDecision,
+} from "../01-service-stack/types.js";
+import type { DispatchPriority } from "../01-service-stack/06-action-router/types.js";
+import type { DataIngestState } from "./02-data-ingest-service/types.js";
+import type { SystemState } from "./03-state-service/types.js";
+import type { TopicConfig } from "../01-service-stack/03-classifier-service/types.js";
+import type { Thread, ThreadHistory } from "./05-routing-service/types.js";
+import type { OutboundBudgetTracker } from "./06-budget-service/types.js";
+import type { ActiveEscalation, EscalationStatus } from "./07-escalation-service/types.js";
+import type {
+  Confirmation,
+  ConfirmationActionType,
+  ConfirmationResult,
+  ConfirmationsState,
+} from "./08-confirmation-service/types.js";
+import type { DigestDay } from "./01-scheduler-service/types.js";
+
+export interface SchedulerQueueProducer {
+  produceScheduledItems(reference_time: Date): Promise<StackQueueItem[]>;
+}
+
+export interface DataIngestQueueProducer {
+  produceIngestItems(reference_time: Date): Promise<StackQueueItem[]>;
+}
+
+export interface SchedulerService extends SchedulerQueueProducer {
+  reconcileDowntime(since: Date, until: Date): Promise<StackQueueItem[]>;
+  recordDigestDelivery(day: DigestDay): Promise<void>;
+}
+
+export interface DataIngestService extends DataIngestQueueProducer {
+  getIngestState(): Promise<DataIngestState>;
+  updateIngestState(state: DataIngestState): Promise<void>;
+  processForwardedContent(
+    content: string,
+    target_thread: string,
+    created_at: Date,
+  ): Promise<StackQueueItem>;
+}
+
+export interface StateService {
+  getSystemState(): Promise<SystemState>;
+  saveSystemState(state: SystemState): Promise<void>;
+  getThreadHistory(thread_id: string): Promise<ThreadHistory | null>;
+  saveThreadHistory(thread_id: string, history: ThreadHistory): Promise<void>;
+  appendDispatchResult(queue_item: StackQueueItem, action: ActionRouterResult): Promise<void>;
+}
+
+export interface TopicProfileService {
+  getTopicConfig(topic: TopicKey): Promise<TopicConfig>;
+  classifyFallback(
+    queue_item: StackQueueItem,
+    thread_history: ThreadHistory | null,
+  ): Promise<StackClassificationResult>;
+  composeMessage(decision: WorkerDecision): Promise<string>;
+}
+
+export interface RoutingRequest {
+  topic: TopicKey;
+  intent: ClassifierIntent;
+  concerning: string[];
+  origin_thread: string;
+  is_response: boolean;
+}
+
+export interface RoutingService {
+  getThreadDefinitions(): Promise<Thread[]>;
+  resolveTargetThread(request: RoutingRequest): Promise<string>;
+}
+
+export interface BudgetDecision {
+  priority: DispatchPriority;
+  hold_until?: Date;
+  included_queue_item_ids?: string[];
+  reason: string;
+}
+
+export interface BudgetService {
+  getBudgetTracker(): Promise<OutboundBudgetTracker>;
+  evaluateOutbound(
+    queue_item: StackQueueItem,
+    target_thread: string,
+    collision_policy: CollisionPolicy,
+  ): Promise<BudgetDecision>;
+  recordDispatch(queue_item: StackQueueItem, dispatched_at: Date): Promise<void>;
+}
+
+export interface EscalationDecision {
+  should_escalate: boolean;
+  current?: ActiveEscalation;
+  next_action_at?: Date;
+  next_target_thread?: string;
+}
+
+export interface EscalationService {
+  getStatus(): Promise<EscalationStatus>;
+  evaluate(queue_item: StackQueueItem, target_thread: string): Promise<EscalationDecision>;
+  reconcileOnStartup(now: Date): Promise<StackQueueItem[]>;
+}
+
+export interface ConfirmationRequest {
+  type: ConfirmationActionType;
+  action: string;
+  requested_by: string;
+  requested_in_thread: string;
+  expires_at: Date;
+}
+
+export interface ConfirmationService {
+  getState(): Promise<ConfirmationsState>;
+  requiresConfirmation(type: ConfirmationActionType): boolean;
+  openConfirmation(request: ConfirmationRequest): Promise<Confirmation>;
+  resolveFromQueueItem(queue_item: StackQueueItem): Promise<ConfirmationResult | null>;
+  expirePending(now: Date): Promise<Confirmation[]>;
+}

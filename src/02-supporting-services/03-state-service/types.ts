@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { QueueState } from "../../01-service-stack/04-queue/types.js";
 import type { CalendarState } from "../04-topic-profile-service/04.01-calendar/types.js";
 import type { ChoresState } from "../04-topic-profile-service/04.02-chores/types.js";
@@ -19,6 +21,50 @@ import type { EscalationStatus } from "../07-escalation-service/types.js";
 import type { ConfirmationsState } from "../08-confirmation-service/types.js";
 import type { DigestsState } from "../01-scheduler-service/types.js";
 import type { DataIngestState } from "../02-data-ingest-service/types.js";
+
+export const queueStateRecordSchema = z.object({
+  pending: z.array(z.unknown()),
+  recently_dispatched: z.array(z.unknown()),
+});
+
+export const confirmationsStateRecordSchema = z.object({
+  pending: z.array(z.unknown()),
+  recent: z.array(z.unknown()),
+});
+
+export const digestsStateRecordSchema = z.object({
+  history: z.array(z.unknown()),
+});
+
+export const escalationStatusRecordSchema = z.object({
+  active: z.array(z.unknown()),
+});
+
+export const threadHistoryRecordSchema = z.object({
+  active_topic_context: z.string(),
+  last_activity: z.union([z.string(), z.date()]),
+  recent_messages: z.array(z.unknown()),
+});
+
+export const topicRecordSchema = z.record(z.string(), z.unknown());
+
+export const outboundBudgetTrackerRecordSchema = z.object({
+  date: z.union([z.string(), z.date()]),
+  by_person: z.record(z.string(), z.unknown()),
+  by_thread: z.record(z.string(), z.unknown()),
+});
+
+export const dataIngestStateRecordSchema = z.object({
+  email_monitor: z.record(z.string(), z.unknown()),
+  calendar_sync: z.record(z.string(), z.unknown()),
+  forwarded_messages: z.record(z.string(), z.unknown()),
+});
+
+export enum StateSnapshotMode {
+  Empty = "empty",
+  Seed = "seed",
+  Scenario = "scenario",
+}
 
 export interface SystemState {
   metadata: {
@@ -46,4 +92,10 @@ export interface SystemState {
   threads: Record<string, ThreadHistory>;
   data_ingest_state: DataIngestState;
   digests: DigestsState;
+}
+
+export interface StateSnapshotEnvelope {
+  mode: StateSnapshotMode;
+  loaded_at: Date;
+  state: SystemState;
 }

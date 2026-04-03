@@ -1,17 +1,18 @@
-# Step 47 — Scheduled Triggers Connection Documentation
+# Step 47 — External to Ingest Connection Documentation
 
-> Source: src/03-connections/01-inbound-flow/01.3-scheduled-triggers/notes.txt
+> Source: src/03-connections/01-inbound-flow/01.2-external-to-ingest/notes.txt
 
 ## What to Build
 
-- Verify/update scheduled triggers connection documentation
-- Document BullMQ repeatable and delayed jobs feeding the queue
-- Document daily rhythm: morning digest, daytime quiet, evening check-in
-- Document missed-window recovery: scheduler checks relevance on startup
+- Verify/update external-to-ingest connection documentation
+- Document IMAP email monitoring via imapflow
+- Document calendar input through email parsing or conversation (not external calendar API)
+- Document forwarded message handling
+- Document future integration pattern (each produces queue items)
 
 ## Dependencies
 
-Step 5 (Scheduler Service implementation).
+Step 29 (Data Ingest Service implementation).
 
 ## Technologies
 
@@ -19,12 +20,12 @@ Markdown, ASCII diagrams.
 
 ## Files to Create/Modify
 
-- `src/03-connections/01-inbound-flow/01.3-scheduled-triggers/CLAUDE.md` (verify/update)
+- `src/03-connections/01-inbound-flow/01.2-external-to-ingest/CLAUDE.md` (verify/update)
 
 ## Acceptance Criteria
 
-- Timer types documented
-- Daily rhythm described
-- Missed-window recovery noted
+- All ingest sources documented
+- Email monitoring path accurate
+- No external calendar API mentioned
 
 ---

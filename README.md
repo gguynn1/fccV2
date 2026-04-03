@@ -24,6 +24,9 @@ Internet
   ├── Twilio webhook POST ──→ ngrok ──→ localhost:3000/webhook/twilio
   ├── Calendar app GET ──────→ ngrok ──→ localhost:3000/caldav/*
   │
+Local network only (never exposed through ngrok)
+  └── Browser ───────────────────────→ localhost:3000/admin
+                                       (system configuration dashboard)
 Local machine (outbound)
   ├──→ Twilio REST API (send messages)
   ├──→ Anthropic Claude API (LLM)
@@ -98,6 +101,11 @@ npm run lint:fix       # ESLint + Prettier with auto-fix
 npm run format         # Format all files with Prettier
 npm run format:check   # Check formatting without writing
 npm test               # Run tests (stub until Vitest is wired)
+
+# Admin UI
+npm run ui:dev         # Vite dev server (port 5173, proxies API to :3000)
+npm run ui:build       # Build production bundle to ui/dist/
+npm run ui:preview     # Preview production build locally
 ```
 
 Typical first-boot workflow:
@@ -352,17 +360,27 @@ src/
 ├── 03-connections/         Documentation only — how services interact
 ├── types.ts                Shared vocabulary enums (TopicKey, EscalationLevel, etc.)
 └── index.ts                Barrel exports + SystemConfig interface
+
+ui/                         Admin UI — React SPA served by Fastify at /admin
+├── src/                    Components, routes, hooks
+├── vite.config.ts          Vite build config (proxies /api to Fastify in dev)
+└── package.json            Separate dependency tree from the backend
 ```
 
-Each numbered folder is a bounded service with its own `CLAUDE.md` (behavior docs), `types.ts` (owned types), and `notes.txt` (technology notes).
+Each numbered folder under `src/` is a bounded service with its own `CLAUDE.md` (behavior docs), `types.ts` (owned types), and `notes.txt` (technology notes).
+
+The `ui/` directory is a standalone React project. In production, Fastify serves the built bundle as static files at `/admin`. During development, the Vite dev server runs on port 5173 and proxies API calls to Fastify on port 3000.
 
 ## Scripts
 
-| Script              | Purpose                             |
-| ------------------- | ----------------------------------- |
-| `npm run build`     | Compile TypeScript to `dist/`       |
-| `npm run typecheck` | Type check without emitting         |
-| `npm run lint`      | ESLint + Prettier check             |
-| `npm run lint:fix`  | Auto-fix lint issues                |
-| `npm run format`    | Format with Prettier                |
-| `npm test`          | Run tests (Vitest, once configured) |
+| Script              | Purpose                                             |
+| ------------------- | --------------------------------------------------- |
+| `npm run build`     | Compile TypeScript to `dist/`                       |
+| `npm run typecheck` | Type check without emitting                         |
+| `npm run lint`      | ESLint + Prettier check                             |
+| `npm run lint:fix`  | Auto-fix lint issues                                |
+| `npm run format`    | Format with Prettier                                |
+| `npm test`          | Run tests (Vitest, once configured)                 |
+| `npm run ui:dev`    | Start admin UI dev server (Vite, port 5173)         |
+| `npm run ui:build`  | Build admin UI production bundle to `ui/dist/`      |
+| `npm run ui:preview`| Preview admin UI production build                   |

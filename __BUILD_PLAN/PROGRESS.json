@@ -1,5 +1,5 @@
 {
-  "current_step": "step-01",
+  "current_step": "step-07",
   "status_notes": {
     "step-00-part-1": {
       "updated_at": "2026-04-03T13:55:03Z",
@@ -63,18 +63,101 @@
         "IMAP credentials still deferred; listener currently skips when placeholders are present"
       ],
       "next_action": "Proceed to step-01."
+    },
+    "step-01": {
+      "updated_at": "2026-04-03T14:18:04Z",
+      "checks_completed": [
+        "stack-level service contracts added in src/01-service-stack/types.ts",
+        "queue item zod schema enforces required fields (source, content, concerning, target_thread, created_at)",
+        "action router result discriminated union covers dispatch, hold, and store decisions",
+        "worker decision contracts include clarification request for unresolved actions",
+        "npm run typecheck passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-02."
+    },
+    "step-02": {
+      "updated_at": "2026-04-03T14:25:34Z",
+      "checks_completed": [
+        "supporting service contracts added in src/02-supporting-services/types.ts",
+        "typed interfaces defined for scheduler, data ingest, state, topic profile, routing, budget, escalation, and confirmation services",
+        "queue producer interfaces defined for scheduler and data ingest",
+        "worker-facing contracts import shared enums and stack contracts without implementation coupling",
+        "npm run typecheck passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-03."
+    },
+    "step-03": {
+      "updated_at": "2026-04-03T14:33:31Z",
+      "checks_completed": [
+        "state service schemas added for queue, confirmations, digests, escalation status, thread history, budget tracker, topic records, and ingest state",
+        "sqlite state service implemented with WAL mode, schema-versioned migrations, zod validation, and pino audit logging",
+        "migration strategy implemented with numbered SQL files under src/02-supporting-services/03-state-service/migrations",
+        "bootstrap seeding now uses state service snapshot loading (seed mode)",
+        "database verified in WAL mode with all required state/topic tables present",
+        "seed load verified via npm run start:seed",
+        "scenario snapshot loading verified via StateSnapshotMode.Scenario",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-04."
+    },
+    "step-04": {
+      "updated_at": "2026-04-03T14:42:01Z",
+      "checks_completed": [
+        "queue zod schemas added with required source/content/concerning/target_thread/created_at and optional topic/intent/idempotency_key/clarification_of",
+        "bullmq queue service implemented with producer/consumer interfaces in src/01-service-stack/04-queue/index.ts",
+        "pre-enqueue validation and pre-consumption validation enforced with zod",
+        "idempotency safeguards implemented for enqueue-time duplicate suppression and startup deduplication",
+        "startup stale detection implemented with silent log-and-remove behavior",
+        "retry configured with exponential backoff and exhausted items moved to dead-letter queue",
+        "runtime verification: queue connected, stale removed, retries observed, dead-letter queue populated",
+        "npm run typecheck passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-05."
+    },
+    "step-05": {
+      "updated_at": "2026-04-03T14:42:01Z",
+      "checks_completed": [
+        "scheduler contracts expanded with scheduled event types and startup recovery result",
+        "scheduler service implemented with bullmq repeatable jobs for morning digest and evening check-in",
+        "digest eligibility rules applied in queue item production (exclude stale, suppress repeats, include unresolved)",
+        "startup missed-window recovery implemented with relevance-window adaptation/skip logic",
+        "all scheduler-produced items validated against pending queue item schema",
+        "runtime verification: repeatable jobs registered and scheduler output validated",
+        "npm run typecheck passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-06."
+    },
+    "step-06": {
+      "updated_at": "2026-04-03T14:42:01Z",
+      "checks_completed": [
+        "identity service types expanded with identity resolution result and zod entity schemas",
+        "identity service implementation added with sender-to-entity resolution and thread membership lookups",
+        "entity registry loads from system configuration and validates malformed records at load time",
+        "pet messaging identity invariant enforced (pet entities must not have messaging identity)",
+        "runtime verification: participant_1/2/3 identities resolve with correct entity types and permissions",
+        "runtime verification: malformed entity config fails fast via zod",
+        "npm run typecheck passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-07."
     }
   },
   "steps": {
     "step-00-part-1": { "status": "complete", "completed_at": "2026-04-03T13:55:03Z" },
     "step-00-part-2": { "status": "complete", "completed_at": "2026-04-03T13:58:35Z" },
     "step-00-part-3": { "status": "complete", "completed_at": "2026-04-03T14:03:41Z" },
-    "step-01": { "status": "pending" },
-    "step-02": { "status": "pending" },
-    "step-03": { "status": "pending" },
-    "step-04": { "status": "pending" },
-    "step-05": { "status": "pending" },
-    "step-06": { "status": "pending" },
+    "step-01": { "status": "complete", "completed_at": "2026-04-03T14:18:04Z" },
+    "step-02": { "status": "complete", "completed_at": "2026-04-03T14:25:34Z" },
+    "step-03": { "status": "complete", "completed_at": "2026-04-03T14:33:31Z" },
+    "step-04": { "status": "complete", "completed_at": "2026-04-03T14:42:01Z" },
+    "step-05": { "status": "complete", "completed_at": "2026-04-03T14:42:01Z" },
+    "step-06": { "status": "complete", "completed_at": "2026-04-03T14:42:01Z" },
     "step-07": { "status": "pending" },
     "step-08": { "status": "pending" },
     "step-09": { "status": "pending" },
@@ -122,6 +205,7 @@
     "step-51": { "status": "pending" },
     "step-52": { "status": "pending" },
     "step-53": { "status": "pending" },
-    "step-54": { "status": "pending" }
+    "step-54": { "status": "pending" },
+    "step-55": { "status": "pending" }
   }
 }

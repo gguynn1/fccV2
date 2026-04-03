@@ -1,3 +1,5 @@
+import type { PendingQueueItem } from "../../01-service-stack/04-queue/types.js";
+
 export interface DigestScheduleBlock {
   description: string;
   times: Record<string, string | null>;
@@ -32,4 +34,32 @@ export interface DigestDay {
 
 export interface DigestsState {
   history: DigestDay[];
+}
+
+export enum ScheduledEventType {
+  MorningDigest = "morning_digest",
+  EveningCheckin = "evening_checkin",
+  ReminderTimer = "reminder_timer",
+  FollowUpWindow = "follow_up_window",
+  EscalationDeadline = "escalation_deadline",
+  BillDueDateAlert = "bill_due_date_alert",
+  RelationshipNudgeCooldown = "relationship_nudge_cooldown",
+}
+
+export interface DigestWindowDefinition {
+  key: ScheduledEventType.MorningDigest | ScheduledEventType.EveningCheckin;
+  at: string;
+  timezone: string;
+}
+
+export interface ScheduledEvent {
+  id: string;
+  type: ScheduledEventType;
+  due_at: Date;
+  payload: Record<string, unknown>;
+}
+
+export interface SchedulerStartupRecoveryResult {
+  produced: PendingQueueItem[];
+  skipped_stale: number;
 }

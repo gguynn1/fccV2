@@ -70,6 +70,7 @@ export const systemState: SystemState = {
             details: "Topic selection due by April 5, full project April 10",
           },
         },
+        target_thread: "participant_3_private",
         created_at: new Date("2026-04-02T13:45:00-07:00"),
         status: QueuePendingStatus.PendingClassification,
       },

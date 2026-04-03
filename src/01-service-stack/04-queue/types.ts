@@ -1,5 +1,7 @@
-import type { TopicKey, ClassifierIntent } from "../../types.js";
-import type { DispatchPriority } from "../06-action-router/types.js";
+import { z } from "zod";
+
+import { ClassifierIntent, TopicKey } from "../../types.js";
+import { DispatchPriority } from "../06-action-router/types.js";
 
 export enum QueueItemType {
   Outbound = "outbound",
@@ -12,6 +14,7 @@ export enum QueueItemSource {
   ForwardedMessage = "forwarded_message",
   ImageAttachment = "image_attachment",
   EmailMonitor = "email_monitor",
+  DataIngest = "data_ingest",
   InternalStateChange = "internal_state_change",
   ScheduledTrigger = "scheduled_trigger",
   CrossTopic = "cross_topic",
@@ -39,7 +42,7 @@ export interface PendingQueueItem {
   concerning: string[];
   content: string | InboundEmailContent;
   priority?: DispatchPriority;
-  target_thread?: string;
+  target_thread: string;
   created_at: Date;
   hold_until?: Date;
   status?: QueuePendingStatus;
@@ -62,4 +65,69 @@ export interface DispatchedQueueItem {
 export interface QueueState {
   pending: PendingQueueItem[];
   recently_dispatched: DispatchedQueueItem[];
+}
+
+const queueDateSchema = z.preprocess((value) => {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  return value;
+}, z.date());
+
+export const inboundEmailContentSchema = z.object({
+  from: z.string().min(1),
+  subject: z.string().min(1),
+  extracted: z.record(z.string(), z.string()),
+});
+
+export const pendingQueueItemSchema = z.object({
+  id: z.string().min(1),
+  source: z.nativeEnum(QueueItemSource),
+  type: z.nativeEnum(QueueItemType),
+  topic: z.nativeEnum(TopicKey).optional(),
+  intent: z.nativeEnum(ClassifierIntent).optional(),
+  concerning: z.array(z.string().min(1)).min(1),
+  content: z.union([z.string().min(1), inboundEmailContentSchema]),
+  priority: z.nativeEnum(DispatchPriority).optional(),
+  target_thread: z.string().min(1),
+  created_at: queueDateSchema,
+  hold_until: queueDateSchema.optional(),
+  status: z.nativeEnum(QueuePendingStatus).optional(),
+  idempotency_key: z.string().min(1).optional(),
+  clarification_of: z.string().min(1).optional(),
+});
+
+export const dispatchedQueueItemSchema = z.object({
+  id: z.string().min(1),
+  topic: z.nativeEnum(TopicKey),
+  target_thread: z.string().min(1),
+  content: z.string().min(1),
+  dispatched_at: queueDateSchema,
+  priority: z.nativeEnum(DispatchPriority),
+  included_in: z.string().optional(),
+  response_received: z.boolean().optional(),
+  escalation_step: z.number().int().nonnegative().optional(),
+});
+
+export const queueStateSchema = z.object({
+  pending: z.array(pendingQueueItemSchema),
+  recently_dispatched: z.array(dispatchedQueueItemSchema),
+});
+
+export type PendingQueueItemInput = z.input<typeof pendingQueueItemSchema>;
+
+export interface QueueRetryPolicy {
+  attempts: number;
+  backoff_ms: number;
+}
+
+export interface QueueConsumerOptions {
+  concurrency: number;
+  retry: QueueRetryPolicy;
 }

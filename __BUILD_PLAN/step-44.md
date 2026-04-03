@@ -1,29 +1,30 @@
-# Step 44 — Inbound Flow Documentation
+# Step 44 — Connections Documentation Framework
 
-> Source: src/03-connections/01-inbound-flow/notes.txt
+> Source: src/03-connections/notes.txt
 
 ## What to Build
 
-- Verify/update inbound flow documentation showing three doors: phone messages, email parsing, scheduled triggers
-- Document how each input path produces queue items
-- Ensure flow diagrams match Transport, Data Ingest, and Scheduler implementations
+- Verify/update the connection documentation in `src/03-connections/` to accurately reflect the implemented services
+- Cross-check all ASCII flow diagrams against actual service interfaces
+- Ensure terminology aligns with `src/types.ts` and architecture rules
+- No runtime code — documentation only
 
 ## Dependencies
 
-Steps 5, 7, 29 (Scheduler, Transport, Data Ingest implementations).
+All service stack and supporting service steps complete.
 
 ## Technologies
 
-Markdown, ASCII diagrams.
+Markdown, ASCII flow diagrams.
 
 ## Files to Create/Modify
 
-- `src/03-connections/01-inbound-flow/CLAUDE.md` (verify/update)
+- `src/03-connections/CLAUDE.md` (verify/update)
 
 ## Acceptance Criteria
 
-- Three input paths documented accurately
-- Queue item production described
-- Diagrams match implementation
+- All diagrams match implemented reality
+- Terminology consistent with `types.ts`
+- No runtime code in this folder
 
 ---

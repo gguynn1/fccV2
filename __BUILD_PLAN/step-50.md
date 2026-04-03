@@ -1,18 +1,17 @@
-# Step 50 — Queue to Worker Flow Documentation
+# Step 50 — Transport-Identity-Classifier Flow Documentation
 
-> Source: src/03-connections/02-processing-flow/02.2-queue-to-worker/notes.txt
+> Source: src/03-connections/02-processing-flow/02.1-transport-identity-classifier/notes.txt
 
 ## What to Build
 
-- Verify/update Queue → Worker flow documentation
-- Document single-queue principle: one funnel for all sources
-- Document BullMQ backed by Redis with AOF persistence
-- Document worker pull model: one item at a time
-- Document retry behavior and dead-letter queue
+- Verify/update Transport → Identity → Classifier flow documentation
+- Document transport as Twilio input normalization
+- Document identity as typed sender resolution mapping to entity
+- Document classification as Claude API topic/intent output with Zod validation
 
 ## Dependencies
 
-Steps 4, 30 (Queue and Worker implementations).
+Steps 6, 7, 9 (Identity, Transport, Classifier implementations).
 
 ## Technologies
 
@@ -20,12 +19,11 @@ Markdown, ASCII diagrams.
 
 ## Files to Create/Modify
 
-- `src/03-connections/02-processing-flow/02.2-queue-to-worker/CLAUDE.md` (verify/update)
+- `src/03-connections/02-processing-flow/02.1-transport-identity-classifier/CLAUDE.md` (verify/update)
 
 ## Acceptance Criteria
 
-- Single-funnel principle documented
-- Retry and dead-letter described
-- BullMQ/Redis path accurate
+- Three-step flow documented accurately
+- Outputs aligned with `src/types.ts` enums
 
 ---

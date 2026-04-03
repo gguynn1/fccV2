@@ -1,11 +1,12 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { Queue, Worker, type ConnectionOptions } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import { ImapFlow } from "imapflow";
 import { pino } from "pino";
 import type BetterSqlite3 from "better-sqlite3";
 
 import { loadEnv } from "./env.js";
 import { initializeDatabase } from "./bootstrap.js";
+import { toRedisConnection } from "./lib/redis.js";
 
 const logger = pino({ name: "fcc-server" });
 
@@ -20,20 +21,6 @@ interface RuntimeHandles {
   scheduler: SchedulerHandle;
   imapClient: ImapFlow | null;
   db: BetterSqlite3.Database;
-}
-
-function toRedisConnection(redisUrl: string): ConnectionOptions {
-  const parsed = new URL(redisUrl);
-  const db = parsed.pathname.length > 1 ? Number(parsed.pathname.slice(1)) : 0;
-
-  return {
-    host: parsed.hostname,
-    port: Number(parsed.port || "6379"),
-    username: parsed.username || undefined,
-    password: parsed.password || undefined,
-    db: Number.isNaN(db) ? 0 : db,
-    tls: parsed.protocol === "rediss:" ? {} : undefined,
-  };
 }
 
 async function verifyRedisAof(queue: Queue): Promise<void> {

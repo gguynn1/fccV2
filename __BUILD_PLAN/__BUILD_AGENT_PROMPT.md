@@ -97,7 +97,8 @@ Read all 11 files before writing any code on your first step. On subsequent step
     "step-51": { "status": "pending" },
     "step-52": { "status": "pending" },
     "step-53": { "status": "pending" },
-    "step-54": { "status": "pending" }
+    "step-54": { "status": "pending" },
+    "step-55": { "status": "pending" }
   }
 }
 ```
@@ -114,7 +115,7 @@ Update `current_step` to the next pending step after marking one complete.
 
 Execute steps in this exact order:
 
-step-00-part-1 → step-00-part-2 → step-00-part-3 → step-01 → step-02 → step-03 → step-04 → step-05 → step-06 → step-07 → step-08 → step-09 → step-10 → step-11 → step-12 → step-13 → step-14 → step-15 → step-16 → step-17 → step-18 → step-19 → step-20 → step-21 → step-22 → step-23 → step-24 → step-25 → step-26 → step-27 → step-28 → step-29 → step-30 → step-31 → step-32 → step-33 → step-34 → step-35 → step-36 → step-37 → step-38 → step-39 → step-40 → step-41 → step-42 → step-43 → step-44 → step-45 → step-46 → step-47 → step-48 → step-49 → step-50 → step-51 → step-52 → step-53 → step-54
+step-00-part-1 → step-00-part-2 → step-00-part-3 → step-01 → step-02 → step-03 → step-04 → step-05 → step-06 → step-07 → step-08 → step-09 → step-10 → step-11 → step-12 → step-13 → step-14 → step-15 → step-16 → step-17 → step-18 → step-19 → step-20 → step-21 → step-22 → step-23 → step-24 → step-25 → step-26 → step-27 → step-28 → step-29 → step-30 → step-31 → step-32 → step-33 → step-34 → step-35 → step-36 → step-37 → step-38 → step-39 → step-40 → step-41 → step-42 → step-43 → step-44 → step-45 → step-46 → step-47 → step-48 → step-49 → step-50 → step-51 → step-52 → step-53 → step-54 → step-55
 
 ## Hard Rules
 
