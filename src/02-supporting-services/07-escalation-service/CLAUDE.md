@@ -20,7 +20,7 @@ or "no escalation for this topic"
 Different topics escalate differently. Some push hard. Some don't push at all.
 
 ```
-HIGH ACCOUNTABILITY — chores, bills
+HIGH ACCOUNTABILITY — chores, finances
 
   First:   message to the responsible person
            in their private thread
@@ -31,7 +31,7 @@ HIGH ACCOUNTABILITY — chores, bills
   Finally: flagged as unresolved in the
            next digest
 
-MEDIUM ACCOUNTABILITY — school, health, calendar
+MEDIUM ACCOUNTABILITY — school, health, calendar, travel
 
   First:   message to the responsible person
   Then:    one follow-up reminder
@@ -39,7 +39,7 @@ MEDIUM ACCOUNTABILITY — school, health, calendar
            no thread escalation unless
            a hard deadline is imminent
 
-LOW ACCOUNTABILITY — relationship, pets, family status
+LOW ACCOUNTABILITY — relationship, pets, family status, maintenance
 
   First:   send once
   Then:    if ignored, quietly disappear
@@ -47,6 +47,11 @@ LOW ACCOUNTABILITY — relationship, pets, family status
            with something different
            never pressure, never escalate
            never follow up
+
+NO ESCALATION — grocery, vendors, business, meals
+
+  Send once or store silently
+  No follow-up
 ```
 
 ## Silence Handling

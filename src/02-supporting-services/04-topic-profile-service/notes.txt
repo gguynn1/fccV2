@@ -12,7 +12,7 @@ Recommended tools/dependencies:
 - `prettier` to keep docs and source formatting consistent.
 - `vitest` for fixture-driven verification where the scope has behavior worth testing.
 - Per-topic fixtures that prove behavior differences stay intentional.
-- A scenario matrix that checks profile outputs across all 12 topics.
+- A scenario matrix that checks profile outputs across all 14 topics.
 
 Technologies and integrations:
 - Topic profiles should live as strict TypeScript definitions keyed by shared `TopicKey` values.

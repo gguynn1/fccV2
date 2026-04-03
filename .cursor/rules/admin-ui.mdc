@@ -63,7 +63,7 @@ Topics are broadly editable through the UI: enabled/disabled toggle, tone, forma
 | Components     | shadcn/ui (Radix + Tailwind) | No raw HTML buttons, inputs, selects, or dialogs. Always use the shadcn primitive.                               |
 | Build          | Vite                         |                                                                                                                  |
 | Data fetching  | TanStack Query               | Polling via `refetchInterval` for live data                                                                      |
-| Form handling  | React Hook Form + Zod        | Inline editing wired through RHF for validation                                                                  |
+| Validation     | Zod                          | Schema validation for inline editing                                                                             |
 | Routing        | React Router (hash mode)     | Single Fastify catch-all serves the SPA                                                                          |
 | Schema sharing | TypeScript path aliases      | UI tsconfig maps `@backend/*` to `../src/*`. Vite resolves via alias config. No shared package, no type copying. |
 

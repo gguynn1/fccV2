@@ -2,7 +2,7 @@
 
 What tone, format, initiative style?
 
-## Step 6 — Apply the Topic Behavior Profile
+## Step 7 — Apply the Topic Behavior Profile
 
 ```
 Tone ---------> direct, warm, factual,

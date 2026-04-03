@@ -31,4 +31,8 @@ Every outbound message is one of three priority levels:
 
 ## Collision Avoidance
 
-Before dispatching any outbound message, the worker checks what else is pending or recently sent for the same person or thread. If multiple items would stack up, it batches them into one combined message. If someone has already received several messages today, non-urgent items hold until tomorrow's digest. The goal is that no one ever feels bombarded.
+Before dispatching any outbound message, the budget service checks what else is pending or recently sent for the same person or thread. If multiple items would stack up, it batches them into one combined message. If someone has already received several messages today, non-urgent items hold until tomorrow's digest. The goal is that no one ever feels bombarded.
+
+## Counter Reconstruction
+
+If Redis budget counters are lost (despite AOF), the budget service reconstructs them from `recently_dispatched` records in SQLite. This prevents duplicate sends after a Redis crash or data loss.

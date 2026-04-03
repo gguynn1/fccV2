@@ -382,12 +382,14 @@ export class DataIngestService implements DataIngestServiceContract {
         messages: [
           {
             role: "user",
-            content: `Extract the relevant Family Command Center facts as JSON.\n\n${JSON.stringify({
-              origin: envelope.origin,
-              from: envelope.from,
-              subject: envelope.subject,
-              content: envelope.content,
-            })}`,
+            content: `Extract the relevant Family Command Center facts as JSON.\n\n${JSON.stringify(
+              {
+                origin: envelope.origin,
+                from: envelope.from,
+                subject: envelope.subject,
+                content: envelope.content,
+              },
+            )}`,
           },
         ],
       });

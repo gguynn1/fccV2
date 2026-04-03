@@ -21,7 +21,7 @@ Email (IMAP via imapflow) connects to existing family inboxes — no new subscri
 | Runtime                   | Node.js (LTS) + TypeScript (strict, ESM)                                                         |
 | HTTP server               | Fastify — Twilio webhooks on localhost:3000; CalDAV on a separate local-only port (default 3001) |
 | Queue + scheduling        | BullMQ backed by Redis (AOF persistence required)                                                |
-| Persistence               | SQLite via better-sqlite3 (or Drizzle ORM) — WAL mode required                                   |
+| Persistence               | SQLite via better-sqlite3 — WAL mode required                                                    |
 | Calendar serving          | Local CalDAV endpoint — the system serves events outward; calendar apps subscribe to it          |
 | Rate limiting / counters  | Redis (shared instance with BullMQ)                                                              |
 | Escalation state machines | XState v5                                                                                        |

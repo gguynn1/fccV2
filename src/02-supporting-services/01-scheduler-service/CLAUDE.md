@@ -2,14 +2,19 @@
 
 Runs independently on a timer
 
-Maintains all scheduled events:
-morning digests
-evening check-ins
-reminder timers
-follow-up windows
-escalation deadlines
+Maintains scheduled events:
+
+Implemented:
+morning digests (BullMQ repeatable cron job)
+evening check-ins (BullMQ repeatable cron job)
+
+Design intent (not yet wired through this service):
+reminder timers — currently managed by escalation service timers
+follow-up windows — currently managed by escalation service timers
+escalation deadlines — currently managed by escalation service timers
+confirmation expiry — currently managed by confirmation service timers
 relationship nudge cooldowns
-bill due date alerts
+financial due date alerts
 
 When a trigger fires:
 creates a queue item

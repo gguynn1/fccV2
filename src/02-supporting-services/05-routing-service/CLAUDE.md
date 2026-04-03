@@ -19,6 +19,10 @@ Returns: target thread ID
 
 When both rules apply to the same event — someone says something in a group thread that will later need a proactive follow-up — Rule 1 handles the immediate reply and Rule 2 handles any future outbound.
 
+## Context Transition
+
+The routing service tracks active topic context per thread and detects when the conversation has shifted. A topic reset happens when the thread has been idle for 90 minutes, or when the new message's classified topic differs from the thread's active context, or when an explicit switch signal is detected. This prevents stale context from influencing routing or composition.
+
 ## Thread Map
 
 Thread membership is defined in the system configuration. Each thread has an explicit participant list and type (private or shared). The routing service reads the thread definitions and applies the two routing rules to determine the target thread.

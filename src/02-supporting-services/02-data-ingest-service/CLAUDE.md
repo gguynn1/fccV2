@@ -1,9 +1,8 @@
 # Data Ingest Service
 
 Watches external sources independently:
-monitored inboxes
-calendar connectors
-future external feeds
+monitored inboxes (IMAP polling)
+forwarded messages (parsed by transport, classified here)
 
 When something relevant arrives:
 extracts content
@@ -26,14 +25,6 @@ MONITORED INBOX
     Same queue, same worker,
     same dispatch rules
 
-CALENDAR CONNECTOR
-  Events added or changed externally
-  Detected, queued as a calendar topic item
-         |
-         v
-    Same queue, same worker,
-    same dispatch rules
-
 FORWARDED MESSAGES
   A family member forwards a message or
   image to the assistant's messaging identity
@@ -43,13 +34,11 @@ FORWARDED MESSAGES
     Same queue, same worker,
     same dispatch rules
 
-FUTURE INTEGRATIONS
-  Financial alerts
-  School systems
-  Care-provider systems
-  Weather alerts
-  Delivery updates
-  Each one just produces queue items
+FUTURE DATA SOURCES
+  Any new source feeds the queue via
+  email parsing, conversational input,
+  or a local adapter — never a paid
+  third-party API without explicit discussion
          |
          v
     Same queue, same worker,

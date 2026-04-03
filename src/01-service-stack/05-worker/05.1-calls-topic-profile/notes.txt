@@ -16,4 +16,4 @@ Recommended tools/dependencies:
 Technologies and integrations:
 - This call depends on the topic-profile service contract and `TopicKey` shared vocabulary.
 - Anthropic Claude API composition should consume the returned profile fields rather than inventing tone from scratch.
-- Vitest snapshots or fixtures are useful for comparing profile-shaped outputs across all 12 topics.
+- Vitest snapshots or fixtures are useful for comparing profile-shaped outputs across all 14 topics.

@@ -12,7 +12,7 @@ Batched ------------> hold for next digest
 Silent -------------> store only, no send
 ```
 
-## Step 5 — Collision Check
+## Collision Check (part of step 4 + action router at step 8)
 
 ```
 Nothing else pending --> dispatch

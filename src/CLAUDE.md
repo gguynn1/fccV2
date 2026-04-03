@@ -12,7 +12,7 @@ Root of the system architecture. Contains configuration, state, and all service 
 
 `types.ts` defines cross-cutting enums that belong to no single service:
 
-- **TopicKey** — The 12 topic classifications used system-wide
+- **TopicKey** — The 14 topic classifications used system-wide
 - **EscalationLevel** — Severity levels for escalation paths
 - **GrocerySection** — Categorization for the grocery list
 - **InputMethod** — How input was received (text, image)

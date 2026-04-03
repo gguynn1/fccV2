@@ -11,6 +11,7 @@ which thread to confirm in
 
 When a response arrives that matches a pending confirmation:
 resolves it as approved or rejected
+rejects replies arriving from a different thread than the originating thread (wrong-thread safety)
 
 When a timer expires:
 marks it expired

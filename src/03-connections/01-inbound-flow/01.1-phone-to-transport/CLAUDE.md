@@ -34,4 +34,4 @@ Transport is responsible for recognizing and normalizing:
 
 ## Identity after Transport
 
-Identity maps the sender **messaging identity** to an `EntityType` (adult / child / pet), permissions, and **target_thread**. Pets do not carry personal messaging identities; rules in Identity enforce invariants from configuration.
+Pre-enqueue identity maps the sender **messaging identity** to an **entity id** and **target_thread**. This is a lightweight lookup inside the Transport layer, not a full Identity Service call. Full identity resolution — `EntityType`, permissions, thread memberships — happens post-dequeue in Worker step 2. Pets do not carry personal messaging identities; rules in Identity enforce invariants from configuration.

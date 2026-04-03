@@ -100,7 +100,7 @@ npm run lint           # Lint backend + admin UI and run Prettier check
 npm run lint:fix       # Auto-fix backend + admin UI lint issues, then format
 npm run format         # Format all files with Prettier
 npm run format:check   # Check formatting without writing
-npm test               # Run tests (stub until Vitest is wired)
+npm test               # Run tests (Vitest)
 
 # Admin UI
 npm run ui:dev         # Vite dev server (port 5173, proxies API to :3000)
@@ -359,7 +359,7 @@ See `.env.example` for the full list. Key variables:
 
 ```
 src/
-├── 01-service-stack/       Core pipeline (Transport → Identity → Classifier → Queue → Worker → Action Router)
+├── 01-service-stack/       Core pipeline (Transport → Identity → Queue → Worker → Action Router)
 ├── 02-supporting-services/ Services called by the Worker or feeding the Queue
 ├── 03-connections/         Documentation only — how services interact
 ├── types.ts                Shared vocabulary enums (TopicKey, EscalationLevel, etc.)

@@ -34,7 +34,7 @@ The ngrok tunnel is a public internet endpoint. Only services with their own aut
 | Twilio webhooks          | Yes                         | Twilio signs every request; the transport layer validates the signature and rejects forgeries                       |
 | Health check (`/health`) | Yes                         | Returns no data, no side effects                                                                                    |
 | CalDAV endpoint          | **No** — local network only | No authentication layer; exposes calendar data for all entities. Served on a separate port that ngrok never tunnels |
-| Admin UI (future)        | **No** — local network only | Would expose system state and controls without auth                                                                 |
+| Admin UI                 | **No** — local network only | Exposes system state and controls without auth; tunnel requests to `/admin` and `/api/admin/*` are rejected          |
 
 ### Rules
 

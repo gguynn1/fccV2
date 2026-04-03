@@ -2,7 +2,7 @@
 
 At the top are the people. At the bottom is storage. Everything in between is the engine.
 
-The simplest possible architecture that delivers Family Command Center outcomes through native text messaging. No apps to install. No channels to manage. No dashboards. Just one messaging address the family can message, optimized for phone-native texting.
+The simplest possible architecture that delivers Family Command Center outcomes through native text messaging. No apps to install. No channels to manage. Just one messaging address the family can message, optimized for phone-native texting. A separate local-only admin UI exists for operator configuration — it is not part of the messaging experience.
 
 Every family member has the assistant saved as a contact on their PHONE. The assistant has one shared messaging identity and no name.
 
@@ -80,17 +80,10 @@ TRANSPORT LAYER
          |  outbound messages flow up
          |
          v
-IDENTITY SERVICE
+IDENTITY (lightweight)
          |
-         |  "an adult entity said this
-         |   in a shared thread"
-         |
-         v
-CLASSIFIER SERVICE
-         |
-         |  "this is a calendar request
-         |   about a vet appointment
-         |   involving PET"
+         |  maps messaging identity
+         |  to entity id + thread id
          |
          v
 THE QUEUE
@@ -101,11 +94,22 @@ THE QUEUE
          v
 WORKER
          |
-         |--- calls TOPIC PROFILE SERVICE
-         |--- calls ROUTING SERVICE
-         |--- calls BUDGET SERVICE
-         |--- calls ESCALATION SERVICE
-         |--- calls CONFIRMATION SERVICE
+         |--- step 1: CLASSIFIER SERVICE
+         |      "this is a calendar request
+         |       about a vet appointment
+         |       involving PET"
+         |--- step 2: IDENTITY SERVICE
+         |      entity type, permissions,
+         |      thread memberships
+         |--- step 3: determine action type
+         |--- step 4: BUDGET SERVICE
+         |--- step 5: ESCALATION SERVICE
+         |--- step 6: CONFIRMATION SERVICE
+         |--- step 7: TOPIC PROFILE SERVICE
+         |--- step 8: ROUTING SERVICE
+         |--- reads/writes STATE SERVICE
+         |--- re-enqueues cross-topic items via QUEUE
+         |--- sends outbound via TRANSPORT
          |
          |  once all decisions are made
          |
@@ -138,7 +142,7 @@ Every source of information flows through the same queue, same worker, same disp
 
 The design is testable. Every behavior maps to a scenario that can be generated, evaluated, and used to refine the model.
 
-One phone number. One queue. One set of rules. Infinite scenarios to prove it.
+One messaging identity. One queue. One set of rules. Infinite scenarios to prove it.
 
 ## Scenario Testing Framework
 

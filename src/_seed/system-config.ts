@@ -657,7 +657,7 @@ export const systemConfig: SystemConfig = {
         step: 1,
         action: WorkerAction.ClassifyTopic,
         service: WorkerService.Classifier,
-        description: "Determine which of the 12 topics this item belongs to.",
+        description: "Determine which of the 14 topics this item belongs to.",
       },
       {
         step: 2,

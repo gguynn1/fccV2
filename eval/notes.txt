@@ -1,3 +1,5 @@
+Design specification — not yet implemented. See __BUILD_PLAN/TODO.md (TODO-01) for status.
+
 Eval and Auto-Tuning Utility
 
 Core Idea
