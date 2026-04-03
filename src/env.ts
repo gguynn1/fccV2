@@ -20,6 +20,11 @@ const envSchema = z.object({
   PORT: z.string().optional(),
   CALDAV_PORT: z.string().optional(),
   PUBLIC_BASE_URL: z.string().url().optional(),
+  IMAP_HOST: z.string().optional(),
+  IMAP_PORT: z.string().optional(),
+  IMAP_USER: z.string().optional(),
+  IMAP_PASSWORD: z.string().optional(),
+  IMAP_MAILBOX: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

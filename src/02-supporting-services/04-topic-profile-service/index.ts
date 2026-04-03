@@ -106,7 +106,16 @@ export class StaticTopicProfileService {
       typeof decision.queue_item.content === "string"
         ? decision.queue_item.content
         : JSON.stringify(decision.queue_item.content);
-    return Promise.resolve(`[${profile.tone}] ${content}`);
+    const framing = [
+      `Tone: ${profile.tone}.`,
+      `Format: ${profile.format}.`,
+      `Initiative: ${profile.initiative_style}.`,
+      `Response shape: ${profile.response_format}.`,
+    ];
+    if (profile.framework_grounding) {
+      framing.push(`Grounding: ${profile.framework_grounding}.`);
+    }
+    return Promise.resolve(`${framing.join(" ")} Content: ${content}`);
   }
 
   private toTopicFromThread(threadHistory: ThreadHistory | null): TopicKey {

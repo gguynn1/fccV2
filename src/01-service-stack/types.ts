@@ -9,17 +9,21 @@ import { z } from "zod";
 
 import { ClassifierIntent, TopicKey } from "../types.js";
 import type { ClarificationReason } from "../types.js";
-import type { CollisionPrecedence, DispatchPriority } from "./06-action-router/types.js";
-import { QueueItemSource } from "./04-queue/types.js";
+import { DispatchPriority } from "./06-action-router/types.js";
+import type { CollisionPrecedence } from "./06-action-router/types.js";
+import { inboundEmailContentSchema, QueueItemSource } from "./04-queue/types.js";
+import type { ThreadHistory } from "../02-supporting-services/05-routing-service/types.js";
 
 export const stackQueueItemSchema = z.object({
+  id: z.string().min(1).optional(),
   source: z.nativeEnum(QueueItemSource),
-  content: z.union([z.string(), z.record(z.string(), z.unknown())]),
+  content: z.union([z.string(), z.record(z.string(), z.unknown()), inboundEmailContentSchema]),
   concerning: z.array(z.string()).min(1),
   target_thread: z.string().min(1),
   created_at: z.date(),
   topic: z.nativeEnum(TopicKey).optional(),
   intent: z.nativeEnum(ClassifierIntent).optional(),
+  priority: z.nativeEnum(DispatchPriority).optional(),
   idempotency_key: z.string().min(1).optional(),
   clarification_of: z.string().min(1).optional(),
 });
@@ -113,7 +117,10 @@ export interface IdentityServiceContract {
 }
 
 export interface ClassifierServiceContract {
-  classify(item: StackQueueItem): Promise<StackClassificationResult>;
+  classify(
+    item: StackQueueItem,
+    thread_history?: ThreadHistory | null,
+  ): Promise<StackClassificationResult>;
 }
 
 export interface QueueServiceContract {

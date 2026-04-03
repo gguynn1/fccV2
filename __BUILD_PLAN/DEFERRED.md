@@ -6,20 +6,14 @@ Flags identified during code review that were accepted or deferred for resolutio
 
 ## Active Deferrals
 
-### D-01 — process.env double-read in server.ts
-
-- **Identified:** step-00-part-3 review
-- **Severity:** Medium
-- **Description:** `src/server.ts` passes raw `process.env` to `startImapListener()` instead of the already-validated env object from `loadEnv()`. Two different env access paths coexist.
-- **Resolve at:** step-29 (IMAP credentials join the validated `AppEnv` schema)
-- **Action:** Refactor `startImapListener` to accept `AppEnv` with optional IMAP fields instead of raw `process.env`.
+### D-01 — ~~process.env double-read in server.ts~~ MOVED TO RESOLVED (R-17)
 
 ### D-03 — IdentityService defaults to seed config import
 
 - **Identified:** step-06 review
 - **Severity:** Medium
 - **Description:** `IdentityService` constructor falls back to `seedSystemConfig` at runtime: `const config = options?.config ?? seedSystemConfig;`. This couples the identity service to seed data files. In production, entity configuration should come from the State Service / database.
-- **Resolve at:** step-07+ (when the Worker wires services together)
+- **Resolve at:** step-33+ (dedicated seed-import elimination refactoring — Worker wiring in steps 29-32 perpetuated the pattern rather than eliminating it)
 - **Action:** Remove the seed import fallback. Require `config` to be passed explicitly by the Worker during service wiring.
 
 ### D-04 — Shallow topic state validation in State Service
@@ -35,7 +29,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Identified:** step-05 review
 - **Severity:** Low
 - **Description:** `BullSchedulerService.inferConcerningFromThread()` returns `["participant_1"]` as a hardcoded fallback when the thread ID doesn't match the `_private` suffix pattern. This is a silent assumption that produces wrong results for shared threads.
-- **Resolve at:** Worker wiring step (step-28+, when the Routing Service is integrated with the Scheduler)
+- **Resolve at:** step-33+ (dedicated refactoring — Scheduler was not modified during Worker wiring)
 - **Action:** Replace with a thread-membership lookup from the Routing Service to determine which entities belong to the target thread.
 
 ### D-06 — Transport layer imports seed config at runtime
@@ -43,7 +37,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Identified:** step-07–10 review
 - **Severity:** Medium
 - **Description:** `src/01-service-stack/01-transport-layer/index.ts` imports `seedSystemConfig` from `../../_seed/system-config.js` and uses it in `initializeThreadParticipantMaps()` and `resolveParticipantsForThread()`. The seed-data rule says the running application reads from the database, never from seed files. Same anti-pattern as D-03.
-- **Resolve at:** Worker wiring step (alongside D-03)
+- **Resolve at:** step-33+ (dedicated seed-import elimination refactoring, alongside D-03)
 - **Action:** Accept entity/thread configuration via constructor injection from the State Service or system configuration loaded at boot. Remove the seed import.
 
 ### D-07 — HealthProfile.upcoming_appointments union type
@@ -58,25 +52,49 @@ Flags identified during code review that were accepted or deferred for resolutio
 
 - **Identified:** step-24–27 review
 - **Severity:** Medium
-- **Description:** `src/02-supporting-services/05-routing-service/index.ts` (lines 3, 31, 54) and `src/02-supporting-services/06-budget-service/index.ts` (lines 5, 80, 194, 241, 279, 366) import `systemConfig` from `../../_seed/system-config.js` and use it at runtime. The seed-data rule says "The running application reads from the database, never from seed files." Same anti-pattern as D-03 (IdentityService) and D-06 (Transport Layer).
-- **Resolve at:** Worker wiring step (step-28+, alongside D-03 and D-06)
-- **Action:** Accept entity/thread configuration via constructor injection from the State Service or system configuration loaded at boot. Remove the seed import from both files.
+- **Description:** `src/02-supporting-services/05-routing-service/index.ts` (lines 3, 31, 54) and `src/02-supporting-services/06-budget-service/index.ts` (lines 5, 80, 194, 241, 279, 366) import `systemConfig` from `../../_seed/system-config.js` and use it at runtime. The seed-data rule says "The running application reads from the database, never from seed files." Same anti-pattern as D-03 (IdentityService) and D-06 (Transport Layer). Steps 29-32 introduced the same pattern in the Worker and Data Ingest Service (see D-11).
+- **Resolve at:** step-33+ (dedicated seed-import elimination refactoring, alongside D-03, D-06, and D-11)
+- **Action:** Accept entity/thread configuration via constructor injection from the State Service or system configuration loaded at boot. Remove the seed import from all affected files.
 
 ### D-09 — Cross-boundary runtime enum imports (EntityType, DispatchPriority, QueueItemSource, QueueItemType)
 
-- **Identified:** step-24–27 review (updated step-28 review)
+- **Identified:** step-24–27 review (updated step-28 and step-29–32 reviews)
 - **Severity:** Medium
-- **Description:** Four enums are imported across the 01↔02 service boundary as runtime values: `EntityType` from `02-identity-service/types.js` (routing service), `DispatchPriority` from `06-action-router/types.js` (budget service), `QueueItemSource` from `04-queue/types.js` (escalation service, confirmation service), and `QueueItemType` from `04-queue/types.js` (confirmation service). The type-boundaries rule says: "If an enum is used across the 01↔02 boundary, it belongs in `src/types.ts`."
-- **Resolve at:** Worker wiring step (when cross-service enum usage is finalized)
+- **Description:** Four enums are imported across the 01↔02 service boundary as runtime values: `EntityType` from `02-identity-service/types.js` (routing service, data ingest service), `DispatchPriority` from `06-action-router/types.js` (budget service, data ingest service, stack types.ts), `QueueItemSource` from `04-queue/types.js` (escalation service, confirmation service, data ingest service, stack types.ts), and `QueueItemType` from `04-queue/types.js` (confirmation service). Steps 29-32 widened the problem: data ingest service (02) imports all three cross-boundary enums from 01, and `src/01-service-stack/types.ts` now imports `DispatchPriority` and `QueueItemSource` as runtime values. The type-boundaries rule says: "If an enum is used across the 01↔02 boundary, it belongs in `src/types.ts`."
+- **Resolve at:** step-33+ (dedicated enum migration refactoring)
 - **Action:** Move `EntityType`, `DispatchPriority`, `QueueItemSource`, and `QueueItemType` to `src/types.ts`. Update all imports across the codebase to reference the shared location.
 
 ### D-10 — Unsafe type casts in routing, budget, and escalation services
 
-- **Identified:** step-24–27 review
+- **Identified:** step-24–27 review (updated step-29–32 review)
 - **Severity:** Medium
-- **Description:** Three services use `as` casts to access properties not on the declared types: routing service casts entity to `{ routes_to?: string[] }` (line 36), budget service casts `StackQueueItem` to `Record<string, unknown>` for `.priority` (line 200), escalation service casts `StackQueueItem` to `Record<string, unknown>` for `.id` (line 98). These bypass type safety instead of extending the type definitions.
-- **Resolve at:** Worker wiring step (step-28+, when `StackQueueItem` and entity types are finalized)
-- **Action:** Add `id` and `priority` to `StackQueueItem`. Add `routes_to` to the pet entity type definition. Remove all `as` casts.
+- **Description:** Three services use `as` casts to access properties not on the declared types: routing service casts entity to `{ routes_to?: string[] }` (line 36), budget service casts `StackQueueItem` to `Record<string, unknown>` for `.priority` (line 200), escalation service casts `StackQueueItem` to `Record<string, unknown>` for `.id` (line 98). Steps 29-32 added `id` and `priority` to `StackQueueItem` (partially addressing the issue) but the routing service pet entity cast and escalation service cast remain. The Worker's `resolveRoutingDecision` also introduces a duck-typing cast (see D-13).
+- **Resolve at:** step-33+ (type cleanup refactoring)
+- **Action:** Add `routes_to` to the pet entity type definition. Remove remaining `as` casts in routing and escalation services. Update escalation service to use `queueItem.id` directly.
+
+### D-11 — Worker and Data Ingest import systemConfig from seed at runtime
+
+- **Identified:** step-29–32 review
+- **Severity:** Medium
+- **Description:** `src/01-service-stack/05-worker/index.ts` (line 3) and `src/02-supporting-services/02-data-ingest-service/index.ts` (line 5) import `systemConfig` from `../../_seed/system-config.js` and use it at runtime. The Worker uses it for `processing_sequence`, `dispatch.collision_avoidance`, and `confirmation_gates`. Data Ingest uses it for entity filtering and thread resolution. Same anti-pattern as D-03, D-06, D-08.
+- **Resolve at:** step-33+ (dedicated seed-import elimination refactoring, alongside D-03, D-06, D-08)
+- **Action:** Accept all system configuration via constructor injection. The Worker should receive `processing_sequence`, `collision_avoidance`, and `confirmation_gates` through `WorkerConfig`. Data Ingest should receive entity/thread configuration through its options. Remove the seed imports from both files.
+
+### D-12 — Data Ingest cross-boundary runtime enum imports
+
+- **Identified:** step-29–32 review
+- **Severity:** Medium
+- **Description:** `src/02-supporting-services/02-data-ingest-service/index.ts` imports three runtime enums from `01-service-stack`: `EntityType` from `02-identity-service/types.js` (line 6), `QueueItemSource` from `04-queue/types.js` (line 12), and `DispatchPriority` from `06-action-router/types.js` (line 13). The type-boundaries rule says "If an enum is used across the 01↔02 boundary, it belongs in `src/types.ts`." Tracked alongside D-09.
+- **Resolve at:** step-33+ (alongside D-09 enum migration)
+- **Action:** After D-09 moves these enums to `src/types.ts`, update data ingest imports to reference the shared location.
+
+### D-13 — resolveRoutingDecision uses duck-typing cast
+
+- **Identified:** step-29–32 review
+- **Severity:** Low
+- **Description:** `src/01-service-stack/05-worker/index.ts` line 1072: `const maybeRichRouting = this.routingService as RoutingService & { resolveRoutingDecision?: ... }`. This casts the routing service to check for an optional method, bypassing the type system. If `resolveRoutingDecision` is expected on the routing service, it should be declared on the `RoutingService` interface.
+- **Resolve at:** step-33+ (when RoutingService interface is finalized)
+- **Action:** Add `resolveRoutingDecision` to the `RoutingService` interface or restructure the Worker to use only declared methods.
 
 ---
 
@@ -250,6 +268,13 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** `ConfirmationMatchOutcome` is defined in `08-confirmation-service/types.ts` (lines 101-105) but not consumed by `index.ts`. Scaffolding for Worker integration.
 - **Decision:** Accepted — consistent with A-21 (six unused scaffolding types from steps 24-27). Will be consumed when the Worker wires the confirmation service.
 
+### A-26 — Steps 29-32 share identical completion timestamp
+
+- **Identified:** step-29–32 review
+- **Severity:** Low
+- **Description:** All four steps have `completed_at: "2026-04-03T17:02:30Z"`, indicating they were completed in a single Build Agent session.
+- **Decision:** Accepted — consistent with prior decisions A-03, A-06, A-12, A-13, A-17, A-20. Code quality is fine; human review happened during this review session.
+
 ### A-23 — BullMQ Queue used solely for Redis client access in budget service
 
 - **Identified:** step-24–27 review
@@ -372,3 +397,38 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolved:** same session
 - **Description:** `ConfirmationService` interface in `src/02-supporting-services/types.ts` was missing `reconcileOnStartup(now: Date)` and `close()` methods that `BullConfirmationService` implements. The `EscalationService` interface already includes `reconcileOnStartup`.
 - **Fix:** Added `reconcileOnStartup(now: Date): Promise<ConfirmationRecoveryResult>` and `close(): Promise<void>` to the `ConfirmationService` interface. Added `ConfirmationRecoveryResult` to the import.
+
+### R-17 — D-01: process.env double-read in server.ts
+
+- **Identified:** step-00-part-3 review
+- **Resolved:** step-29–32 review
+- **Description:** `src/server.ts` passed raw `process.env` to `startImapListener()` instead of the validated env object. Steps 29-32 removed `startImapListener()` entirely and replaced it with `DataIngestService.startMonitoring()`, which receives IMAP credentials from the validated `AppEnv` object via constructor injection.
+- **Fix:** IMAP startup now flows through `createDataIngestService()` with validated `env.IMAP_HOST`, `env.IMAP_USER`, `env.IMAP_PASSWORD` from `loadEnv()`. No raw `process.env` access remains.
+
+### R-18 — TypeScript typecheck failure in worker test mock
+
+- **Identified:** step-29–32 review
+- **Resolved:** same session
+- **Description:** `src/01-service-stack/05-worker/index.test.ts` line 188: `mockImplementation` passed a function returning `Promise<ThreadHistory | null>` but `vi.fn()` inferred the mock's return type as `Promise<ThreadHistory>` because `state.threads[threadId]` indexes a `Record<string, ThreadHistory>`.
+- **Fix:** Added explicit return type annotation `Promise<ThreadHistory | null>` to the function passed to `vi.fn()` at the mock creation site.
+
+### R-19 — Unnecessary unsafe cast in extractQueueItemId
+
+- **Identified:** step-29–32 review
+- **Resolved:** same session
+- **Description:** `src/01-service-stack/05-worker/index.ts` cast `queueItem as Record<string, unknown>` to access `.id`, even though `StackQueueItem` now has `id?: string` added in the same change set.
+- **Fix:** Replaced `(queueItem as Record<string, unknown>).id` with direct `queueItem.id` access.
+
+### R-20 — `as TopicAction` cast in grocery action resolution
+
+- **Identified:** step-29–32 review
+- **Resolved:** same session
+- **Description:** `src/01-service-stack/05-worker/index.ts` grocery branch used a ternary with spread and `as TopicAction` to construct either `remove_items` or `add_items`. The cast bypassed type safety.
+- **Fix:** Split into two explicit `if`/`return` branches, each returning a properly typed object without any cast.
+
+### R-21 — confirmationTypeForAction indexed systemConfig arrays by position
+
+- **Identified:** step-29–32 review
+- **Resolved:** same session
+- **Description:** `confirmationTypeForAction()` used `systemConfig.confirmation_gates.always_require_approval[0]` and `[1]` to select confirmation types. Array reordering would silently break behavior.
+- **Fix:** Replaced with direct `ConfirmationActionType.FinancialAction` and `ConfirmationActionType.SendingOnBehalf` enum references. Added `ConfirmationActionType` import.

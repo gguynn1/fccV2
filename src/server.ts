@@ -1,17 +1,39 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { parse as parseQueryString } from "node:querystring";
 import { Queue, type Worker } from "bullmq";
-import { ImapFlow } from "imapflow";
+import type { ImapFlow } from "imapflow";
 import { pino } from "pino";
 import type BetterSqlite3 from "better-sqlite3";
 
 import { createCalDavService } from "./01-service-stack/01-transport-layer/01.1-caldav/index.js";
 import { createTwilioTransportLayer } from "./01-service-stack/01-transport-layer/index.js";
+import type {
+  TransportOutboundEnvelope,
+  TransportServiceContract,
+} from "./01-service-stack/types.js";
+import { createClassifierService } from "./01-service-stack/03-classifier-service/index.js";
 import { BullQueueService } from "./01-service-stack/04-queue/index.js";
+import { createWorker, createWorkerIdentityService } from "./01-service-stack/05-worker/index.js";
+import { systemConfig } from "./_seed/system-config.js";
+import { createDataIngestService } from "./02-supporting-services/02-data-ingest-service/index.js";
 import {
   createStateService,
   type SqliteStateService,
 } from "./02-supporting-services/03-state-service/index.js";
+import { createTopicProfileService } from "./02-supporting-services/04-topic-profile-service/index.js";
+import { createRoutingService } from "./02-supporting-services/05-routing-service/index.js";
+import {
+  createBudgetService,
+  type RedisBudgetService,
+} from "./02-supporting-services/06-budget-service/index.js";
+import {
+  createEscalationService,
+  type XStateEscalationService,
+} from "./02-supporting-services/07-escalation-service/index.js";
+import {
+  createConfirmationService,
+  type BullConfirmationService,
+} from "./02-supporting-services/08-confirmation-service/index.js";
 import { loadEnv } from "./env.js";
 import { initializeDatabase } from "./bootstrap.js";
 import { toRedisConnection } from "./lib/redis.js";
@@ -31,6 +53,9 @@ interface RuntimeHandles {
   scheduler: SchedulerHandle;
   imapClient: ImapFlow | null;
   stateService: SqliteStateService;
+  budgetService: RedisBudgetService;
+  escalationService: XStateEscalationService;
+  confirmationService: BullConfirmationService;
   transportLayer: ReturnType<typeof createTwilioTransportLayer>;
   db: BetterSqlite3.Database;
 }
@@ -46,7 +71,33 @@ async function verifyRedisAof(queue: Queue): Promise<void> {
   }
 }
 
-async function runStaleCatchUp(queue: Queue): Promise<void> {
+function createTransportContract(
+  transportLayer: ReturnType<typeof createTwilioTransportLayer>,
+): TransportServiceContract {
+  return {
+    normalizeInbound(input) {
+      return input;
+    },
+    async sendOutbound(output: TransportOutboundEnvelope): Promise<void> {
+      await transportLayer.queueOutbound({
+        id: `out_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        target_thread: output.target_thread,
+        content: output.content,
+        concerning: output.concerning,
+        created_at: new Date(),
+      });
+    },
+  };
+}
+
+async function runStaleCatchUp(
+  queue: Queue,
+  queueService: BullQueueService,
+  stateService: SqliteStateService,
+  escalationService: XStateEscalationService,
+  confirmationService: BullConfirmationService,
+  budgetService: RedisBudgetService,
+): Promise<void> {
   // This runs before worker startup so old backlog state can be reconciled safely.
   logger.info("Startup catch-up: begin stale queue reconciliation.");
   const [waitingCount, delayedCount, activeCount] = await Promise.all([
@@ -59,9 +110,29 @@ async function runStaleCatchUp(queue: Queue): Promise<void> {
     { waitingCount, delayedCount, activeCount },
     "Startup catch-up: queue snapshot collected before worker start.",
   );
-  logger.info("Startup catch-up: escalation reconciliation placeholder completed.");
-  logger.info("Startup catch-up: confirmation expiry reconciliation placeholder completed.");
-  logger.info("Startup catch-up: budget counter reconstruction check placeholder completed.");
+  const now = new Date();
+  const [queueReconciliation, escalationRecovery, confirmationRecovery] = await Promise.all([
+    queueService.reconcileStartup(stateService),
+    escalationService.reconcileOnStartup(now),
+    confirmationService.reconcileOnStartup(now),
+  ]);
+  await Promise.all([
+    ...escalationRecovery.map((item) => queueService.enqueue(item)),
+    ...confirmationRecovery.notifications.map((notification) =>
+      queueService.enqueue(notification.queue_item),
+    ),
+    budgetService.getBudgetTracker(),
+  ]);
+  logger.info(queueReconciliation, "Startup catch-up: queue reconciliation completed.");
+  logger.info(
+    { recovered_items: escalationRecovery.length },
+    "Startup catch-up: escalation reconciliation completed.",
+  );
+  logger.info(
+    { expired_confirmations: confirmationRecovery.expired.length },
+    "Startup catch-up: confirmation expiry reconciliation completed.",
+  );
+  logger.info("Startup catch-up: budget counter reconstruction check completed.");
   logger.info("Startup catch-up: scheduler relevance check placeholder completed.");
 }
 
@@ -79,42 +150,6 @@ function startScheduler(): SchedulerHandle {
       logger.info("Scheduler service stopped.");
     },
   };
-}
-
-function shouldStartImap(env: Record<string, string | undefined>): boolean {
-  const host = env.IMAP_HOST;
-  const user = env.IMAP_USER;
-  const password = env.IMAP_PASSWORD;
-
-  if (!host || !user || !password) {
-    return false;
-  }
-
-  // Placeholder values are treated as "not configured" to avoid noisy connection failures.
-  return host !== "imap.example.com" && user !== "your_email@example.com";
-}
-
-async function startImapListener(
-  env: Record<string, string | undefined>,
-): Promise<ImapFlow | null> {
-  if (!shouldStartImap(env)) {
-    logger.warn("IMAP listener skipped (credentials not configured yet).");
-    return null;
-  }
-
-  const client = new ImapFlow({
-    host: env.IMAP_HOST!,
-    port: Number(env.IMAP_PORT || "993"),
-    secure: true,
-    auth: {
-      user: env.IMAP_USER!,
-      pass: env.IMAP_PASSWORD!,
-    },
-  });
-
-  await client.connect();
-  logger.info("IMAP listener connected.");
-  return client;
 }
 
 async function createRuntime(): Promise<RuntimeHandles> {
@@ -166,23 +201,84 @@ async function createRuntime(): Promise<RuntimeHandles> {
   await caldavServer.listen({ port: caldavPort, host: "0.0.0.0" });
   logger.info({ port: caldavPort }, "CalDAV server started (local network only, no ngrok).");
 
+  const classifierService = createClassifierService({
+    anthropic_api_key: env.ANTHROPIC_API_KEY,
+    state_service: stateService,
+    context_window_limit: systemConfig.worker.max_thread_history_messages ?? 15,
+    logger,
+  });
+  const topicProfileService = createTopicProfileService({ logger });
+  const routingService = createRoutingService({ logger });
+  const budgetService = createBudgetService({
+    redis_url: env.REDIS_URL,
+    state_service: stateService,
+    database_path: env.DATABASE_PATH,
+    logger,
+  });
+  const escalationService = createEscalationService({
+    redis_url: env.REDIS_URL,
+    state_service: stateService,
+    logger,
+  });
+  const confirmationService = createConfirmationService({
+    redis_url: env.REDIS_URL,
+    state_service: stateService,
+    gates: systemConfig.confirmation_gates,
+    logger,
+  });
+  const dataIngestService = createDataIngestService({
+    state_service: stateService,
+    classifier: classifierService,
+    queue_service: queueService,
+    anthropic_api_key: env.ANTHROPIC_API_KEY,
+    logger,
+    imap: {
+      host: env.IMAP_HOST,
+      port: Number(env.IMAP_PORT ?? "993"),
+      user: env.IMAP_USER,
+      password: env.IMAP_PASSWORD,
+      mailbox: env.IMAP_MAILBOX,
+    },
+  });
+
   // Reconcile stale queue/scheduler state before any new work is pulled.
-  await runStaleCatchUp(queue);
+  await runStaleCatchUp(
+    queue,
+    queueService,
+    stateService,
+    escalationService,
+    confirmationService,
+    budgetService,
+  );
+
+  const workerService = createWorker({
+    classifier_service: classifierService,
+    identity_service: createWorkerIdentityService(),
+    topic_profile_service: topicProfileService,
+    routing_service: routingService,
+    budget_service: budgetService,
+    escalation_service: escalationService,
+    confirmation_service: confirmationService,
+    state_service: stateService,
+    queue_service: queueService,
+    transport_service: createTransportContract(transportLayer),
+    logger,
+    config: systemConfig.worker,
+  });
 
   const worker = queueService.registerWorker(
     {
       concurrency: 1,
       retry: { attempts: 5, backoff_ms: 1_000 },
     },
-    () => {
-      logger.info("Worker processed placeholder job.");
-      return Promise.resolve();
+    async (item) => {
+      await workerService.process(item);
     },
   );
   await worker.pause(true);
 
   const scheduler = startScheduler();
-  const imapClient = await startImapListener(process.env as Record<string, string | undefined>);
+  const imapClient = await dataIngestService.startMonitoring();
 
   return {
     fastify,
@@ -193,6 +289,9 @@ async function createRuntime(): Promise<RuntimeHandles> {
     scheduler,
     imapClient,
     stateService,
+    budgetService,
+    escalationService,
+    confirmationService,
     transportLayer,
     db,
   };
@@ -225,6 +324,8 @@ function registerShutdown(runtime: RuntimeHandles): void {
       }
 
       runtime.scheduler.stop();
+      await runtime.confirmationService.close();
+      await runtime.budgetService.close();
       await runtime.transportLayer.close();
       runtime.stateService.close();
       runtime.db.close();

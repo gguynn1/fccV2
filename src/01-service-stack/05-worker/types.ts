@@ -30,6 +30,10 @@ export interface WorkerStep {
 
 export interface WorkerConfig {
   processing_sequence: WorkerStep[];
+  max_thread_history_messages?: number;
+  stale_after_hours?: number;
+  urgent_relevance_minutes?: number;
+  clarification_timeout_minutes?: number;
 }
 
 export interface ClarificationRequest {
@@ -47,6 +51,7 @@ export interface ProcessingTraceStep {
   input_summary: string;
   output_summary: string;
   duration_ms: number;
+  metadata?: Record<string, unknown>;
 }
 
 export type ProcessingOutcome =
@@ -62,4 +67,5 @@ export interface ProcessingTrace {
   completed_at: Date;
   outcome: ProcessingOutcome;
   steps: ProcessingTraceStep[];
+  classification_source?: "worker" | "preclassified_email" | "preclassified_scheduled";
 }

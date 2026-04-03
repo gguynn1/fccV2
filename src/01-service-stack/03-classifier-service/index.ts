@@ -4,6 +4,7 @@ import { pino, type Logger } from "pino";
 import { ClassifierIntent, TopicKey } from "../../types.js";
 import type { StackClassificationResult, StackQueueItem } from "../types.js";
 import type { StateService } from "../../02-supporting-services/types.js";
+import type { ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
 import { classifierSystemPrompt, classifierUserPrompt } from "./prompts.js";
 import {
   classificationResultSchema,
@@ -40,9 +41,13 @@ export class ClaudeClassifierService {
     this.stateService = options.state_service;
   }
 
-  public async classify(item: StackQueueItem): Promise<StackClassificationResult> {
+  public async classify(
+    item: StackQueueItem,
+    providedThreadHistory?: ThreadHistory | null,
+  ): Promise<StackClassificationResult> {
     const content = typeof item.content === "string" ? item.content : JSON.stringify(item.content);
-    const threadHistory = await this.stateService.getThreadHistory(item.target_thread);
+    const threadHistory =
+      providedThreadHistory ?? (await this.stateService.getThreadHistory(item.target_thread));
     const recentMessages = (threadHistory?.recent_messages ?? [])
       .slice(-this.contextWindowLimit)
       .map<ClassifierContextMessage>((message) => ({

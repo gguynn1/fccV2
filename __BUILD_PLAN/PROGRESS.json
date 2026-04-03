@@ -1,5 +1,5 @@
 {
-  "current_step": "step-29",
+  "current_step": "step-33",
   "status_notes": {
     "step-00-part-1": {
       "updated_at": "2026-04-03T13:55:03Z",
@@ -458,6 +458,70 @@
         "npm run lint passed"
       ],
       "next_action": "Proceed to step-29 Setup Gate (IMAP)."
+    },
+    "step-29": {
+      "updated_at": "2026-04-03T17:02:30Z",
+      "checks_completed": [
+        "data ingest service implemented in src/02-supporting-services/02-data-ingest-service/index.ts",
+        "forwarded-content normalization implemented with extraction fallback and ingest-originated queue items",
+        "email normalization implemented with inbox attribution, stale-awareness, and calendar attachment parsing",
+        "imapflow startup path implemented with deferred runtime skip when placeholder .env credentials remain in place",
+        "vitest coverage added for forwarded-content and .ics parsing flows",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "deferred_by_user": [
+        "live IMAP credential verification remains deferred until .env IMAP_HOST / IMAP_USER / IMAP_PASSWORD are real values"
+      ],
+      "requires_manual_verification": [
+        "connect to the real inbox with .env IMAP credentials",
+        "fetch one known email and confirm it produces a valid queue item",
+        "confirm reconnection behavior after disconnect, sleep/wake, and provider timeout",
+        "confirm stale time-sensitive email is stored silently rather than dispatched late"
+      ],
+      "next_action": "Proceed to step-30."
+    },
+    "step-30": {
+      "updated_at": "2026-04-03T17:02:30Z",
+      "checks_completed": [
+        "worker orchestration implemented in src/01-service-stack/05-worker/index.ts",
+        "all 8 worker steps now trace inputs, outputs, and durations via ProcessingTrace",
+        "pre-classification trust policy implemented for ingest and scheduled items",
+        "typed action resolution now returns topic-shaped actions or clarification requests",
+        "cross-topic event queueing implemented with deterministic idempotency keys",
+        "startup catch-up now reconciles queue, escalation, confirmation, and budget state before worker start",
+        "vitest worker coverage added for preclassified ingest, capped thread history, clarification flow, and stale-drop behavior",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-31."
+    },
+    "step-31": {
+      "updated_at": "2026-04-03T17:02:30Z",
+      "checks_completed": [
+        "worker step 7 now requests topic profiles and composes output from profile fields",
+        "topic profile composition now includes tone, format, initiative style, response shape, and framework grounding when present",
+        "vitest coverage verifies profile-shaped outputs are distinct across all 14 topics",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-32."
+    },
+    "step-32": {
+      "updated_at": "2026-04-03T17:02:30Z",
+      "checks_completed": [
+        "worker step 8 now routes through the routing service before final action selection",
+        "response-in-place and proactive narrowest-thread routing are both covered in worker tests",
+        "follow-up target derivation added for response-plus-future-proactive scenarios",
+        "server worker boot path now uses the real worker implementation instead of the placeholder processor",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-33."
     }
   },
   "steps": {
@@ -492,10 +556,10 @@
     "step-26": { "status": "complete", "completed_at": "2026-04-03T16:07:54Z" },
     "step-27": { "status": "complete", "completed_at": "2026-04-03T16:07:54Z" },
     "step-28": { "status": "complete", "completed_at": "2026-04-03T16:32:03Z" },
-    "step-29": { "status": "pending" },
-    "step-30": { "status": "pending" },
-    "step-31": { "status": "pending" },
-    "step-32": { "status": "pending" },
+    "step-29": { "status": "complete", "completed_at": "2026-04-03T17:02:30Z" },
+    "step-30": { "status": "complete", "completed_at": "2026-04-03T17:02:30Z" },
+    "step-31": { "status": "complete", "completed_at": "2026-04-03T17:02:30Z" },
+    "step-32": { "status": "complete", "completed_at": "2026-04-03T17:02:30Z" },
     "step-33": { "status": "pending" },
     "step-34": { "status": "pending" },
     "step-35": { "status": "pending" },
