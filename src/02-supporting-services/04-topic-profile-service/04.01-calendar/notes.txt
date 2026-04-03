@@ -17,6 +17,6 @@ Recommended tools/dependencies:
 Technologies and integrations:
 - Calendar records persist through the state service into SQLite.
 - Inbound calendar data should come from email parsing, `.ics` handling, or conversation rather than any external calendar API.
-- CalDAV endpoint: the system serves a local CalDAV endpoint accessible off-network via the ngrok tunnel — calendar apps subscribe to it from anywhere.
+- CalDAV endpoint: the system serves a local CalDAV endpoint on a separate port (CALDAV_PORT, default 3001) accessible only on the local network — not tunneled through ngrok. Calendar apps on the home network subscribe to it.
 - BullMQ scheduling supports reminders and post-appointment follow-ups.
 - Recovery after downtime: reminders that should have fired during an outage are checked for staleness on startup — past-due reminders are logged, not dispatched late.

@@ -18,7 +18,7 @@ Recommended tools/dependencies:
 Technologies and integrations:
 - Email monitoring: IMAP via imapflow for watched inboxes.
 - Email extraction and image parsing should use Anthropic Claude API before queueing normalized items.
-- Calendar input enters through email parsing or conversation, while the system serves a local CalDAV endpoint outward.
+- Calendar input enters through email parsing or conversation, while the system serves a local CalDAV endpoint outward on a separate local-only port (not tunneled through ngrok).
 - New sources should produce queue items and must not require new paid third-party APIs without discussion.
 - Network outage: IMAP connections drop when internet is down; imapflow should reconnect automatically on restore. Emails that arrived during the outage are processed on reconnection.
 - Backlog processing: after downtime, the ingest service must process accumulated emails with staleness awareness — time-sensitive items that have passed their window should be stored silently, not dispatched as urgent alerts.

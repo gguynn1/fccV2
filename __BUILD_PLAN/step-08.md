@@ -22,9 +22,9 @@ Step 0, Step 3 (State Service for calendar event data), Step 7 (shares Fastify s
 
 ## Technologies
 
-- Fastify routes on localhost:3000/caldav/\*
+- Dedicated Fastify instance on CALDAV_PORT (default 3001) serving /caldav/\* routes
 - iCalendar formatting (ical.js or hand-rolled)
-- ngrok tunnel for off-network access
+- Local network only — not tunneled through ngrok (unauthenticated endpoint)
 
 ## Files to Create/Modify
 

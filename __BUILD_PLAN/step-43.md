@@ -6,14 +6,14 @@ A React single-page application served by Fastify that provides a clean, simple 
 
 ### Technology Choices
 
-| Layer | Technology |
-| ----- | --- |
-| Framework | React 19 |
-| Component library | shadcn/ui (Radix primitives + Tailwind CSS) |
-| Build tool | Vite |
-| Data fetching | TanStack Query |
-| Form handling | React Hook Form + Zod resolvers (reuse existing Zod schemas from `src/`) |
-| Routing | React Router (hash mode — single Fastify catch-all serves the SPA) |
+| Layer             | Technology                                                               |
+| ----------------- | ------------------------------------------------------------------------ |
+| Framework         | React 19                                                                 |
+| Component library | shadcn/ui (Radix primitives + Tailwind CSS)                              |
+| Build tool        | Vite                                                                     |
+| Data fetching     | TanStack Query                                                           |
+| Form handling     | React Hook Form + Zod resolvers (reuse existing Zod schemas from `src/`) |
+| Routing           | React Router (hash mode — single Fastify catch-all serves the SPA)       |
 
 ### Project Structure
 
@@ -42,17 +42,17 @@ Fastify exposes a `/api/admin/*` route namespace with JSON endpoints for each co
 
 Endpoints to implement:
 
-| Route | Purpose |
-| ----- | --- |
-| `GET/PUT /api/admin/config` | System-level configuration (threads, messaging identity, timezone, digest windows) |
-| `GET/PUT /api/admin/entities` | Entity registry (participants, roles, permissions, thread membership) |
-| `GET/PUT /api/admin/topics` | Topic profile settings (enabled/disabled, escalation profile, confirmation gates) |
-| `GET/PUT /api/admin/budget` | Budget limits (daily caps, thread rate limits, collision precedence overrides) |
-| `GET/PUT /api/admin/scheduler` | Scheduler timing (digest windows, reminder intervals, repeatable job schedules) |
-| `GET /api/admin/state/queue` | Queue inspection (pending items, DLQ, recent completions) |
-| `GET /api/admin/state/escalations` | Active escalation states |
-| `GET /api/admin/state/confirmations` | Pending and recent confirmations |
-| `GET /api/admin/state/dispatches` | Recently dispatched messages |
+| Route                                | Purpose                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------- |
+| `GET/PUT /api/admin/config`          | System-level configuration (threads, messaging identity, timezone, digest windows) |
+| `GET/PUT /api/admin/entities`        | Entity registry (participants, roles, permissions, thread membership)              |
+| `GET/PUT /api/admin/topics`          | Topic profile settings (enabled/disabled, escalation profile, confirmation gates)  |
+| `GET/PUT /api/admin/budget`          | Budget limits (daily caps, thread rate limits, collision precedence overrides)     |
+| `GET/PUT /api/admin/scheduler`       | Scheduler timing (digest windows, reminder intervals, repeatable job schedules)    |
+| `GET /api/admin/state/queue`         | Queue inspection (pending items, DLQ, recent completions)                          |
+| `GET /api/admin/state/escalations`   | Active escalation states                                                           |
+| `GET /api/admin/state/confirmations` | Pending and recent confirmations                                                   |
+| `GET /api/admin/state/dispatches`    | Recently dispatched messages                                                       |
 
 ### UI Pages
 

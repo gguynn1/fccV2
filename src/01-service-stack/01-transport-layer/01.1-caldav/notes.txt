@@ -14,8 +14,8 @@ Recommended tools/dependencies:
 - CalDAV compliance tests that verify PROPFIND, REPORT, and GET against real calendar apps.
 
 Technologies and integrations:
-- Served as Fastify routes on the same localhost:3000 server that handles Twilio webhooks.
-- Exposed via the ngrok tunnel — same static subdomain, different path prefix (/caldav/*).
+- Served on a dedicated Fastify instance on a separate port (CALDAV_PORT, default 3001) — not on the same server as Twilio webhooks.
+- Local network only — not exposed via the ngrok tunnel. Unauthenticated calendar data stays off the public internet.
 - Read-only: the endpoint serves VCALENDAR data but does not accept writes.
 - Calendar events come from the State service — the CalDAV layer formats them, it does not own them.
 - No external calendar API is consumed. The system is the authoritative calendar source.

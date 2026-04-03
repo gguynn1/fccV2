@@ -176,14 +176,14 @@
         "CalDAV endpoint implemented with OPTIONS, PROPFIND, REPORT, and GET routes under /caldav",
         "CalDAV reads events from State Service and renders stable UID values derived from internal event IDs",
         "read-only enforcement added: PUT/POST/PATCH/DELETE return 405",
-        "CalDAV routes wired into shared Fastify server",
+        "CalDAV routes served on dedicated local-only Fastify instance (CALDAV_PORT, default 3001)",
         "npm run typecheck passed",
         "npm run lint passed",
         "npm run build passed"
       ],
       "requires_manual_verification": [
         "curl smoke tests for PROPFIND, REPORT, and GET against running endpoint and verify response structure",
-        "calendar app subscription test through ngrok endpoint and visual event rendering",
+        "calendar app subscription test from local network and visual event rendering",
         "full topic coverage confirmation deferred to step-41 integration (seed calendar events validated at this stage)"
       ],
       "next_action": "Proceed to step-09."

@@ -14,15 +14,33 @@ Mac Mini on a local network. Not cloud-hosted. Not remotely accessible except th
 All managed by launchd with `KeepAlive: true` (auto-start on boot, auto-restart on crash):
 
 1. **Redis** — queue, scheduling, rate-limiting counters (AOF persistence enabled)
-2. **ngrok** — tunnel from a static public URL to localhost:3000
-3. **Node.js app** — Fastify server handling webhooks, CalDAV, and the BullMQ worker
+2. **ngrok** — tunnel from a static public URL to localhost:3000 (webhooks only)
+3. **Node.js app** — Fastify server handling webhooks and BullMQ worker on port 3000, CalDAV on a separate local-only port
 
 If any process crashes, launchd restarts it automatically. No manual intervention required.
 
 ## Network Model
 
-- **Inbound**: Internet → ngrok static subdomain → localhost:3000 (Twilio webhooks + CalDAV subscriptions)
+- **Inbound (tunneled)**: Internet → ngrok static subdomain → localhost:3000 (Twilio webhooks only)
+- **Inbound (local)**: Local network → localhost:3001 (CalDAV calendar subscriptions)
 - **Outbound**: localhost → Twilio API, Anthropic Claude API, IMAP email servers
+
+## Tunnel Exposure Guardrails
+
+The ngrok tunnel is a public internet endpoint. Only services with their own authentication or signature verification may be exposed through it.
+
+| Service                  | Exposed via ngrok?          | Why                                                                                                                 |
+| ------------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Twilio webhooks          | Yes                         | Twilio signs every request; the transport layer validates the signature and rejects forgeries                       |
+| Health check (`/health`) | Yes                         | Returns no data, no side effects                                                                                    |
+| CalDAV endpoint          | **No** — local network only | No authentication layer; exposes calendar data for all entities. Served on a separate port that ngrok never tunnels |
+| Admin UI (future)        | **No** — local network only | Would expose system state and controls without auth                                                                 |
+
+### Rules
+
+- **Never tunnel an unauthenticated endpoint.** If a route serves data or accepts commands without verifying the caller, it stays on the local network.
+- **New routes default to local-only.** A route must explicitly justify tunnel exposure by documenting its authentication mechanism before being registered on the tunneled port.
+- **CalDAV stays local until auth is added.** If CalDAV needs off-network access in the future, add authentication (e.g., HTTP Basic over TLS, or a bearer token) before moving it behind the tunnel.
 
 ## URL Stability
 

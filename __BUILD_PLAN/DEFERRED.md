@@ -79,7 +79,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** Steps 04, 05, and 06 all have `completed_at: "2026-04-03T14:42:01Z"`, suggesting they were completed in a single agent session instead of one-step-per-invocation.
 - **Decision:** Accepted — code quality is fine; the human review happened during this review session.
 
-### A-04 — __BUILD_AGENT_PROMPT.md modified
+### A-04 — \_\_BUILD_AGENT_PROMPT.md modified
 
 - **Identified:** step-00-part-3 review
 - **Severity:** Low (rule violation, harmless)

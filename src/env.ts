@@ -18,6 +18,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1),
   DATABASE_PATH: z.string().min(1),
   PORT: z.string().optional(),
+  CALDAV_PORT: z.string().optional(),
   PUBLIC_BASE_URL: z.string().url().optional(),
 });
 

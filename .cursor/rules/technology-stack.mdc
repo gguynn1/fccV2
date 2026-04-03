@@ -16,23 +16,23 @@ Email (IMAP via imapflow) connects to existing family inboxes — no new subscri
 
 ## Local Infrastructure
 
-| Layer                     | Technology                                                                              |
-| ------------------------- | --------------------------------------------------------------------------------------- |
-| Runtime                   | Node.js (LTS) + TypeScript (strict, ESM)                                                |
-| HTTP server               | Fastify — handles Twilio webhooks and CalDAV subscriptions on localhost:3000            |
-| Queue + scheduling        | BullMQ backed by Redis (AOF persistence required)                                       |
-| Persistence               | SQLite via better-sqlite3 (or Drizzle ORM) — WAL mode required                          |
-| Calendar serving          | Local CalDAV endpoint — the system serves events outward; calendar apps subscribe to it |
-| Rate limiting / counters  | Redis (shared instance with BullMQ)                                                     |
-| Escalation state machines | XState v5                                                                               |
-| Validation                | Zod                                                                                     |
-| Logging                   | pino (structured JSON)                                                                  |
-| Environment config        | dotenv (loads `.env` into `process.env` at startup)                                     |
-| Testing                   | Vitest                                                                                  |
+| Layer                     | Technology                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| Runtime                   | Node.js (LTS) + TypeScript (strict, ESM)                                                         |
+| HTTP server               | Fastify — Twilio webhooks on localhost:3000; CalDAV on a separate local-only port (default 3001) |
+| Queue + scheduling        | BullMQ backed by Redis (AOF persistence required)                                                |
+| Persistence               | SQLite via better-sqlite3 (or Drizzle ORM) — WAL mode required                                   |
+| Calendar serving          | Local CalDAV endpoint — the system serves events outward; calendar apps subscribe to it          |
+| Rate limiting / counters  | Redis (shared instance with BullMQ)                                                              |
+| Escalation state machines | XState v5                                                                                        |
+| Validation                | Zod                                                                                              |
+| Logging                   | pino (structured JSON)                                                                           |
+| Environment config        | dotenv (loads `.env` into `process.env` at startup)                                              |
+| Testing                   | Vitest                                                                                           |
 
 ## Tunnel
 
-ngrok (paid plan, static subdomain) exposes the local Fastify server to the internet for Twilio webhooks and CalDAV subscriptions. See `hosting-model.mdc` for process supervision details.
+ngrok (paid plan, static subdomain) exposes localhost:3000 to the internet for Twilio webhooks only. CalDAV runs on a separate local-only port and is never tunneled. See `hosting-model.mdc` for tunnel exposure guardrails and process supervision details.
 
 ## Boundaries
 

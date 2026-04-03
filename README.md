@@ -11,22 +11,22 @@ The system has two paid external dependencies and everything else runs locally:
 | Twilio           | SMS/MMS messaging across five threads                    |
 | Anthropic Claude | Classification, message composition, image/email parsing |
 
-| Local                | Purpose                                            |
-| -------------------- | -------------------------------------------------- |
-| Node.js + TypeScript | Application runtime                                |
-| Redis                | Queue (BullMQ), scheduling, rate-limiting counters |
-| SQLite               | All persistent state                               |
-| ngrok                | Tunnel from public URL to local Fastify server     |
+| Local                | Purpose                                                         |
+| -------------------- | --------------------------------------------------------------- |
+| Node.js + TypeScript | Application runtime                                             |
+| Redis                | Queue (BullMQ), scheduling, rate-limiting counters              |
+| SQLite               | All persistent state                                            |
+| ngrok                | Tunnel from public URL to localhost:3000 (Twilio webhooks only) |
 
 ```
 Internet
   │
   ├── Twilio webhook POST ──→ ngrok ──→ localhost:3000/webhook/twilio
-  ├── Calendar app GET ──────→ ngrok ──→ localhost:3000/caldav/*
   │
 Local network only (never exposed through ngrok)
-  └── Browser ───────────────────────→ localhost:3000/admin
-                                       (system configuration dashboard)
+  ├── Calendar app GET ────────────────→ localhost:3001/caldav/*
+  └── Browser ─────────────────────────→ localhost:3000/admin
+                                         (system configuration dashboard)
 Local machine (outbound)
   ├──→ Twilio REST API (send messages)
   ├──→ Anthropic Claude API (LLM)
@@ -53,7 +53,7 @@ brew install node          # Node.js LTS (v22+)
 
 # Infrastructure — required for production
 brew install redis         # Queue, scheduling, rate-limiting counters
-brew install --cask ngrok  # Tunnel from public URL to localhost:3000
+brew install --cask ngrok  # Tunnel from public URL to localhost:3000 (Twilio webhooks only)
 ```
 
 Verify installed versions:
@@ -350,6 +350,7 @@ See `.env.example` for the full list. Key variables:
 | `DATABASE_PATH`                             | SQLite database file location                        |
 | `REDIS_URL`                                 | Redis connection (default: `redis://localhost:6379`) |
 | `PORT`                                      | Fastify server port (default: `3000`)                |
+| `CALDAV_PORT`                               | CalDAV server port, local only (default: `3001`)     |
 
 ## Project Structure
 
@@ -373,14 +374,14 @@ The `ui/` directory is a standalone React project. In production, Fastify serves
 
 ## Scripts
 
-| Script              | Purpose                                             |
-| ------------------- | --------------------------------------------------- |
-| `npm run build`     | Compile TypeScript to `dist/`                       |
-| `npm run typecheck` | Type check without emitting                         |
-| `npm run lint`      | ESLint + Prettier check                             |
-| `npm run lint:fix`  | Auto-fix lint issues                                |
-| `npm run format`    | Format with Prettier                                |
-| `npm test`          | Run tests (Vitest, once configured)                 |
-| `npm run ui:dev`    | Start admin UI dev server (Vite, port 5173)         |
-| `npm run ui:build`  | Build admin UI production bundle to `ui/dist/`      |
-| `npm run ui:preview`| Preview admin UI production build                   |
+| Script               | Purpose                                        |
+| -------------------- | ---------------------------------------------- |
+| `npm run build`      | Compile TypeScript to `dist/`                  |
+| `npm run typecheck`  | Type check without emitting                    |
+| `npm run lint`       | ESLint + Prettier check                        |
+| `npm run lint:fix`   | Auto-fix lint issues                           |
+| `npm run format`     | Format with Prettier                           |
+| `npm test`           | Run tests (Vitest, once configured)            |
+| `npm run ui:dev`     | Start admin UI dev server (Vite, port 5173)    |
+| `npm run ui:build`   | Build admin UI production bundle to `ui/dist/` |
+| `npm run ui:preview` | Preview admin UI production build              |

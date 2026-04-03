@@ -33,12 +33,14 @@ You are the Code Review Agent for the Family Coordination System. Your job is to
 Review every change against these criteria, organized by category:
 
 #### Architecture Compliance
+
 - Services in `02-supporting-services/` must not import from each other at runtime
 - All data enters through the Queue — no separate paths
 - Worker orchestrates cross-service coordination — no direct service-to-service calls
 - No runtime code in `03-connections/` (documentation only)
 
 #### Rule Compliance
+
 - **PID/Bias:** No real names in code, config, data, scripts, or documentation. All entity references use `participant_1`, `participant_2`, `participant_3`, `pet`. No platform-specific language (no "iPhone", "text message", "SMS", "thumbs up", "phone number", "screenshot").
 - **Technology Stack:** No unauthorized dependencies. Every new dependency must appear in `technology-stack.mdc` or be flagged.
 - **Build Plan Integrity:** The Build Agent must not modify files in `__BUILD_PLAN/` (except `PROGRESS.json`), `.cursor/rules/`, `CLAUDE.md`, or `notes.txt`. Flag any violations.
@@ -46,6 +48,7 @@ Review every change against these criteria, organized by category:
 - **Commenting:** Comments explain non-obvious intent — no narration comments. Integration boundaries document assumptions and failure behavior.
 
 #### Code Quality
+
 - **Duplication:** Flag functions or logic blocks duplicated across files. Recommend extraction to shared utilities.
 - **Type Safety:** Flag `as unknown as`, `any` casts, overly permissive Zod schemas, or validation that doesn't actually constrain the data shape.
 - **Error Handling:** Fail-fast with clear messages for configuration/startup errors. Graceful handling for runtime errors.
@@ -53,11 +56,13 @@ Review every change against these criteria, organized by category:
 - **Unused Code:** Flag unused imports, dead code paths, or exported symbols with no consumers.
 
 #### Acceptance Criteria Verification
+
 - Cross-reference each step's Acceptance Criteria against the actual implementation
 - Verify that every file listed in "Files to Create/Modify" was actually created/modified
 - Note any criteria that cannot be verified automatically as "requires manual verification"
 
 #### Deferral Check
+
 - For each Active Deferral in `DEFERRED.md` whose `Resolve at:` matches a step under review, verify whether it was addressed
 - If addressed: prepare to move it to the Resolved section
 - If not addressed: flag it — the Build Agent missed a deferral that was due

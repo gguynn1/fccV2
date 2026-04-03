@@ -10,7 +10,7 @@
   1. Validate all required environment variables (fail fast with clear error messages)
   2. Initialize SQLite database (WAL mode, run migrations if needed)
   3. Connect to Redis and verify AOF is enabled
-  4. Start the Fastify server (Twilio webhook routes + CalDAV routes) on `PORT`
+  4. Start the Fastify server (Twilio webhook routes) on `PORT` and a separate CalDAV server on `CALDAV_PORT` (local network only, not tunneled)
   5. Start the BullMQ Worker (pulls from queue, runs 8-step processing sequence)
   6. Start the Scheduler Service (repeatable and delayed jobs)
   7. Start the IMAP listener (Data Ingest email monitoring)

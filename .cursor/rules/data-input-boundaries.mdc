@@ -25,7 +25,7 @@ Business lead tracking uses an internal CRM schema owned by the topic profile �
 
 ## Calendar Serving
 
-The system serves a local CalDAV endpoint that calendar apps subscribe to — accessible off-network via the ngrok tunnel. Calendar data enters via email parsing (appointment confirmations, .ics attachments) or conversational input — never by consuming an external calendar API.
+The system serves a local CalDAV endpoint that calendar apps on the home network subscribe to — accessible on the local network only, never tunneled through ngrok. Calendar data enters via email parsing (appointment confirmations, .ics attachments) or conversational input — never by consuming an external calendar API.
 
 ## Principle
 

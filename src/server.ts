@@ -24,6 +24,7 @@ interface SchedulerHandle {
 
 interface RuntimeHandles {
   fastify: FastifyInstance;
+  caldavServer: FastifyInstance;
   queue: Queue;
   queueService: BullQueueService;
   worker: Worker;
@@ -151,12 +152,19 @@ async function createRuntime(): Promise<RuntimeHandles> {
     public_base_url: env.PUBLIC_BASE_URL,
     logger,
   });
-  const calDavService = createCalDavService({ state_service: stateService });
   transportLayer.registerRoutes(fastify, queueService);
-  calDavService.registerRoutes(fastify);
 
   await fastify.listen({ port: Number(env.PORT || "3000"), host: "0.0.0.0" });
-  logger.info({ port: env.PORT || "3000" }, "Fastify server started.");
+  logger.info({ port: env.PORT || "3000" }, "Fastify server started (Twilio webhooks via ngrok).");
+
+  // CalDAV runs on a separate port, accessible only on the local network.
+  // No ngrok tunnel — unauthenticated calendar data stays off the public internet.
+  const caldavPort = Number(env.CALDAV_PORT || "3001");
+  const caldavServer = Fastify({ logger });
+  const calDavService = createCalDavService({ state_service: stateService });
+  calDavService.registerRoutes(caldavServer);
+  await caldavServer.listen({ port: caldavPort, host: "0.0.0.0" });
+  logger.info({ port: caldavPort }, "CalDAV server started (local network only, no ngrok).");
 
   // Reconcile stale queue/scheduler state before any new work is pulled.
   await runStaleCatchUp(queue);
@@ -178,6 +186,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
 
   return {
     fastify,
+    caldavServer,
     queue,
     queueService,
     worker,
@@ -201,6 +210,8 @@ function registerShutdown(runtime: RuntimeHandles): void {
 
     try {
       // Stop inbound traffic first, then drain worker and close dependencies in order.
+      await runtime.caldavServer.close();
+      logger.info("CalDAV server closed.");
       await runtime.fastify.close();
       logger.info("Fastify closed.");
 

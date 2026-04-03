@@ -22,5 +22,5 @@ Technologies and integrations:
 - Logging: pino for structured JSON logs.
 - Testing: Vitest for scenario and fixture-based verification.
 - Hosting: Mac Mini on a local network; three launchd-supervised processes (Node.js app, Redis, ngrok).
-- Tunnel: ngrok with a static subdomain exposes the Fastify server for Twilio webhooks and CalDAV subscriptions.
+- Tunnel: ngrok with a static subdomain exposes the Fastify server for Twilio webhooks only. CalDAV runs on a separate local-only port (not tunneled).
 - Resilience: machine sleep disabled, auto-restart after power failure enabled, stale catch-up logic on startup.

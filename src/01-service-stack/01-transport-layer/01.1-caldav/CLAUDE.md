@@ -2,7 +2,7 @@
 
 Serves calendar data to external calendar apps over the CalDAV protocol.
 
-Runs on the same Fastify server as the Twilio webhook (localhost:3000), exposed to the internet via the ngrok tunnel. Calendar apps subscribe to a URL and poll for changes — the system is the authoritative calendar source.
+Runs on a dedicated Fastify instance on a separate port (default 3001), accessible only on the local network. Not tunneled through ngrok — unauthenticated calendar data stays off the public internet. Calendar apps on the home network subscribe to a URL and poll for changes — the system is the authoritative calendar source.
 
 ## What It Serves
 
@@ -25,7 +25,7 @@ Minimum CalDAV compliance for read-only calendar subscriptions:
 - **GET** on individual event resources — returns a single VCALENDAR/VEVENT.
 - **OPTIONS** — advertises supported methods and DAV compliance classes.
 
-No authentication layer is required for the initial deployment — the ngrok URL is the access control. Authentication can be added later if the endpoint needs to distinguish between calendar subscribers.
+No authentication layer exists yet. Access control is enforced by keeping the endpoint on the local network only — it is never exposed through the ngrok tunnel. If off-network access is needed in the future, an authentication layer (e.g., HTTP Basic over TLS, or a bearer token) must be added before moving CalDAV behind the tunnel.
 
 ## Data Flow
 
@@ -36,11 +36,8 @@ State Service (calendar events across all topics)
 CalDAV Endpoint (formats as VCALENDAR/VEVENT)
          |
          v
-Fastify route on localhost:3000/caldav/*
+Dedicated Fastify instance on localhost:3001/caldav/*
          |
-         v
-ngrok tunnel
-         |
-         v
+         v  (local network only — no ngrok tunnel)
 Calendar app (subscribes, polls periodically)
 ```
