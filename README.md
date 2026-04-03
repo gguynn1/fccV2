@@ -32,27 +32,91 @@ Local machine (outbound)
 
 ## Prerequisites
 
+### Host Environment
+
+| Requirement | Value                           |
+| ----------- | ------------------------------- |
+| Machine     | Mac Mini (Apple Silicon, arm64) |
+| OS          | macOS 26.3+ (Tahoe)             |
+| Shell       | zsh                             |
+
+### CLI Toolchain
+
 Install via [Homebrew](https://brew.sh):
 
 ```bash
-brew install node redis
-brew install --cask ngrok
+# Core — required for development
+brew install node          # Node.js LTS (v22+)
+
+# Infrastructure — required for production
+brew install redis         # Queue, scheduling, rate-limiting counters
+brew install --cask ngrok  # Tunnel from public URL to localhost:3000
 ```
 
-Verify:
+Verify installed versions:
 
 ```bash
-node --version   # LTS (v22+)
-redis-server --version
-ngrok version
+node --version       # v22.13.0+ (LTS required)
+npm --version        # 10.9.2+
+npx tsc --version    # 6.0.2+ (project-local, no global install)
+git --version        # 2.50.1+
+redis-server --version  # required for production
+ngrok version           # required for production
 ```
+
+Additional system tools (already present on macOS):
+
+| Tool     | Purpose                                                |
+| -------- | ------------------------------------------------------ |
+| curl     | HTTP requests, API testing, webhook inspection         |
+| Python 3 | Auxiliary scripting only — not the application runtime |
+| Homebrew | Package management for all system-level dependencies   |
+
+### Tool Usage Priorities
+
+1. **Node/npm/npx** — all project commands. TypeScript, linting, formatting, testing run via `npx` or `npm run`. No global npm installs.
+2. **Homebrew** — system packages (Redis, ngrok). Never compile from source.
+3. **curl** — HTTP/API testing. Prefer over installing client tools.
+4. **Python** — auxiliary scripting if Node isn't practical for a specific task. Never for core logic.
+5. **git** — version control. All changes tracked.
+
+### Package Scripts
+
+All project tasks run through `npm run`. Never invoke tooling directly when a script exists.
+
+```bash
+# Application
+npm start              # Run the compiled application
+npm run start:seed     # Run and populate database from src/_seed/
+npm run dev            # Run in development with file watching
+
+# Build and verify
+npm run build          # Compile TypeScript
+npm run typecheck      # Type-check without emitting
+npm run lint           # ESLint + Prettier check
+npm run lint:fix       # ESLint + Prettier with auto-fix
+npm run format         # Format all files with Prettier
+npm run format:check   # Check formatting without writing
+npm test               # Run tests (stub until Vitest is wired)
+```
+
+Typical first-boot workflow:
+
+```bash
+npm run typecheck      # types clean?
+npm run lint           # lint clean?
+npm run build          # compile to dist/
+npm run start:seed     # first boot — seed the database, then serve
+```
+
+Subsequent boots use `npm start` — the database is already populated.
 
 ## Development Setup
 
 ### 1. Clone and install
 
 ```bash
-git clone <repo-url> && cd FCCv2
+git clone https://github.com/gguynn1/fccV2.git && cd fccV2
 npm install
 ```
 
@@ -78,17 +142,20 @@ ngrok http 3000
 
 Note the forwarding URL (e.g., `https://abc123.ngrok-free.app`) and configure it as your Twilio webhook URL.
 
-### 5. Build and run
+### 5. Verify, build, and run
 
 ```bash
-npm run build
-npm start
+npm run typecheck     # verify types compile clean
+npm run lint          # verify lint + formatting
+npm run build         # compile to dist/
+npm run start:seed    # first boot — seed database and start server
 ```
 
-Or for development with type checking:
+For subsequent runs after the database is seeded:
 
 ```bash
-npm run typecheck
+npm start             # start server with existing database
+npm run dev           # start with file watching (development)
 ```
 
 ## Production Deployment (Mac Mini)

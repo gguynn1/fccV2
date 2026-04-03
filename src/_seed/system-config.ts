@@ -10,13 +10,13 @@ import {
   DataIngestSourceType,
   WorkerAction,
   WorkerService,
-} from "./index.js";
+} from "../index.js";
 
 export const systemConfig: SystemConfig = {
   metadata: {
     snapshot_time: new Date("2026-04-02T17:05:00-07:00"),
     description:
-      "Static system definition — entities, threads, topics, behavior profiles, dispatch rules, escalation paths, and all configuration that governs how the system operates.",
+      "Seed configuration — the complete static system definition used to populate the database on first boot. Defines all entities, threads, topic behavior profiles, dispatch rules, confirmation gates, input recognition and disambiguation rules, data ingest sources, daily rhythm, the 8-step worker processing sequence, and escalation profiles. This file is never modified at runtime. Schema changes must be reflected here to keep the seed valid and complete.",
   },
 
   system: {

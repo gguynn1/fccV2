@@ -1,0 +1,41 @@
+---
+description: Seed data files — static initial state for database bootstrapping
+globs: "src/_seed/**"
+alwaysApply: false
+---
+
+# Seed Data
+
+## What These Files Are
+
+`src/_seed/system-config.ts` and `src/_seed/system-state.ts` are the initial state the application boots with. When the database is stood up with a `--seed` flag, these values populate every table as the starting data.
+
+- `system-config.ts` — the full system definition: entities, threads, topics with behavior profiles, dispatch rules, confirmation gates, input recognition, disambiguation rules, data ingest sources, daily rhythm, worker processing sequence, escalation profiles, and scenario testing.
+- `system-state.ts` — a complete runtime snapshot: queue (pending + recently dispatched), outbound budget tracker, escalation status, and per-topic records across all 14 topics, plus confirmations, thread histories, data ingest state, and digests.
+
+## Constraints
+
+1. **Static after seed.** These files populate the database once. The running application reads from and writes to the database — never back to these files. Runtime state changes do not sync here.
+
+2. **Schema-valid at all times.** These files must compile against the current type system. If a schema change is made anywhere in `src/` — a new field on an interface, a new enum value, a removed property — these files must be updated to match. A type error in `_seed/` means the seed is broken.
+
+3. **Complete — nothing missing.** Every topic in `TopicKey` must have a corresponding entry in both config and state. Every thread, every entity, every escalation profile, every confirmation gate type — all must be represented. The seed is a full, valid system. If the database were empty and you ran `--seed`, the application must be fully functional with no missing data.
+
+4. **Only changed by the developer.** These files change when:
+   - A new topic is added (new config entry + new state entry)
+   - A type/interface gains or loses a field
+   - An enum gains or loses a value
+   - The developer wants to adjust the initial state for development or testing purposes
+     They do NOT change because the running system processed a message or updated a record.
+
+5. **Representative sample data.** The state file contains realistic sample data — active items, recent history, pending queue entries — so that the seeded system looks like a mid-day snapshot, not an empty shell. This makes development and testing practical from the first boot.
+
+## Relationship to the Type System
+
+The seed files import from `src/index.js` and use the full type system. TypeScript enforces completeness:
+
+- `SystemConfig.topics` is typed as `Record<TopicKey, TopicConfig>` — a missing topic is a compile error.
+- `SystemState` has a named field per topic — a missing field is a compile error.
+- Enum values are used throughout — a removed enum member surfaces everywhere it was referenced.
+
+This means the seed files act as a living proof that the type system is complete and internally consistent. If they compile, the schema is valid and the seed is usable.

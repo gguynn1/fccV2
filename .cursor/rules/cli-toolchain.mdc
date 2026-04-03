@@ -1,0 +1,91 @@
+---
+description: Available CLI tools, installed versions, and usage priorities
+alwaysApply: true
+---
+
+# CLI Toolchain
+
+## Host Environment
+
+- **Machine**: Mac Mini (Apple Silicon, arm64)
+- **OS**: macOS 26.3 (Tahoe)
+- **Shell**: zsh
+
+## Installed Tools (in order of priority)
+
+### Tier 1 — Primary (used daily during development)
+
+| Tool       | Version        | Installed via       | Purpose                                           |
+| ---------- | -------------- | ------------------- | ------------------------------------------------- |
+| Node.js    | v22.13.0 (LTS) | Homebrew            | Application runtime, all scripts                  |
+| npm        | 10.9.2         | Bundled with Node   | Package management, script runner                 |
+| npx        | 10.9.2         | Bundled with Node   | Run project-local binaries (tsc, vitest, eslint)  |
+| TypeScript | 6.0.2          | npm (project-local) | Type checking, compilation — always via `npx tsc` |
+| git        | 2.50.1         | Apple Git           | Version control                                   |
+
+### Tier 2 — Infrastructure (required for production, installed when deploying)
+
+| Tool  | Version           | Installed via               | Purpose                                            |
+| ----- | ----------------- | --------------------------- | -------------------------------------------------- |
+| Redis | not yet installed | `brew install redis`        | Queue (BullMQ), scheduling, rate-limiting counters |
+| ngrok | not yet installed | `brew install --cask ngrok` | Tunnel from public URL to localhost:3000           |
+
+### Tier 3 — System utilities (available, used occasionally)
+
+| Tool     | Version | Installed via     | Purpose                                                |
+| -------- | ------- | ----------------- | ------------------------------------------------------ |
+| Homebrew | 5.1.3   | brew.sh installer | Package manager for macOS                              |
+| curl     | 8.7.1   | macOS built-in    | HTTP requests, API testing                             |
+| Python 3 | 3.9.6   | Xcode CLI tools   | Scripting, one-off utilities — not the primary runtime |
+| pip3     | 21.2.4  | Xcode CLI tools   | Python package management                              |
+
+## Package Scripts
+
+All project tasks run through `npm run`. Never invoke tooling directly when a script exists.
+
+| Command                | What it does                                                    |
+| ---------------------- | --------------------------------------------------------------- |
+| `npm start`            | Run the compiled application (`node dist/index.js`)             |
+| `npm run start:seed`   | Run the application and populate the database from `src/_seed/` |
+| `npm run dev`          | Run in development with file watching and auto-restart          |
+| `npm run build`        | Compile TypeScript (`tsc`)                                      |
+| `npm run typecheck`    | Type-check without emitting (`tsc --noEmit`)                    |
+| `npm run lint`         | Run ESLint + Prettier check                                     |
+| `npm run lint:fix`     | Run ESLint + Prettier with auto-fix                             |
+| `npm run format`       | Format all files with Prettier                                  |
+| `npm run format:check` | Check formatting without writing                                |
+| `npm test`             | Run tests (stub until Vitest is wired)                          |
+
+When the eval framework is implemented, additional scripts will be added:
+
+| Command                 | What it will do                     |
+| ----------------------- | ----------------------------------- |
+| `npm run eval`          | Run eval suite in watch mode        |
+| `npm run eval:run`      | Run eval suite once                 |
+| `npm run eval:coverage` | Run eval suite with coverage matrix |
+
+### Script lifecycle for a typical workflow
+
+```
+npm run typecheck     →  types clean?
+npm run lint          →  lint clean?
+npm run build         →  compile to dist/
+npm run start:seed    →  first boot: populate database from seed
+npm start             →  subsequent boots: run with existing database
+```
+
+## Usage Rules
+
+1. **Use package scripts, not raw commands.** Run `npm run typecheck`, not `npx tsc --noEmit`. Run `npm run lint`, not `npx eslint .`. The scripts are the canonical way to invoke every tool. If a task doesn't have a script, add one before running it ad-hoc.
+
+2. **Node/npm/npx first.** All project commands run through Node. TypeScript compilation, linting, formatting, testing — always via `npm run` or `npx` for one-off commands not yet in scripts.
+
+3. **Homebrew for system packages.** Redis, ngrok, and any future system-level dependencies install via `brew`. Never compile from source. Never use manual downloads.
+
+4. **curl for HTTP.** API testing, webhook inspection, health checks. Prefer curl over installing HTTP client tools.
+
+5. **Python is auxiliary.** Available for one-off scripting or tooling if Node isn't practical for a specific task. Never used for core application logic. The application runtime is Node.js — no exceptions.
+
+6. **No global npm installs.** All project tooling (tsc, eslint, prettier, vitest) runs via `npx` from the project's `node_modules`. Never `npm install -g`.
+
+7. **Version awareness.** When installing new packages or writing scripts, account for the installed versions. Node 22 supports ESM natively, top-level await, and the latest V8 features. TypeScript 6 has `verbatimModuleSyntax` enabled.
