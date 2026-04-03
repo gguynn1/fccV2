@@ -384,7 +384,7 @@ The `ui/` directory is a standalone React project. In production, Fastify serves
 | `npm run lint`       | Lint backend and admin UI, then run Prettier   |
 | `npm run lint:fix`   | Auto-fix backend and admin UI lint issues      |
 | `npm run format`     | Format with Prettier                           |
-| `npm test`           | Run tests (Vitest, once configured)            |
+| `npm test`           | Run tests (Vitest)                             |
 | `npm run ui:dev`     | Start admin UI dev server (Vite, port 5173)    |
 | `npm run ui:build`   | Build admin UI production bundle to `ui/dist/` |
 | `npm run ui:preview` | Preview admin UI production build              |

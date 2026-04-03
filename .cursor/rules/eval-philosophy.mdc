@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Eval Philosophy
 
+**Status: target-state design.** The eval framework is not yet implemented (see `__BUILD_PLAN/TODO.md`, TODO-01). These principles describe how the system will work once built and how features should be developed in anticipation of it.
+
 ## The System Is Its Own Teacher
 
 The eval framework is not an afterthought or a test suite bolted on after implementation. It is the primary quality mechanism. Every behavioral specification — topic profiles, routing rules, escalation paths, disambiguation rules, cross-topic connections — must have corresponding eval scenarios that prove it works.

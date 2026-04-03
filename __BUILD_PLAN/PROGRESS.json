@@ -25,6 +25,6 @@
     }
   },
   "completed_summary": [
-    "Core runtime, queue, scheduler, transport, CalDAV, classifier, topic profiles, supporting services, worker pipeline, action router, admin UI, and connections documentation are complete."
+    "Core runtime, queue, scheduler, transport, CalDAV, classifier, topic profiles, supporting services, worker pipeline, action router, admin UI (code complete, pending production verification in TODO-03), and connections documentation are complete."
   ]
 }
