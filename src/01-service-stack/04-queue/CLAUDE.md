@@ -40,3 +40,11 @@ Future integrations ---------->|
 Everything flows through a single queue. There is no separate path for human input versus system-generated events. One funnel, one worker, one set of rules.
 
 Every queue item carries: source, raw content, who it involves, which thread it originated from (if applicable), and a timestamp.
+
+## Implementation
+
+BullMQ backed by shared Redis. AOF persistence (`appendonly yes`) is required — a crash without it loses the entire queue.
+
+Queue items carry an optional `idempotency_key` for deduplication on enqueue and during startup backlog reconciliation. Items are validated with Zod both before enqueue and before the Worker consumes them.
+
+Failed jobs retry with exponential backoff. Items that exhaust all retries move to a dead-letter queue for operator inspection, retry, or discard.

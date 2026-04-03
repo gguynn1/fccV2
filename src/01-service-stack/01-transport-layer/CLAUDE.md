@@ -10,6 +10,10 @@ Sends: outbound messages to threads
 Inbound messages flow down
 Outbound messages flow up
 
+MMS media URLs are downloaded to a local media store and normalized before classification.
+
+Reaction handling is conservative — not all clients encode reactions the same way. When mapping is uncertain, the system falls back to requesting a text clarification rather than assuming intent.
+
 ## Threads
 
 Threads are defined by participants, not topics. A private thread is one entity plus the assistant. A shared thread is multiple entities plus the assistant. The system never creates threads per topic — it routes topics into the correct participant-based thread.

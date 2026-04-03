@@ -1,7 +1,7 @@
 # Data Ingest Service
 
 Watches external sources independently:
-monitored inboxes (IMAP polling)
+monitored inboxes (IMAP via imapflow — reconnects automatically after network outage)
 forwarded messages (parsed by transport, classified here)
 
 When something relevant arrives:
@@ -46,3 +46,7 @@ FUTURE DATA SOURCES
 ```
 
 Adding a new data source never requires rethinking the dispatch logic. It just feeds the queue.
+
+## Implementation
+
+Email content and image attachments are parsed using Anthropic Claude API before items are queued. Ingest items may arrive pre-classified — `topic` and `intent` already set on the queue item — in which case the Worker skips a fresh classification call and records the source as `preclassified_email`.

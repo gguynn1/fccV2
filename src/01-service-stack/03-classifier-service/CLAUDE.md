@@ -27,3 +27,7 @@ Intent is a typed enum (`ClassifierIntent`) that tells the Worker what the sende
 - **ForwardedData** — forwarding content for the system to parse and process (email, image, booking confirmation)
 
 Intent is determined alongside topic. The same message in different contexts can have different intents — "move it to Thursday" is an Update, "add one for Thursday" is a Request. Thread history and recent conversation inform the classification.
+
+## Implementation
+
+Uses Anthropic Claude API with capped thread history context. Claude returns structured output; the stack validates and maps it to a typed `ClassificationResult` using Zod before the Worker consumes it. On API failure, the classifier supplies a bounded fallback path rather than propagating the error downstream.

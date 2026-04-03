@@ -36,3 +36,7 @@ Both stores together allow the system to be booted in any state — empty, mid-d
 ## Seed Data
 
 The initial values for both stores live in `src/_seed/`. When the database is bootstrapped with `--seed`, these files populate every table. The running application reads from and writes to the database — never back to the seed files. The seed files change only when the schema changes, ensuring they always represent a valid, complete initial state.
+
+## Implementation
+
+SQLite is accessed via `better-sqlite3`. WAL mode is required for crash resilience and concurrent read performance.

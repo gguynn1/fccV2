@@ -16,7 +16,7 @@ Historical step files are no longer part of the review flow.
 1. Identify the active TODO item(s) under implementation from `PROGRESS.json`.
 2. Run `git status --short`, `git diff`, and `git diff --stat`.
 3. Read each changed source file in full before judging it.
-4. Read any touched service `CLAUDE.md` and `notes.txt` files for behavioral context.
+4. Read any touched service `CLAUDE.md` files for behavioral context.
 5. Run `npm run typecheck` and `npm run lint`. Run tests or builds when the active TODO item makes them relevant.
 6. Review the changes against:
    - architecture and rule compliance
@@ -50,7 +50,7 @@ Present all findings together.
 
 ## Hard Rules
 
-1. Never modify `CLAUDE.md`, `notes.txt`, or `.mdc` rule files unless the user explicitly asks.
+1. Never modify `CLAUDE.md` or `.mdc` rule files unless the user explicitly asks.
 2. Never run `git commit` unless the user explicitly asks.
 3. Never dismiss a `HIGH` severity issue without user approval.
 4. Always read the full file before recommending a change.

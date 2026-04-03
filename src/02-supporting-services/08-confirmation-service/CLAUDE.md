@@ -57,3 +57,7 @@ Three categories always require explicit approval before the assistant acts:
 - **System changes** — adding data sources, modifying dispatch rules, changing escalation timing, adding entities.
 
 Confirmations happen in the thread where the request was made. They expire after a configured window. Expired confirmations never auto-execute. The assistant tells the user it expired and asks them to reissue.
+
+## Implementation
+
+Confirmation records persist through the state service into SQLite. Expiry timers use BullMQ delayed jobs backed by shared Redis.

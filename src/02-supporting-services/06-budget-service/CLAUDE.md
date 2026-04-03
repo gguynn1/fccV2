@@ -33,6 +33,10 @@ Every outbound message is one of three priority levels:
 
 Before dispatching any outbound message, the budget service checks what else is pending or recently sent for the same person or thread. If multiple items would stack up, it batches them into one combined message. If someone has already received several messages today, non-urgent items hold until tomorrow's digest. The goal is that no one ever feels bombarded.
 
+## Counter Storage
+
+Budget counters live in Redis (shared with BullMQ). AOF persistence is required — a crash without it resets all counters, risking duplicate sends on restart.
+
 ## Counter Reconstruction
 
 If Redis budget counters are lost (despite AOF), the budget service reconstructs them from `recently_dispatched` records in SQLite. This prevents duplicate sends after a Redis crash or data loss.

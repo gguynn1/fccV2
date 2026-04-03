@@ -13,7 +13,7 @@ External world
 ## Door 1 — Phone-native channel → Transport → Identity
 
 - Inbound segments are validated and normalized by the Transport layer, then a lightweight identity lookup resolves the sender to an entity id and their **private thread** before enqueue. SMS is inherently 1:1, so the Transport cannot determine a shared-thread origin — routing to shared threads is a Worker decision based on topic and audience.
-- See `01.1-phone-to-transport/CLAUDE.md` and `01-inbound-flow/notes.txt`.
+- See `01.1-phone-to-transport/CLAUDE.md`.
 
 ## Door 2 — Email and structured ingest → Data Ingest
 

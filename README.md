@@ -381,7 +381,7 @@ ui/                         Admin UI — React SPA served by Fastify at /admin
 └── package.json            Separate dependency tree (pins own TypeScript version)
 ```
 
-Each numbered folder under `src/` is a bounded service with its own `CLAUDE.md` (behavior docs), `types.ts` (owned types), and `notes.txt` (technology notes).
+Each numbered folder under `src/` is a bounded service with its own `CLAUDE.md` (behavior docs) and `types.ts` (owned types).
 
 The `ui/` directory is a standalone React project. In production, Fastify serves the built bundle as static files at `/admin`. During development, the Vite dev server runs on port 5173 and proxies API calls to Fastify on port 3000.
 

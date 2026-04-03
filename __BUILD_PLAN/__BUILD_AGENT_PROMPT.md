@@ -14,7 +14,7 @@ Historical step files have been retired. Do not recreate them.
 
 1. Read the relevant `.mdc` rules before making changes. Refresh any rule that applies to the current task's domain.
 2. Use `PROGRESS.json.current_focus` or the first non-complete TODO item as the active target.
-3. Read any referenced `CLAUDE.md` and `notes.txt` files for the service directories you will touch. They are read-only behavioral specs.
+3. Read any referenced `CLAUDE.md` files for the service directories you will touch. They are read-only behavioral specs.
 4. Implement one focused slice of the active TODO item unless the user explicitly asks for a larger batch.
 5. If the active TODO item has prerequisites or manual gates, stop and present them to the user before proceeding past that boundary.
 6. Run the relevant verification commands as you go. At minimum use `npm run typecheck` and `npm run lint` after substantive code changes. Run tests or build steps when the TODO item calls for them.
@@ -33,7 +33,7 @@ Do not rebuild the old step-by-step audit log.
 
 ## Hard Rules
 
-1. Never modify any `CLAUDE.md`, `notes.txt`, or `.mdc` rule file unless the user explicitly asks.
+1. Never modify any `CLAUDE.md` or `.mdc` rule file unless the user explicitly asks.
 2. Use anonymized identifiers only: `participant_1`, `participant_2`, `participant_3`, `pet`.
 3. Use platform-neutral language defined by the project rules.
 4. Respect service boundaries. No direct supporting-service runtime imports.

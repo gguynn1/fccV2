@@ -23,3 +23,7 @@ Each topic has a behavior profile:
 - **Escalation level** — high (chores, finances), medium (school, health, calendar), low (relationship, pets, family status, maintenance), or none (grocery, vendors, business, meals).
 - **Framework grounding** — certain topics draw on established frameworks. Relationship draws on Internal Family Systems Therapy, emotionally focused therapy, and attachment-based connection practices. The assistant uses these to inform the quality of its nudges, not to act as a therapist.
 - **Response format** — lists for grocery, snapshots with numbers for finances, open-ended prompts for relationship, structured confirmations for calendar, clear task statements for chores.
+
+## Composition
+
+When the Worker calls the Anthropic Claude API to compose an outbound message, the returned topic profile fields drive the composition prompt. The API does not invent tone or format independently — it receives the profile as explicit instruction.

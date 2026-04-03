@@ -31,3 +31,7 @@ DEFAULT STATE
   It earns the right to speak
   by being useful when it does
 ```
+
+## Implementation
+
+Held items are stored as BullMQ delayed jobs in shared Redis. When multiple held items are ready for the same participant at the same touchpoint, Anthropic Claude API merges them into a single natural-language digest message rather than dispatching back-to-back segments.

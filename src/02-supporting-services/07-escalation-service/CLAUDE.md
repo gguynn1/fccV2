@@ -57,3 +57,7 @@ NO ESCALATION — grocery, vendors, business, meals
 ## Silence Handling
 
 Silence feeds escalation for high-accountability topics. Means "not now" for low-accountability topics. Never treated as approval.
+
+## Implementation
+
+Escalation state machines are implemented with XState v5. Timed escalation steps use BullMQ delayed jobs. Escalation progress persists through the state service into SQLite.
