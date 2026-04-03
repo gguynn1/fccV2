@@ -1,5 +1,5 @@
 {
-  "current_step": "step-07",
+  "current_step": "step-11",
   "status_notes": {
     "step-00-part-1": {
       "updated_at": "2026-04-03T13:55:03Z",
@@ -146,6 +146,75 @@
         "npm run lint passed"
       ],
       "next_action": "Proceed to step-07."
+    },
+    "step-07": {
+      "updated_at": "2026-04-03T15:04:50Z",
+      "checks_completed": [
+        "transport input and outbound/delivery types implemented in src/01-service-stack/01-transport-layer/types.ts",
+        "Twilio transport layer implemented with webhook signature validation, inbound normalization, media download to data/media/, and outbound delivery status callback handling",
+        "thread-to-participants mapping initialized from system configuration for five allowed threads",
+        "outbound delivery retries configured with exponential backoff via BullMQ outbound queue",
+        "Fastify routes /webhook/twilio and /webhook/twilio/status registered through transport layer",
+        "data/media/ explicitly added to .gitignore",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "requires_manual_verification": [
+        "Twilio webhook URL configured to https://<NGROK_DOMAIN>/webhook/twilio",
+        "test inbound message reaches webhook, signature validates, and normalized queue item is enqueued",
+        "test outbound send via Twilio REST API produces status callback at /webhook/twilio/status",
+        "invalid signature request is rejected with 403",
+        "curl mock payload smoke test validates webhook handler path before live provider test"
+      ],
+      "next_action": "Proceed to step-08."
+    },
+    "step-08": {
+      "updated_at": "2026-04-03T15:04:50Z",
+      "checks_completed": [
+        "CalDAV types extended for VCALENDAR/VEVENT and collection metadata",
+        "CalDAV endpoint implemented with OPTIONS, PROPFIND, REPORT, and GET routes under /caldav",
+        "CalDAV reads events from State Service and renders stable UID values derived from internal event IDs",
+        "read-only enforcement added: PUT/POST/PATCH/DELETE return 405",
+        "CalDAV routes wired into shared Fastify server",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "requires_manual_verification": [
+        "curl smoke tests for PROPFIND, REPORT, and GET against running endpoint and verify response structure",
+        "calendar app subscription test through ngrok endpoint and visual event rendering",
+        "full topic coverage confirmation deferred to step-41 integration (seed calendar events validated at this stage)"
+      ],
+      "next_action": "Proceed to step-09."
+    },
+    "step-09": {
+      "updated_at": "2026-04-03T15:04:50Z",
+      "checks_completed": [
+        "classifier types expanded with context input contracts, structured result schema, and service options",
+        "classifier prompts added in src/01-service-stack/03-classifier-service/prompts.ts with explicit topic/intent and disambiguation guidance",
+        "Claude-backed classifier service implemented with thread-context windowing and structured output validation",
+        "fallback classification includes context-aware heuristics and intent disambiguation defaults for API failure path",
+        "context window limit implemented (default 12 recent thread messages)",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-10."
+    },
+    "step-10": {
+      "updated_at": "2026-04-03T15:04:50Z",
+      "checks_completed": [
+        "topic profile contracts added with TopicProfile fields (tone, format, initiative_style, escalation_level, framework_grounding, response_format, cross_topic_connections)",
+        "typed action resolution unions added for topic-owned discriminated action payload handling",
+        "topic profile service implemented with registry entries for all 14 topics and boot-time Zod validation",
+        "topic profile service methods provided for profile lookup, fallback classification, and message composition shaping",
+        "supporting-services contract updated to use topic profile config type for getTopicConfig",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-11."
     }
   },
   "steps": {
@@ -158,10 +227,10 @@
     "step-04": { "status": "complete", "completed_at": "2026-04-03T14:42:01Z" },
     "step-05": { "status": "complete", "completed_at": "2026-04-03T14:42:01Z" },
     "step-06": { "status": "complete", "completed_at": "2026-04-03T14:42:01Z" },
-    "step-07": { "status": "pending" },
-    "step-08": { "status": "pending" },
-    "step-09": { "status": "pending" },
-    "step-10": { "status": "pending" },
+    "step-07": { "status": "complete", "completed_at": "2026-04-03T15:04:50Z" },
+    "step-08": { "status": "complete", "completed_at": "2026-04-03T15:04:50Z" },
+    "step-09": { "status": "complete", "completed_at": "2026-04-03T15:04:50Z" },
+    "step-10": { "status": "complete", "completed_at": "2026-04-03T15:04:50Z" },
     "step-11": { "status": "pending" },
     "step-12": { "status": "pending" },
     "step-13": { "status": "pending" },

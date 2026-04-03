@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { EscalationLevel, GrocerySection, TopicKey, ClassifierIntent } from "../../types.js";
 
 export interface ClassificationResult {
@@ -5,6 +7,20 @@ export interface ClassificationResult {
   intent: ClassifierIntent;
   entities: string[];
   confidence?: number;
+}
+
+export interface ClassifierContextMessage {
+  from: string;
+  content: string;
+  at: Date;
+  topic_context?: string;
+}
+
+export interface ClassifierInput {
+  content: string;
+  thread_id: string;
+  concerning: string[];
+  recent_messages: ClassifierContextMessage[];
 }
 
 export interface TopicRouting {
@@ -32,4 +48,17 @@ export interface TopicConfig {
   minimum_gap_between_nudges?: string;
   status_expiry?: string;
   grocery_linking?: boolean;
+}
+
+export const classificationResultSchema = z.object({
+  topic: z.string().min(1),
+  intent: z.string().min(1),
+  entities: z.array(z.string().min(1)).min(1),
+  confidence: z.number().min(0).max(1).optional(),
+});
+
+export interface ClassifierServiceOptions {
+  anthropic_api_key: string;
+  model?: string;
+  context_window_limit?: number;
 }

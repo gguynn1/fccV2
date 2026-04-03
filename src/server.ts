@@ -1,9 +1,17 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { Queue, Worker } from "bullmq";
+import { parse as parseQueryString } from "node:querystring";
+import { Queue, type Worker } from "bullmq";
 import { ImapFlow } from "imapflow";
 import { pino } from "pino";
 import type BetterSqlite3 from "better-sqlite3";
 
+import { createCalDavService } from "./01-service-stack/01-transport-layer/01.1-caldav/index.js";
+import { createTwilioTransportLayer } from "./01-service-stack/01-transport-layer/index.js";
+import { BullQueueService } from "./01-service-stack/04-queue/index.js";
+import {
+  createStateService,
+  type SqliteStateService,
+} from "./02-supporting-services/03-state-service/index.js";
 import { loadEnv } from "./env.js";
 import { initializeDatabase } from "./bootstrap.js";
 import { toRedisConnection } from "./lib/redis.js";
@@ -17,9 +25,12 @@ interface SchedulerHandle {
 interface RuntimeHandles {
   fastify: FastifyInstance;
   queue: Queue;
+  queueService: BullQueueService;
   worker: Worker;
   scheduler: SchedulerHandle;
   imapClient: ImapFlow | null;
+  stateService: SqliteStateService;
+  transportLayer: ReturnType<typeof createTwilioTransportLayer>;
   db: BetterSqlite3.Database;
 }
 
@@ -108,20 +119,41 @@ async function startImapListener(
 async function createRuntime(): Promise<RuntimeHandles> {
   const env = loadEnv(process.env as Record<string, string | undefined>);
   const db = initializeDatabase(env.DATABASE_PATH);
+  const stateService = createStateService(env.DATABASE_PATH, logger);
   logger.info("SQLite initialized with WAL mode.");
 
   const redisConnection = toRedisConnection(env.REDIS_URL);
   const queue = new Queue("fcc-main", { connection: redisConnection });
   await verifyRedisAof(queue);
+  const queueService = new BullQueueService({
+    redis_url: env.REDIS_URL,
+    logger,
+  });
+  await queueService.verifyConnection();
   logger.info("Redis connected and AOF verified.");
 
-  const fastify = Fastify({ logger: false });
+  const fastify = Fastify({ logger });
+  fastify.addContentTypeParser(
+    "application/x-www-form-urlencoded",
+    { parseAs: "string" },
+    (_request, body, done) => {
+      const payload = typeof body === "string" ? body : body.toString("utf8");
+      done(null, parseQueryString(payload));
+    },
+  );
+
   fastify.get("/health", () => ({ ok: true }));
-  fastify.get("/caldav/health", () => ({ ok: true }));
-  fastify.post("/webhook/twilio", async (_request, reply) => {
-    reply.type("text/xml");
-    return "<Response></Response>";
+  const transportLayer = createTwilioTransportLayer({
+    account_sid: env.TWILIO_ACCOUNT_SID,
+    auth_token: env.TWILIO_AUTH_TOKEN,
+    messaging_identity: env.TWILIO_MESSAGING_IDENTITY,
+    redis_url: env.REDIS_URL,
+    public_base_url: env.PUBLIC_BASE_URL,
+    logger,
   });
+  const calDavService = createCalDavService({ state_service: stateService });
+  transportLayer.registerRoutes(fastify, queueService);
+  calDavService.registerRoutes(fastify);
 
   await fastify.listen({ port: Number(env.PORT || "3000"), host: "0.0.0.0" });
   logger.info({ port: env.PORT || "3000" }, "Fastify server started.");
@@ -129,22 +161,32 @@ async function createRuntime(): Promise<RuntimeHandles> {
   // Reconcile stale queue/scheduler state before any new work is pulled.
   await runStaleCatchUp(queue);
 
-  const worker = new Worker(
-    "fcc-main",
+  const worker = queueService.registerWorker(
+    {
+      concurrency: 1,
+      retry: { attempts: 5, backoff_ms: 1_000 },
+    },
     () => {
       logger.info("Worker processed placeholder job.");
       return Promise.resolve();
     },
-    {
-      connection: redisConnection,
-      autorun: false,
-    },
   );
+  await worker.pause(true);
 
   const scheduler = startScheduler();
   const imapClient = await startImapListener(process.env as Record<string, string | undefined>);
 
-  return { fastify, queue, worker, scheduler, imapClient, db };
+  return {
+    fastify,
+    queue,
+    queueService,
+    worker,
+    scheduler,
+    imapClient,
+    stateService,
+    transportLayer,
+    db,
+  };
 }
 
 function registerShutdown(runtime: RuntimeHandles): void {
@@ -172,9 +214,12 @@ function registerShutdown(runtime: RuntimeHandles): void {
       }
 
       runtime.scheduler.stop();
+      await runtime.transportLayer.close();
+      runtime.stateService.close();
       runtime.db.close();
       logger.info("SQLite connection closed.");
 
+      await runtime.queueService.close();
       await runtime.queue.close();
       logger.info("Redis/BullMQ connections closed.");
 

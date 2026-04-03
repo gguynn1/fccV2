@@ -18,7 +18,7 @@ import type {
 import type { DispatchPriority } from "../01-service-stack/06-action-router/types.js";
 import type { DataIngestState } from "./02-data-ingest-service/types.js";
 import type { SystemState } from "./03-state-service/types.js";
-import type { TopicConfig } from "../01-service-stack/03-classifier-service/types.js";
+import type { TopicProfileConfig } from "./04-topic-profile-service/types.js";
 import type { Thread, ThreadHistory } from "./05-routing-service/types.js";
 import type { OutboundBudgetTracker } from "./06-budget-service/types.js";
 import type { ActiveEscalation, EscalationStatus } from "./07-escalation-service/types.js";
@@ -62,7 +62,7 @@ export interface StateService {
 }
 
 export interface TopicProfileService {
-  getTopicConfig(topic: TopicKey): Promise<TopicConfig>;
+  getTopicConfig(topic: TopicKey): Promise<TopicProfileConfig[TopicKey]>;
   classifyFallback(
     queue_item: StackQueueItem,
     thread_history: ThreadHistory | null,
