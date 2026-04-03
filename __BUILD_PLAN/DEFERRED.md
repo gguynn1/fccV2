@@ -8,75 +8,69 @@ Flags identified during code review that were accepted or deferred for resolutio
 
 ### D-01 — ~~process.env double-read in server.ts~~ MOVED TO RESOLVED (R-17)
 
-### D-03 — IdentityService defaults to seed config import
-
-- **Identified:** step-06 review
-- **Severity:** Medium
-- **Description:** `IdentityService` constructor falls back to `seedSystemConfig` at runtime: `const config = options?.config ?? seedSystemConfig;`. This couples the identity service to seed data files. In production, entity configuration should come from the State Service / database.
-- **Resolve at:** step-33+ (dedicated seed-import elimination refactoring — Worker wiring in steps 29-32 perpetuated the pattern rather than eliminating it)
-- **Action:** Remove the seed import fallback. Require `config` to be passed explicitly by the Worker during service wiring.
+### D-03 — ~~IdentityService defaults to seed config import~~ CONSOLIDATED INTO D-14
 
 ### D-04 — Shallow topic state validation in State Service
 
 - **Identified:** step-03 review
 - **Severity:** Low
-- **Description:** `validateStateSlices()` casts topic states through `as unknown as Record<string, unknown>` and validates with `topicRecordSchema` which is `z.record(z.string(), z.unknown())`. This validates that topic states are objects but nothing about their shape.
-- **Resolve at:** step-24+ (Worker integration, where topic state is read/written and per-topic schemas become actionable)
-- **Action:** Replace the generic `topicRecordSchema` with per-topic Zod schemas. Profile steps (10–23) correctly defined TypeScript interfaces but not runtime validation. The Worker integration layer or State Service enhancement is the right place to add Zod schemas that validate topic state on read/write.
+- **Description:** `validateStateSlices()` casts topic states through `as unknown as Record<string, unknown>` and validates with `topicRecordSchema` which is `z.record(z.string(), z.unknown())`. This validates that topic states are objects but nothing about their shape. Has slipped twice (step-10-23, then step-24+). The Worker now reads/writes topic state without shape validation.
+- **Resolve at:** step-33 (third window — no further deferrals)
+- **Action:** Replace the generic `topicRecordSchema` with per-topic Zod schemas derived from the TypeScript interfaces defined in steps 10–24. Add runtime validation on State Service read/write paths.
 
 ### D-05 — Scheduler hardcodes participant_1 fallback
 
 - **Identified:** step-05 review
 - **Severity:** Low
 - **Description:** `BullSchedulerService.inferConcerningFromThread()` returns `["participant_1"]` as a hardcoded fallback when the thread ID doesn't match the `_private` suffix pattern. This is a silent assumption that produces wrong results for shared threads.
-- **Resolve at:** step-33+ (dedicated refactoring — Scheduler was not modified during Worker wiring)
-- **Action:** Replace with a thread-membership lookup from the Routing Service to determine which entities belong to the target thread.
+- **Resolve at:** step-33
+- **Action:** Replace with a thread-membership lookup from system configuration or the Routing Service to determine which entities belong to the target thread.
 
-### D-06 — Transport layer imports seed config at runtime
-
-- **Identified:** step-07–10 review
-- **Severity:** Medium
-- **Description:** `src/01-service-stack/01-transport-layer/index.ts` imports `seedSystemConfig` from `../../_seed/system-config.js` and uses it in `initializeThreadParticipantMaps()` and `resolveParticipantsForThread()`. The seed-data rule says the running application reads from the database, never from seed files. Same anti-pattern as D-03.
-- **Resolve at:** step-33+ (dedicated seed-import elimination refactoring, alongside D-03)
-- **Action:** Accept entity/thread configuration via constructor injection from the State Service or system configuration loaded at boot. Remove the seed import.
+### D-06 — ~~Transport layer imports seed config at runtime~~ CONSOLIDATED INTO D-14
 
 ### D-07 — ~~HealthProfile.upcoming_appointments union type~~ MOVED TO RESOLVED (R-22)
 
-### D-08 — Routing and budget services import seed config at runtime
-
-- **Identified:** step-24–27 review
-- **Severity:** Medium
-- **Description:** `src/02-supporting-services/05-routing-service/index.ts` (lines 3, 31, 54) and `src/02-supporting-services/06-budget-service/index.ts` (lines 5, 80, 194, 241, 279, 366) import `systemConfig` from `../../_seed/system-config.js` and use it at runtime. The seed-data rule says "The running application reads from the database, never from seed files." Same anti-pattern as D-03 (IdentityService) and D-06 (Transport Layer). Steps 29-32 introduced the same pattern in the Worker and Data Ingest Service (see D-11).
-- **Resolve at:** step-33+ (dedicated seed-import elimination refactoring, alongside D-03, D-06, and D-11)
-- **Action:** Accept entity/thread configuration via constructor injection from the State Service or system configuration loaded at boot. Remove the seed import from all affected files.
+### D-08 — ~~Routing and budget services import seed config at runtime~~ CONSOLIDATED INTO D-14
 
 ### D-09 — Cross-boundary runtime enum imports (EntityType, DispatchPriority, QueueItemSource, QueueItemType)
 
-- **Identified:** step-24–27 review (updated step-28 and step-29–32 reviews)
+- **Identified:** step-24–27 review (updated step-28, step-29–32 reviews, and step-0–32 reassessment)
 - **Severity:** Medium
-- **Description:** Four enums are imported across the 01↔02 service boundary as runtime values: `EntityType` from `02-identity-service/types.js` (routing service, data ingest service), `DispatchPriority` from `06-action-router/types.js` (budget service, data ingest service, stack types.ts), `QueueItemSource` from `04-queue/types.js` (escalation service, confirmation service, data ingest service, stack types.ts), and `QueueItemType` from `04-queue/types.js` (confirmation service). Steps 29-32 widened the problem: data ingest service (02) imports all three cross-boundary enums from 01, and `src/01-service-stack/types.ts` now imports `DispatchPriority` and `QueueItemSource` as runtime values. The type-boundaries rule says: "If an enum is used across the 01↔02 boundary, it belongs in `src/types.ts`."
-- **Resolve at:** step-33+ (dedicated enum migration refactoring)
+- **Description:** Four enums are imported across the 01↔02 service boundary as runtime values in 8+ files: `EntityType` from `02-identity-service/types.js` (routing service, data ingest service), `DispatchPriority` from `06-action-router/types.js` (budget service, data ingest service, scheduler service, stack types.ts, supporting-services types.ts), `QueueItemSource` from `04-queue/types.js` (escalation service, confirmation service, data ingest service, stack types.ts), and `QueueItemType` from `04-queue/types.js` (confirmation service). Includes all imports previously tracked separately in D-12.
+- **Resolve at:** step-33
 - **Action:** Move `EntityType`, `DispatchPriority`, `QueueItemSource`, and `QueueItemType` to `src/types.ts`. Update all imports across the codebase to reference the shared location.
 
 ### D-10 — ~~Unsafe type casts in routing, budget, and escalation services~~ MOVED TO RESOLVED (R-23)
 
-### D-11 — Worker and Data Ingest import systemConfig from seed at runtime
+### D-11 — ~~Worker and Data Ingest import systemConfig from seed at runtime~~ CONSOLIDATED INTO D-14
 
-- **Identified:** step-29–32 review
-- **Severity:** Medium
-- **Description:** `src/01-service-stack/05-worker/index.ts` (line 3) and `src/02-supporting-services/02-data-ingest-service/index.ts` (line 5) import `systemConfig` from `../../_seed/system-config.js` and use it at runtime. The Worker uses it for `processing_sequence`, `dispatch.collision_avoidance`, and `confirmation_gates`. Data Ingest uses it for entity filtering and thread resolution. Same anti-pattern as D-03, D-06, D-08.
-- **Resolve at:** step-33+ (dedicated seed-import elimination refactoring, alongside D-03, D-06, D-08)
-- **Action:** Accept all system configuration via constructor injection. The Worker should receive `processing_sequence`, `collision_avoidance`, and `confirmation_gates` through `WorkerConfig`. Data Ingest should receive entity/thread configuration through its options. Remove the seed imports from both files.
-
-### D-12 — Data Ingest cross-boundary runtime enum imports
-
-- **Identified:** step-29–32 review
-- **Severity:** Medium
-- **Description:** `src/02-supporting-services/02-data-ingest-service/index.ts` imports three runtime enums from `01-service-stack`: `EntityType` from `02-identity-service/types.js` (line 6), `QueueItemSource` from `04-queue/types.js` (line 12), and `DispatchPriority` from `06-action-router/types.js` (line 13). The type-boundaries rule says "If an enum is used across the 01↔02 boundary, it belongs in `src/types.ts`." Tracked alongside D-09.
-- **Resolve at:** step-33+ (alongside D-09 enum migration)
-- **Action:** After D-09 moves these enums to `src/types.ts`, update data ingest imports to reference the shared location.
+### D-12 — ~~Data Ingest cross-boundary runtime enum imports~~ MERGED INTO D-09
 
 ### D-13 — ~~resolveRoutingDecision uses duck-typing cast~~ MOVED TO RESOLVED (R-24)
+
+### D-14 — Seed config imported at runtime across 7 files
+
+- **Identified:** step-06 through step-29–32 reviews (consolidates D-03, D-06, D-08, D-11)
+- **Severity:** Medium
+- **Description:** Seven files import `systemConfig` (or `seedSystemConfig`) from `_seed/system-config.js` at runtime. The seed-data rule says "The running application reads from the database, never from seed files." Affected files: `src/server.ts`, `src/01-service-stack/01-transport-layer/index.ts`, `src/01-service-stack/02-identity-service/index.ts`, `src/01-service-stack/05-worker/index.ts`, `src/02-supporting-services/02-data-ingest-service/index.ts`, `src/02-supporting-services/05-routing-service/index.ts`, `src/02-supporting-services/06-budget-service/index.ts`. The pattern was never reduced — each new service copied it. This is the largest structural debt item.
+- **Resolve at:** step-33
+- **Action:** Load system configuration once at boot in `server.ts` from the State Service / database, then pass it via constructor injection to every service. Remove all 7 `_seed/` imports from runtime code. Seed files remain for `npm run start:seed` only.
+
+### D-15 — Unused scaffolding types (7 definitions)
+
+- **Identified:** step-24–27 and step-28 reviews (upgraded from A-21 + A-25 during step-0–32 reassessment)
+- **Severity:** Low
+- **Description:** Seven type definitions were created as scaffolding for Worker integration but remain unused after steps 30-32 wired the Worker: `MaintenanceCrossTopicLinks` (maintenance/types.ts), `BudgetDecisionTyped`, `BudgetCounterSnapshot`, `BudgetCollisionCheck` (budget/types.ts), `AccountabilityLevel`, `EscalationTransitionResult` (escalation/types.ts), `ConfirmationMatchOutcome` (confirmation/types.ts).
+- **Resolve at:** step-33+
+- **Action:** For each type: either wire it into the service/Worker implementation where it was intended, or remove it. Do not leave dead type definitions.
+
+### D-16 — suggestGroceryItemsFromMealDescription is a hardcoded placeholder
+
+- **Identified:** step-23 review (upgraded from A-19 during step-0–32 reassessment)
+- **Severity:** Low
+- **Description:** `suggestGroceryItemsFromMealDescription()` in `04.13-meals/profile.ts` only handles "taco" and "pasta" keywords. The Worker's Meals→Grocery cross-topic path calls this function. The step spec says Claude API should interpret meal ideas and suggest grocery items.
+- **Resolve at:** step-35+ (action router / composition refinement)
+- **Action:** Replace the hardcoded keyword matching with a Claude API call that extracts grocery items from meal descriptions. Wire through the Worker's composition step.
 
 ---
 
@@ -173,12 +167,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** All five steps have `completed_at: "2026-04-03T15:26:59Z"`, indicating they were completed in a single Build Agent session.
 - **Decision:** Accepted — consistent with prior decisions A-03, A-06, A-12. Code quality is fine; human review happened during this review session.
 
-### A-14 — index.ts changes entangled with steps 21-23
-
-- **Identified:** step-16–20 review
-- **Severity:** Medium
-- **Description:** The `index.ts` refactoring replaces all 8 inline profile definitions (topics 04.06–04.13) with imports from dedicated profile.ts modules. Topics 04.11-relationship, 04.12-family-status, and 04.13-meals are steps 21–23 (pending in PROGRESS.json). Steps 16–20 cannot be committed independently.
-- **Decision:** Accepted — the profiles will be reviewed when steps 21–23 come up. The code compiles correctly as a whole.
+### A-14 — ~~index.ts changes entangled with steps 21-23~~ MOVED TO RESOLVED (R-25)
 
 ### A-15 — BusinessLead has many optional CRM-critical fields
 
@@ -208,12 +197,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** `shouldRelationshipNudgeDisappearWhenIgnored(ignored) → ignored` (relationship/profile.ts) and `shouldRequestTransitEta(is_calendar_transit_window) → is_calendar_transit_window` (family-status/profile.ts) are identity functions.
 - **Decision:** Accepted — they communicate design intent and serve as natural extension points if the logic becomes conditional later.
 
-### A-19 — suggestGroceryItemsFromMealDescription is a hardcoded placeholder
-
-- **Identified:** step-23 review
-- **Severity:** Low
-- **Description:** `suggestGroceryItemsFromMealDescription()` in meals/profile.ts only handles "taco" and "pasta" keywords. The step spec says Claude API should interpret meal ideas and suggest grocery items.
-- **Decision:** Accepted — placeholder fallback pattern. Real meal-to-grocery mapping will use Claude at Worker integration.
+### A-19 — ~~suggestGroceryItemsFromMealDescription is a hardcoded placeholder~~ UPGRADED TO DEFERRAL (D-16)
 
 ### A-20 — Steps 24–27 share identical completion timestamp
 
@@ -222,12 +206,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** All four steps have `completed_at: "2026-04-03T16:07:54Z"`, indicating they were completed in a single Build Agent session.
 - **Decision:** Accepted — consistent with prior decisions A-03, A-06, A-12, A-13, A-17. Code quality is fine; human review happened during this review session.
 
-### A-21 — Six unused type definitions (scaffolding)
-
-- **Identified:** step-24–27 review
-- **Severity:** Low
-- **Description:** `MaintenanceCrossTopicLinks` (maintenance/types.ts), `BudgetDecisionTyped`, `BudgetCounterSnapshot`, `BudgetCollisionCheck` (budget/types.ts), `AccountabilityLevel`, `EscalationTransitionResult` (escalation/types.ts) are defined but not consumed by any implementation.
-- **Decision:** Accepted — scaffolding types for Worker integration. Will be consumed when the Worker wires these services together.
+### A-21 — ~~Six unused type definitions (scaffolding)~~ UPGRADED TO DEFERRAL (D-15)
 
 ### A-22 — Hardcoded "family" thread ID as fallback
 
@@ -243,12 +222,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** `BullConfirmationService.openConfirmation()` in `08-confirmation-service/index.ts` (line 177) casts the `ConfirmationRequest` parameter to `OpenConfirmationRequest` to access optional fields (`requested_at`, `reply_options`, `expiry_message`) not on the declared interface. All additional fields are optional, so the cast is safe in practice.
 - **Decision:** Accepted — documents that callers may provide extra fields. The interface can be expanded during Worker wiring when actual callers are known.
 
-### A-25 — ConfirmationMatchOutcome type unused
-
-- **Identified:** step-28 review
-- **Severity:** Low
-- **Description:** `ConfirmationMatchOutcome` is defined in `08-confirmation-service/types.ts` (lines 101-105) but not consumed by `index.ts`. Scaffolding for Worker integration.
-- **Decision:** Accepted — consistent with A-21 (six unused scaffolding types from steps 24-27). Will be consumed when the Worker wires the confirmation service.
+### A-25 — ~~ConfirmationMatchOutcome type unused~~ UPGRADED TO DEFERRAL (D-15)
 
 ### A-26 — Steps 29-32 share identical completion timestamp
 
@@ -414,6 +388,13 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolved:** same session
 - **Description:** `confirmationTypeForAction()` used `systemConfig.confirmation_gates.always_require_approval[0]` and `[1]` to select confirmation types. Array reordering would silently break behavior.
 - **Fix:** Replaced with direct `ConfirmationActionType.FinancialAction` and `ConfirmationActionType.SendingOnBehalf` enum references. Added `ConfirmationActionType` import.
+
+### R-25 — A-14: index.ts entanglement with steps 21-23
+
+- **Identified:** step-16–20 review
+- **Resolved:** step-0–32 reassessment
+- **Description:** Steps 16-20 refactored `index.ts` to import profiles from modules that were part of steps 21-23 (then pending). The concern was that steps 16-20 could not be committed independently.
+- **Fix:** Steps 21-23 completed, all profiles now exist. The entanglement concern is moot.
 
 ### R-22 — D-07: HealthProfile.upcoming_appointments union type
 
