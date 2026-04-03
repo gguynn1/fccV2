@@ -1,5 +1,5 @@
 {
-  "current_step": "step-16",
+  "current_step": "step-24",
   "status_notes": {
     "step-00-part-1": {
       "updated_at": "2026-04-03T13:55:03Z",
@@ -280,6 +280,117 @@
         "npm run build passed"
       ],
       "next_action": "Proceed to step-16."
+    },
+    "step-16": {
+      "updated_at": "2026-04-03T15:26:59Z",
+      "checks_completed": [
+        "pets topic profile module added in 04.06-pets/profile.ts and registered in topic profile service",
+        "pets types expanded for vet visits, medications, grooming, boarding, and care history tracking",
+        "responsible-adult private-thread routing helper added and PET direct-message guard implemented",
+        "overdue-care and travel-prep checklist helpers added for gentle low-escalation reminders",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-17."
+    },
+    "step-17": {
+      "updated_at": "2026-04-03T15:26:59Z",
+      "checks_completed": [
+        "school topic profile module added in 04.07-school/profile.ts and registered in topic profile service",
+        "school types expanded for assignments, due dates, school communications, and escalation stage tracking",
+        "student/private and parent/private routing helpers added for dual-audience handling",
+        "deadline timeline and child-to-parent escalation helper behavior added for medium escalation",
+        "school inputs constrained to conversation and email-parsing model in type contracts",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-18."
+    },
+    "step-18": {
+      "updated_at": "2026-04-03T15:26:59Z",
+      "checks_completed": [
+        "travel topic profile module added in 04.08-travel/profile.ts and registered in topic profile service",
+        "travel types expanded for itineraries, checklist lifecycle, countdown reminders, and post-trip follow-up",
+        "cross-topic links codified for calendar, pets, finances, and grocery in profile contract",
+        "routing helper added for broadest shared-thread selection and solo-travel private fallback",
+        "countdown and post-trip helper functions added for medium-escalation travel workflows",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-19."
+    },
+    "step-19": {
+      "updated_at": "2026-04-03T15:26:59Z",
+      "checks_completed": [
+        "vendors topic profile module added in 04.09-vendors/profile.ts and registered in topic profile service",
+        "vendor types expanded with follow-up stage/history tracking and historical query support fields",
+        "managing-adult private-thread routing helper implemented for vendor ownership",
+        "no-escalation proactive guard implemented (only send reminders when follow-up is explicitly pending)",
+        "historical vendor answer renderer added for lookup prompts",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-20."
+    },
+    "step-20": {
+      "updated_at": "2026-04-03T15:26:59Z",
+      "checks_completed": [
+        "business topic profile module added in 04.10-business/profile.ts and registered in topic profile service",
+        "business types expanded for per-entity business profiles and CRM lead schema (contact, inquiry, event details, pipeline, follow-up, booking status)",
+        "business-owner private-thread routing and per-owner lead privacy helper added",
+        "draft confirmation requirement helper added for client-facing staged sends",
+        "business-type-aware tone hint helper added for draft composition behavior",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-21."
+    },
+    "step-21": {
+      "updated_at": "2026-04-03T15:29:19Z",
+      "checks_completed": [
+        "relationship topic profile module added in 04.11-relationship/profile.ts and registered in topic profile service",
+        "relationship types expanded with framework grounding, nudge history metadata, quiet-window state, and cooldown tracking fields",
+        "adults-only shared-thread routing helper enforced for relationship prompts",
+        "ignored-nudge disappearance and cooldown-based retry helper behavior added with alternate nudge-type selection",
+        "quiet-window guard helper added to prevent nudges during busy or stressful periods",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-22."
+    },
+    "step-22": {
+      "updated_at": "2026-04-03T15:29:19Z",
+      "checks_completed": [
+        "family status topic profile module added in 04.12-family-status/profile.ts and registered in topic profile service",
+        "family status types expanded for ETA/location snapshot fields and freshness-window metadata",
+        "snapshot expiry helpers added for active-status filtering and stale-entry cleanup",
+        "narrowest-appropriate thread routing helper added for audience-fit status updates",
+        "minimal proactive ETA transit-check helper added",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-23."
+    },
+    "step-23": {
+      "updated_at": "2026-04-03T15:29:19Z",
+      "checks_completed": [
+        "meals topic profile module added in 04.13-meals/profile.ts and registered in topic profile service",
+        "meals types expanded with recipe references and explicit grocery-link action support",
+        "cross-topic connection to grocery enforced in dedicated meals profile module",
+        "routing helpers added for broadest shared planning thread and private dietary-note handling",
+        "grocery suggestion helper added for meal-plan-to-grocery linkage without external APIs",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-24."
     }
   },
   "steps": {
@@ -301,14 +412,14 @@
     "step-13": { "status": "complete", "completed_at": "2026-04-03T15:16:08Z" },
     "step-14": { "status": "complete", "completed_at": "2026-04-03T15:16:08Z" },
     "step-15": { "status": "complete", "completed_at": "2026-04-03T15:16:08Z" },
-    "step-16": { "status": "pending" },
-    "step-17": { "status": "pending" },
-    "step-18": { "status": "pending" },
-    "step-19": { "status": "pending" },
-    "step-20": { "status": "pending" },
-    "step-21": { "status": "pending" },
-    "step-22": { "status": "pending" },
-    "step-23": { "status": "pending" },
+    "step-16": { "status": "complete", "completed_at": "2026-04-03T15:26:59Z" },
+    "step-17": { "status": "complete", "completed_at": "2026-04-03T15:26:59Z" },
+    "step-18": { "status": "complete", "completed_at": "2026-04-03T15:26:59Z" },
+    "step-19": { "status": "complete", "completed_at": "2026-04-03T15:26:59Z" },
+    "step-20": { "status": "complete", "completed_at": "2026-04-03T15:26:59Z" },
+    "step-21": { "status": "complete", "completed_at": "2026-04-03T15:29:19Z" },
+    "step-22": { "status": "complete", "completed_at": "2026-04-03T15:29:19Z" },
+    "step-23": { "status": "complete", "completed_at": "2026-04-03T15:29:19Z" },
     "step-24": { "status": "pending" },
     "step-25": { "status": "pending" },
     "step-26": { "status": "pending" },

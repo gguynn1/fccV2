@@ -14,6 +14,14 @@ import { CHORES_TOPIC_PROFILE } from "./04.02-chores/profile.js";
 import { FINANCES_TOPIC_PROFILE } from "./04.03-finances/profile.js";
 import { GROCERY_TOPIC_PROFILE } from "./04.04-grocery/profile.js";
 import { HEALTH_TOPIC_PROFILE } from "./04.05-health/profile.js";
+import { PETS_TOPIC_PROFILE } from "./04.06-pets/profile.js";
+import { SCHOOL_TOPIC_PROFILE } from "./04.07-school/profile.js";
+import { TRAVEL_TOPIC_PROFILE } from "./04.08-travel/profile.js";
+import { VENDORS_TOPIC_PROFILE } from "./04.09-vendors/profile.js";
+import { BUSINESS_TOPIC_PROFILE } from "./04.10-business/profile.js";
+import { RELATIONSHIP_TOPIC_PROFILE } from "./04.11-relationship/profile.js";
+import { FAMILY_STATUS_TOPIC_PROFILE } from "./04.12-family-status/profile.js";
+import { MEALS_TOPIC_PROFILE } from "./04.13-meals/profile.js";
 
 const DEFAULT_LOGGER = pino({ name: "topic-profile-service" });
 
@@ -35,84 +43,14 @@ const TOPIC_PROFILES: TopicProfileConfig = {
   [TopicKey.Finances]: FINANCES_TOPIC_PROFILE,
   [TopicKey.Grocery]: GROCERY_TOPIC_PROFILE,
   [TopicKey.Health]: HEALTH_TOPIC_PROFILE,
-  [TopicKey.Pets]: {
-    tone: "warm and practical",
-    format: "care summaries and checklists",
-    initiative_style: "gentle periodic reminders",
-    escalation_level: EscalationLevel.Low,
-    framework_grounding: null,
-    response_format: "caretaker-style summaries",
-    cross_topic_connections: [TopicKey.Calendar, TopicKey.Vendors],
-  },
-  [TopicKey.School]: {
-    tone: "organized and encouraging",
-    format: "deadline lists and concise status updates",
-    initiative_style: "deadline-driven reminders with parent awareness",
-    escalation_level: EscalationLevel.Medium,
-    framework_grounding: null,
-    response_format: "student and parent specific summaries",
-    cross_topic_connections: [TopicKey.Calendar],
-  },
-  [TopicKey.Travel]: {
-    tone: "organized and anticipatory",
-    format: "checklists and timeline snapshots",
-    initiative_style: "countdown-based trip preparation",
-    escalation_level: EscalationLevel.Medium,
-    framework_grounding: null,
-    response_format: "trip briefs and prep checkpoints",
-    cross_topic_connections: [
-      TopicKey.Calendar,
-      TopicKey.Pets,
-      TopicKey.Finances,
-      TopicKey.Grocery,
-    ],
-  },
-  [TopicKey.Vendors]: {
-    tone: "businesslike",
-    format: "records with status and follow-up",
-    initiative_style: "follow-up driven when no response",
-    escalation_level: EscalationLevel.None,
-    framework_grounding: null,
-    response_format: "service-provider records",
-    cross_topic_connections: [TopicKey.Finances, TopicKey.Maintenance],
-  },
-  [TopicKey.Business]: {
-    tone: "professional and organized",
-    format: "pipeline snapshots and draft-ready replies",
-    initiative_style: "pipeline reminders and booking follow-up",
-    escalation_level: EscalationLevel.None,
-    framework_grounding: null,
-    response_format: "lead pipeline summaries",
-    cross_topic_connections: [TopicKey.Finances, TopicKey.Calendar],
-  },
-  [TopicKey.Relationship]: {
-    tone: "warm and non-clinical",
-    format: "open-ended prompts and gentle suggestions",
-    initiative_style: "soft nudges that are easy to ignore",
-    escalation_level: EscalationLevel.Low,
-    framework_grounding:
-      "Internal Family Systems Therapy, emotionally focused approaches, and attachment-based practices",
-    response_format: "short prompts and reflection starters",
-    cross_topic_connections: [],
-  },
-  [TopicKey.FamilyStatus]: {
-    tone: "brief and functional",
-    format: "current-state snapshots",
-    initiative_style: "minimal and timing-aware",
-    escalation_level: EscalationLevel.Low,
-    framework_grounding: null,
-    response_format: "quick status readbacks",
-    cross_topic_connections: [],
-  },
-  [TopicKey.Meals]: {
-    tone: "collaborative and practical",
-    format: "meal plan options and linked grocery impact",
-    initiative_style: "moderate suggestions around planning windows",
-    escalation_level: EscalationLevel.None,
-    framework_grounding: null,
-    response_format: "options and simple plans",
-    cross_topic_connections: [TopicKey.Grocery, TopicKey.Health],
-  },
+  [TopicKey.Pets]: PETS_TOPIC_PROFILE,
+  [TopicKey.School]: SCHOOL_TOPIC_PROFILE,
+  [TopicKey.Travel]: TRAVEL_TOPIC_PROFILE,
+  [TopicKey.Vendors]: VENDORS_TOPIC_PROFILE,
+  [TopicKey.Business]: BUSINESS_TOPIC_PROFILE,
+  [TopicKey.Relationship]: RELATIONSHIP_TOPIC_PROFILE,
+  [TopicKey.FamilyStatus]: FAMILY_STATUS_TOPIC_PROFILE,
+  [TopicKey.Meals]: MEALS_TOPIC_PROFILE,
   [TopicKey.Maintenance]: {
     tone: "practical and reminder-driven",
     format: "service schedules and history logs",

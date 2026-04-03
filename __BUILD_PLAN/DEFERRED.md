@@ -27,8 +27,8 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Identified:** step-03 review
 - **Severity:** Low
 - **Description:** `validateStateSlices()` casts topic states through `as unknown as Record<string, unknown>` and validates with `topicRecordSchema` which is `z.record(z.string(), z.unknown())`. This validates that topic states are objects but nothing about their shape.
-- **Resolve at:** steps 10–23 (topic profile implementation steps)
-- **Action:** Replace the generic `topicRecordSchema` with per-topic Zod schemas as each topic profile is built. Each step should add its topic's schema to the validation function.
+- **Resolve at:** step-24+ (Worker integration, where topic state is read/written and per-topic schemas become actionable)
+- **Action:** Replace the generic `topicRecordSchema` with per-topic Zod schemas. Profile steps (10–23) correctly defined TypeScript interfaces but not runtime validation. The Worker integration layer or State Service enhancement is the right place to add Zod schemas that validate topic state on read/write.
 
 ### D-05 — Scheduler hardcodes participant_1 fallback
 
@@ -142,6 +142,55 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** All five steps have `completed_at: "2026-04-03T15:16:08Z"`, indicating they were completed in a single Build Agent session.
 - **Decision:** Accepted — consistent with prior decisions A-03 (steps 04-06) and A-06 (steps 07-10). Code quality is fine; human review happened during this review session.
 
+### A-13 — Steps 16-20 share identical completion timestamp
+
+- **Identified:** step-16–20 review
+- **Severity:** Low
+- **Description:** All five steps have `completed_at: "2026-04-03T15:26:59Z"`, indicating they were completed in a single Build Agent session.
+- **Decision:** Accepted — consistent with prior decisions A-03, A-06, A-12. Code quality is fine; human review happened during this review session.
+
+### A-14 — index.ts changes entangled with steps 21-23
+
+- **Identified:** step-16–20 review
+- **Severity:** Medium
+- **Description:** The `index.ts` refactoring replaces all 8 inline profile definitions (topics 04.06–04.13) with imports from dedicated profile.ts modules. Topics 04.11-relationship, 04.12-family-status, and 04.13-meals are steps 21–23 (pending in PROGRESS.json). Steps 16–20 cannot be committed independently.
+- **Decision:** Accepted — the profiles will be reviewed when steps 21–23 come up. The code compiles correctly as a whole.
+
+### A-15 — BusinessLead has many optional CRM-critical fields
+
+- **Identified:** step-20 review
+- **Severity:** Low
+- **Description:** `BusinessLead` in `04.10-business/types.ts` has `status`, `pipeline_stage`, `booking_status`, `contact`, and `client_name` all optional. CRM tracking is weakened when pipeline stage is unknown.
+- **Decision:** Accepted — progressive data capture is a valid CRM pattern. A lead starts as just an inquiry date and owner; fields populate as the pipeline advances. The Worker can enforce required fields at transition boundaries.
+
+### A-16 — businessClientDraftToneHint hardcodes "photo"/"portrait" check
+
+- **Identified:** step-20 review
+- **Severity:** Low
+- **Description:** `businessClientDraftToneHint()` in `04.10-business/profile.ts` checks if `business_type` contains "photo" or "portrait" to select a warm client-facing tone, otherwise returns a generic professional tone.
+- **Decision:** Accepted — acceptable for a single-deployment system. The Worker or composition logic can add more nuanced mapping later.
+
+### A-17 — Steps 21-23 share identical completion timestamp
+
+- **Identified:** step-21–23 review
+- **Severity:** Low
+- **Description:** All three steps have `completed_at: "2026-04-03T15:29:19Z"`, indicating they were completed in a single Build Agent session.
+- **Decision:** Accepted — consistent with prior decisions A-03, A-06, A-12, A-13. Code quality is fine; human review happened during this review session.
+
+### A-18 — Two trivial identity functions in relationship and family-status profiles
+
+- **Identified:** step-21–23 review
+- **Severity:** Low
+- **Description:** `shouldRelationshipNudgeDisappearWhenIgnored(ignored) → ignored` (relationship/profile.ts) and `shouldRequestTransitEta(is_calendar_transit_window) → is_calendar_transit_window` (family-status/profile.ts) are identity functions.
+- **Decision:** Accepted — they communicate design intent and serve as natural extension points if the logic becomes conditional later.
+
+### A-19 — suggestGroceryItemsFromMealDescription is a hardcoded placeholder
+
+- **Identified:** step-23 review
+- **Severity:** Low
+- **Description:** `suggestGroceryItemsFromMealDescription()` in meals/profile.ts only handles "taco" and "pasta" keywords. The step spec says Claude API should interpret meal ideas and suggest grocery items.
+- **Decision:** Accepted — placeholder fallback pattern. Real meal-to-grocery mapping will use Claude at Worker integration.
+
 ---
 
 ## Resolved
@@ -187,3 +236,59 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolved:** same session
 - **Description:** `TopicClarificationRequest.reason` in `src/02-supporting-services/04-topic-profile-service/types.ts` used a string literal union instead of the `ClarificationReason` enum from `src/types.ts`.
 - **Fix:** Replaced the string literal union with `ClarificationReason` via `import type`.
+
+### R-07 — SchoolAction source union widened to `SchoolInputSource | string`
+
+- **Identified:** step-17 review
+- **Resolved:** same session
+- **Description:** `Assignment.source` and `add_assignment` action `source` in `04.07-school/types.ts` were typed as `SchoolInputSource | string`. The `| string` subsumes the enum, making the type constraint meaningless.
+- **Fix:** Removed `| string` from both locations. Updated seed data to use `SchoolInputSource.EmailParsing` and `SchoolInputSource.Conversation` instead of raw strings.
+
+### R-08 — VendorJob.notes union type `string | string[]`
+
+- **Identified:** step-19 review
+- **Resolved:** same session
+- **Description:** `VendorJob.notes` in `04.09-vendors/types.ts` was typed as `string | string[]`, forcing consumers to handle both shapes with runtime type guards. Same anti-pattern as D-07.
+- **Fix:** Normalized to `string[]`. Updated seed data to wrap single note strings in arrays.
+
+### R-09 — Pets cross_topic_connections dropped Vendors
+
+- **Identified:** step-16 review
+- **Resolved:** same session
+- **Description:** `PETS_TOPIC_PROFILE` in `04.06-pets/profile.ts` had `cross_topic_connections: [TopicKey.Calendar]`, dropping `TopicKey.Vendors` from the previous inline definition. Vet appointments can create vendor relationships.
+- **Fix:** Restored `TopicKey.Vendors` to the pets profile cross-topic connections.
+
+### R-10 — BusinessProfile.follow_up_quiet_period typed as string, parsed as int
+
+- **Identified:** step-20 review
+- **Resolved:** same session
+- **Description:** `BusinessProfile.follow_up_quiet_period` was typed as `string` but `isBusinessLeadQuiet()` parsed it with `Number.parseInt()`. The format was undocumented and type-unsafe.
+- **Fix:** Renamed to `follow_up_quiet_period_days: number`. Removed `parseInt` from `isBusinessLeadQuiet()`. Updated seed data from `"48h"` to `2`.
+
+### R-11 — D-04 resolve-at window passed without resolution
+
+- **Identified:** step-21–23 review
+- **Resolved:** same session
+- **Description:** D-04 (shallow topic state validation) had `Resolve at: steps 10–23`. Profile steps correctly built TypeScript interfaces but not Zod runtime schemas. The window passed without resolution.
+- **Fix:** Updated D-04's resolve-at to `step-24+` (Worker integration, where topic state is read/written and per-topic schemas become actionable).
+
+### R-12 — selectNextRelationshipNudgeType only cycled 3 of 5 NudgeType values
+
+- **Identified:** step-21 review
+- **Resolved:** same session
+- **Description:** The selection function only rotated through AppreciationPrompt, ConversationStarter, and ConnectionPrompt. DateNightSuggestion and GratitudeExercise were defined in the enum but unreachable.
+- **Fix:** Replaced if-chain with array-based rotation over all 5 `NudgeType` values via `NUDGE_ROTATION` array and modular index.
+
+### R-13 — routeMealsPlanningThread sorted by string length instead of participant count
+
+- **Identified:** step-23 review
+- **Resolved:** same session
+- **Description:** `routeMealsPlanningThread()` took `string[]` thread IDs and sorted by `b.length - a.length` (string character count), a flawed proxy for "broadest thread."
+- **Fix:** Changed to accept `MealThreadCandidate[]` objects (with `id`, `participants`, `is_shared`), filter to shared threads, and sort by `participants.length` descending. Matches the pattern used by `routeTravelThread()`.
+
+### R-14 — Meals cross_topic_connections dropped Health
+
+- **Identified:** step-23 review
+- **Resolved:** same session
+- **Description:** `MEALS_TOPIC_PROFILE` had `cross_topic_connections: [TopicKey.Grocery]`, dropping `TopicKey.Health` from the previous inline definition. Dietary notes connect meals to health awareness.
+- **Fix:** Restored `TopicKey.Health` to the meals profile cross-topic connections. Same pattern as R-09 (Pets/Vendors).
