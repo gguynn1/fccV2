@@ -6,6 +6,10 @@ export interface GroceryItem {
   section: GrocerySection;
   added_by: string;
   added_at: Date;
+  purchased?: boolean;
+  purchased_by?: string;
+  purchased_at?: Date;
+  source_topic?: "grocery" | "meals";
 }
 
 export interface PurchasedItem {
@@ -17,6 +21,11 @@ export interface PurchasedItem {
 export interface GroceryState {
   list: GroceryItem[];
   recently_purchased: PurchasedItem[];
+}
+
+export interface GroceryDuplicateCandidate {
+  normalized_item: string;
+  existing_item_id: string;
 }
 
 export type GroceryAction =

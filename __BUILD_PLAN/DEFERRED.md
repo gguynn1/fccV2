@@ -46,6 +46,14 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolve at:** Worker wiring step (alongside D-03)
 - **Action:** Accept entity/thread configuration via constructor injection from the State Service or system configuration loaded at boot. Remove the seed import.
 
+### D-07 — HealthProfile.upcoming_appointments union type
+
+- **Identified:** step-15 review
+- **Severity:** Medium
+- **Description:** `src/02-supporting-services/04-topic-profile-service/04.05-health/types.ts` defines `upcoming_appointments: Array<string | HealthAppointment>`. The union type forces every consumer to use runtime type guards before accessing appointment fields, propagating type unsafety to the Worker, composition logic, and state validation.
+- **Resolve at:** step-24+ (health Worker integration, when health state is read/written)
+- **Action:** Migrate to `HealthAppointment[]` as the single type. Update any seed data that uses plain strings to use `HealthAppointment` objects.
+
 ---
 
 ## Accepted (no action needed)
@@ -98,6 +106,41 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Severity:** Low
 - **Description:** `src/01-service-stack/01-transport-layer/01.1-caldav/index.ts` sets `ctag: "1"` as a static value. Calendar apps use ctag to detect when to re-fetch. A static value prevents cache invalidation.
 - **Decision:** Accepted — full CalDAV compliance is deferred to step-41. The ctag should be derived from the most recent event modification timestamp when real data flows through.
+
+### A-08 — CalendarEvent has 5 optional date-related fields
+
+- **Identified:** step-11 review
+- **Severity:** Low
+- **Description:** `CalendarEvent` in `04.01-calendar/types.ts` has `normalized_start`, `normalized_end`, `date`, `date_start`, `date_end` — all optional. Conflict detection uses a 3-level fallback chain (`normalized_start ?? date_start ?? date`).
+- **Decision:** Accepted — the normalized fields provide a canonical resolution point. The Worker should populate `normalized_start/end` during event creation, making the fallback chain a safety net rather than the primary access path.
+
+### A-09 — Hardcoded thread naming conventions in finance and health helpers
+
+- **Identified:** step-13/15 review
+- **Severity:** Low
+- **Description:** `FINANCES_ALLOWED_THREADS = ["couple"]` in `04.03-finances/profile.ts` and `isHealthPrivateThread()` checking `${entity_id}_private` in `04.05-health/profile.ts` encode thread-naming assumptions.
+- **Decision:** Accepted — stable convention for a single-deployment system. Thread IDs are defined in system config and are unlikely to change. The Worker can inject thread config if needed.
+
+### A-10 — FinanceAction requires_confirmation literal redundant with helper
+
+- **Identified:** step-13 review
+- **Severity:** Low
+- **Description:** Every mutating `FinanceAction` variant includes `requires_confirmation: true` as a literal type field. The `requiresFinanceConfirmation()` helper already derives this from `action.type !== "query_finances"`.
+- **Decision:** Accepted — the literal type serves as compile-time documentation that financial mutations always require confirmation. The helper provides runtime convenience. Mild redundancy but not harmful.
+
+### A-11 — D-04 per-topic Zod schemas not addressed in steps 11-15
+
+- **Identified:** step-11–15 review
+- **Severity:** Low
+- **Description:** D-04's resolve-at range (steps 10–23) includes these steps, but no per-topic Zod validation schemas were added. Profile steps define behavior and TypeScript interfaces — not state validation. Per-topic Zod schemas belong in the State Service or Worker integration layer.
+- **Decision:** Accepted — the deferral's resolve-at range is broad. Steps 11-15 are the wrong place for State Service validation changes. D-04 remains active and will be addressed during Worker integration.
+
+### A-12 — Steps 11-15 share identical completion timestamp
+
+- **Identified:** step-11–15 review
+- **Severity:** Low
+- **Description:** All five steps have `completed_at: "2026-04-03T15:16:08Z"`, indicating they were completed in a single Build Agent session.
+- **Decision:** Accepted — consistent with prior decisions A-03 (steps 04-06) and A-06 (steps 07-10). Code quality is fine; human review happened during this review session.
 
 ---
 

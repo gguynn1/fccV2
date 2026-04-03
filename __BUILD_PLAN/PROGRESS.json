@@ -1,5 +1,5 @@
 {
-  "current_step": "step-11",
+  "current_step": "step-16",
   "status_notes": {
     "step-00-part-1": {
       "updated_at": "2026-04-03T13:55:03Z",
@@ -215,6 +215,71 @@
         "npm run build passed"
       ],
       "next_action": "Proceed to step-11."
+    },
+    "step-11": {
+      "updated_at": "2026-04-03T15:16:08Z",
+      "checks_completed": [
+        "calendar topic profile module added in 04.01-calendar/profile.ts and registered in topic profile service",
+        "calendar types expanded with reminder planning, conflict detection request/result, and reschedule lookup contracts",
+        "calendar conflict detection helper implemented for overlapping appointments",
+        "calendar reminder staleness helper added to support downtime-safe reminder behavior",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-12."
+    },
+    "step-12": {
+      "updated_at": "2026-04-03T15:16:08Z",
+      "checks_completed": [
+        "chores topic profile module added in 04.02-chores/profile.ts and registered in topic profile service",
+        "chores types expanded with explicit escalation stage tracking fields",
+        "high-accountability escalation timeline helper added (reminder, follow-up, post-deadline escalation)",
+        "next escalation stage helper added for structured unresolved-task progression",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-13."
+    },
+    "step-13": {
+      "updated_at": "2026-04-03T15:16:08Z",
+      "checks_completed": [
+        "finances topic profile module added in 04.03-finances/profile.ts and registered in topic profile service",
+        "finances types expanded with explicit snapshot categories and confirmation-gated financial action contracts",
+        "adults-only routing helper constrained finance topic to couple thread",
+        "confirmation requirement helper added for financial mutations",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-14."
+    },
+    "step-14": {
+      "updated_at": "2026-04-03T15:16:08Z",
+      "checks_completed": [
+        "grocery topic profile module added in 04.04-grocery/profile.ts and registered in topic profile service",
+        "grocery types expanded with purchased status support and duplicate candidate contract",
+        "grocery item normalization and duplicate detection helpers added",
+        "cross-topic connection to meals preserved in dedicated profile module",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-15."
+    },
+    "step-15": {
+      "updated_at": "2026-04-03T15:16:08Z",
+      "checks_completed": [
+        "health topic profile module added in 04.05-health/profile.ts and registered in topic profile service",
+        "health types expanded with appointment linkage, provider visit notes, and medication reminder-time support",
+        "private-thread and reminder/follow-up timing helpers added for health topic workflows",
+        "cross-topic connection to calendar enforced in dedicated profile module",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build passed"
+      ],
+      "next_action": "Proceed to step-16."
     }
   },
   "steps": {
@@ -231,11 +296,11 @@
     "step-08": { "status": "complete", "completed_at": "2026-04-03T15:04:50Z" },
     "step-09": { "status": "complete", "completed_at": "2026-04-03T15:04:50Z" },
     "step-10": { "status": "complete", "completed_at": "2026-04-03T15:04:50Z" },
-    "step-11": { "status": "pending" },
-    "step-12": { "status": "pending" },
-    "step-13": { "status": "pending" },
-    "step-14": { "status": "pending" },
-    "step-15": { "status": "pending" },
+    "step-11": { "status": "complete", "completed_at": "2026-04-03T15:16:08Z" },
+    "step-12": { "status": "complete", "completed_at": "2026-04-03T15:16:08Z" },
+    "step-13": { "status": "complete", "completed_at": "2026-04-03T15:16:08Z" },
+    "step-14": { "status": "complete", "completed_at": "2026-04-03T15:16:08Z" },
+    "step-15": { "status": "complete", "completed_at": "2026-04-03T15:16:08Z" },
     "step-16": { "status": "pending" },
     "step-17": { "status": "pending" },
     "step-18": { "status": "pending" },

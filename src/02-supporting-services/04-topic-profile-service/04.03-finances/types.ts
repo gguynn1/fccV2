@@ -68,8 +68,16 @@ export interface FinancesState {
   savings_goals: SavingsGoal[];
 }
 
+export type FinanceSnapshotCategory = "bills" | "expenses" | "savings";
+
 export type FinanceAction =
-  | { type: "log_expense"; description: string; amount: number; logged_by: string }
-  | { type: "pay_bill"; bill_id: string }
-  | { type: "adjust_savings"; goal_id: string; amount: number }
-  | { type: "query_finances"; category?: "bills" | "expenses" | "savings" };
+  | {
+      type: "log_expense";
+      description: string;
+      amount: number;
+      logged_by: string;
+      requires_confirmation: true;
+    }
+  | { type: "pay_bill"; bill_id: string; requires_confirmation: true }
+  | { type: "adjust_savings"; goal_id: string; amount: number; requires_confirmation: true }
+  | { type: "query_finances"; category?: FinanceSnapshotCategory };

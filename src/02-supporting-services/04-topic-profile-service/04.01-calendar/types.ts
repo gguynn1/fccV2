@@ -11,6 +11,8 @@ export enum CalendarEventStatus {
 export interface CalendarEvent {
   id: string;
   title: string;
+  normalized_start?: Date;
+  normalized_end?: Date;
   date?: Date;
   date_start?: Date;
   date_end?: Date;
@@ -31,11 +33,46 @@ export interface CalendarState {
   events: CalendarEvent[];
 }
 
+export interface CalendarReminderPlan {
+  reminder_offsets_minutes: number[];
+  follow_up_offset_minutes: number;
+  stale_after_minutes: number;
+}
+
+export interface CalendarConflictCheckRequest {
+  start: Date;
+  end: Date;
+  concerning: string[];
+  ignore_event_id?: string;
+}
+
+export interface CalendarConflictResult {
+  has_conflicts: boolean;
+  conflicting_event_ids: string[];
+}
+
 export interface CalendarQueryFilters {
   date_range?: { start: Date; end: Date };
   concerning?: string[];
   status?: CalendarEventStatus[];
 }
+
+export interface CalendarRescheduleCandidate {
+  event_id: string;
+  title: string;
+  starts_at: Date;
+}
+
+export type CalendarRescheduleLookup =
+  | {
+      kind: "resolved";
+      event_id: string;
+    }
+  | {
+      kind: "clarification_required";
+      candidates: CalendarRescheduleCandidate[];
+      reason: "multiple_matches";
+    };
 
 export type CalendarAction =
   | {

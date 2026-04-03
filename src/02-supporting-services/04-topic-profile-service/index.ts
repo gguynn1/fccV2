@@ -9,6 +9,11 @@ import type {
   WorkerDecision,
 } from "../../01-service-stack/types.js";
 import type { ThreadHistory } from "../05-routing-service/types.js";
+import { CALENDAR_TOPIC_PROFILE } from "./04.01-calendar/profile.js";
+import { CHORES_TOPIC_PROFILE } from "./04.02-chores/profile.js";
+import { FINANCES_TOPIC_PROFILE } from "./04.03-finances/profile.js";
+import { GROCERY_TOPIC_PROFILE } from "./04.04-grocery/profile.js";
+import { HEALTH_TOPIC_PROFILE } from "./04.05-health/profile.js";
 
 const DEFAULT_LOGGER = pino({ name: "topic-profile-service" });
 
@@ -25,51 +30,11 @@ const topicProfileSchema = z.object({
 const topicConfigSchema = z.record(z.nativeEnum(TopicKey), topicProfileSchema);
 
 const TOPIC_PROFILES: TopicProfileConfig = {
-  [TopicKey.Calendar]: {
-    tone: "precise and logistical",
-    format: "structured confirmation with date, time, location, and participants",
-    initiative_style: "event-driven reminders before events and follow-ups after",
-    escalation_level: EscalationLevel.Medium,
-    framework_grounding: null,
-    response_format: "confirmation blocks and concise updates",
-    cross_topic_connections: [TopicKey.Health, TopicKey.School, TopicKey.Travel, TopicKey.Business],
-  },
-  [TopicKey.Chores]: {
-    tone: "direct and operational",
-    format: "clear task ownership and deadline",
-    initiative_style: "structured reminders with follow-up and escalation",
-    escalation_level: EscalationLevel.High,
-    framework_grounding: null,
-    response_format: "assignment confirmations and completion checks",
-    cross_topic_connections: [],
-  },
-  [TopicKey.Finances]: {
-    tone: "calm and factual",
-    format: "numbered snapshots with due dates",
-    initiative_style: "deadline-driven alerts and milestone updates",
-    escalation_level: EscalationLevel.High,
-    framework_grounding: null,
-    response_format: "concise financial snapshots",
-    cross_topic_connections: [],
-  },
-  [TopicKey.Grocery]: {
-    tone: "utilitarian and brief",
-    format: "organized list by section",
-    initiative_style: "low initiative unless asked",
-    escalation_level: EscalationLevel.None,
-    framework_grounding: null,
-    response_format: "list output with short acknowledgments",
-    cross_topic_connections: [TopicKey.Meals],
-  },
-  [TopicKey.Health]: {
-    tone: "attentive and specific",
-    format: "structured notes for visits, medication, and follow-up",
-    initiative_style: "care-driven reminders and follow-up",
-    escalation_level: EscalationLevel.Medium,
-    framework_grounding: null,
-    response_format: "appointment-focused summaries",
-    cross_topic_connections: [TopicKey.Calendar],
-  },
+  [TopicKey.Calendar]: CALENDAR_TOPIC_PROFILE,
+  [TopicKey.Chores]: CHORES_TOPIC_PROFILE,
+  [TopicKey.Finances]: FINANCES_TOPIC_PROFILE,
+  [TopicKey.Grocery]: GROCERY_TOPIC_PROFILE,
+  [TopicKey.Health]: HEALTH_TOPIC_PROFILE,
   [TopicKey.Pets]: {
     tone: "warm and practical",
     format: "care summaries and checklists",

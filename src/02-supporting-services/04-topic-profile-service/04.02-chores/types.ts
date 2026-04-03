@@ -17,6 +17,13 @@ export enum ChoreEventType {
   Cancelled = "cancelled",
 }
 
+export enum ChoreEscalationStage {
+  Reminder = "reminder",
+  FollowUp = "follow_up",
+  BroaderThread = "broader_thread",
+  DigestFlag = "digest_flag",
+}
+
 export interface ChoreHistoryEntry {
   event: ChoreEventType;
   at: Date;
@@ -32,6 +39,10 @@ export interface ActiveChore {
   due: Date;
   status: ChoreStatus;
   escalation_step: number;
+  escalation_stage?: ChoreEscalationStage;
+  reminder_at?: Date;
+  follow_up_at?: Date;
+  escalated_at?: Date;
   history?: ChoreHistoryEntry[];
 }
 
