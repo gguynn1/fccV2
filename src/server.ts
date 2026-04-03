@@ -1,6 +1,9 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import { existsSync } from "node:fs";
 import { parse as parseQueryString } from "node:querystring";
+import { resolve } from "node:path";
 import { Queue, type Worker } from "bullmq";
+import fastifyStaticPlugin from "@fastify/static";
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import type { ImapFlow } from "imapflow";
 import { pino } from "pino";
 import type BetterSqlite3 from "better-sqlite3";
@@ -11,10 +14,11 @@ import type {
   TransportOutboundEnvelope,
   TransportServiceContract,
 } from "./01-service-stack/types.js";
+import { adminRoutes } from "./admin/routes.js";
 import { createClassifierService } from "./01-service-stack/03-classifier-service/index.js";
 import { BullQueueService } from "./01-service-stack/04-queue/index.js";
 import { createWorker, createWorkerIdentityService } from "./01-service-stack/05-worker/index.js";
-import { runtimeSystemConfig } from "./config/runtime-system-config.js";
+import { applyRuntimeSystemConfig, runtimeSystemConfig } from "./config/runtime-system-config.js";
 import { createDataIngestService } from "./02-supporting-services/02-data-ingest-service/index.js";
 import {
   createStateService,
@@ -152,10 +156,33 @@ function startScheduler(): SchedulerHandle {
   };
 }
 
+function requestArrivedViaTunnel(request: FastifyRequest): boolean {
+  return (
+    request.headers["x-forwarded-for"] !== undefined ||
+    request.headers["x-forwarded-host"] !== undefined
+  );
+}
+
+async function rejectTunnelAdminAccess(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  if (!requestArrivedViaTunnel(request)) {
+    return;
+  }
+
+  await reply.code(403).send({
+    error: "forbidden",
+    message: "Admin UI is available on the local network only.",
+  });
+}
+
 async function createRuntime(): Promise<RuntimeHandles> {
   const env = loadEnv(process.env as Record<string, string | undefined>);
   const db = initializeDatabase(env.DATABASE_PATH);
   const stateService = createStateService(env.DATABASE_PATH, logger);
+  const persistedConfig = await stateService.getSystemConfig();
+  applyRuntimeSystemConfig(persistedConfig);
   logger.info("SQLite initialized with WAL mode.");
 
   const redisConnection = toRedisConnection(env.REDIS_URL);
@@ -178,7 +205,38 @@ async function createRuntime(): Promise<RuntimeHandles> {
     },
   );
 
+  fastify.addHook("onRequest", async (request, reply) => {
+    if (request.url === "/admin" || request.url.startsWith("/admin/")) {
+      await rejectTunnelAdminAccess(request, reply);
+    }
+  });
+
   fastify.get("/health", () => ({ ok: true }));
+  await fastify.register(adminRoutes, {
+    prefix: "/api/admin",
+    queue_service: queueService,
+    state_service: stateService,
+  });
+
+  const adminDistPath = resolve(process.cwd(), "ui/dist");
+  if (existsSync(adminDistPath)) {
+    await fastify.register(fastifyStaticPlugin, {
+      root: adminDistPath,
+      prefix: "/admin/",
+    });
+  }
+
+  fastify.get("/admin", { preHandler: rejectTunnelAdminAccess }, async (_request, reply) => {
+    if (!existsSync(adminDistPath)) {
+      return reply.code(503).send({
+        error: "admin_ui_unavailable",
+        message: "Build the admin UI with `npm run ui:build` before serving /admin.",
+      });
+    }
+
+    return reply.sendFile("index.html");
+  });
+
   const transportLayer = createTwilioTransportLayer({
     account_sid: env.TWILIO_ACCOUNT_SID,
     auth_token: env.TWILIO_AUTH_TOKEN,
@@ -196,6 +254,8 @@ async function createRuntime(): Promise<RuntimeHandles> {
   // No ngrok tunnel — unauthenticated calendar data stays off the public internet.
   const caldavPort = Number(env.CALDAV_PORT || "3001");
   const caldavServer = Fastify({ logger });
+  caldavServer.addHttpMethod("PROPFIND", { hasBody: true });
+  caldavServer.addHttpMethod("REPORT", { hasBody: true });
   const calDavService = createCalDavService({ state_service: stateService });
   calDavService.registerRoutes(caldavServer);
   await caldavServer.listen({ port: caldavPort, host: "0.0.0.0" });
@@ -354,8 +414,8 @@ function registerShutdown(runtime: RuntimeHandles): void {
 async function main(): Promise<void> {
   const runtime = await createRuntime();
   registerShutdown(runtime);
-  // Start job processing only after shutdown hooks are registered.
-  void runtime.worker.run();
+  // Worker registration starts the run loop, so boot only needs to lift the startup pause.
+  runtime.worker.resume();
   logger.info("BullMQ worker started.");
   logger.info("All runtime services initialized.");
 }

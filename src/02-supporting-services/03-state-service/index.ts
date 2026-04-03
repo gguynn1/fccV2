@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pino, type Logger } from "pino";
 
+import type { SystemConfig } from "../../index.js";
 import { systemState as seedSystemState } from "../../_seed/system-state.js";
 import type { ActionRouterResult, StackQueueItem } from "../../01-service-stack/types.js";
 import type { StateService } from "../types.js";
@@ -92,6 +93,72 @@ function serializeForStorage(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function createMinimalSystemConfig(): SystemConfig {
+  return {
+    metadata: {
+      snapshot_time: new Date(),
+      description: "Minimal default configuration",
+    },
+    system: {
+      timezone: "America/Chicago",
+      locale: "en-US",
+      version: "1.0.0",
+    },
+    assistant: {
+      messaging_identity: "",
+      name: null,
+      description: "Family coordination assistant",
+    },
+    entities: [],
+    threads: [],
+    topics: {} as SystemConfig["topics"],
+    escalation_profiles: {} as SystemConfig["escalation_profiles"],
+    confirmation_gates: {
+      always_require_approval: [],
+      expiry_minutes: 30,
+      on_expiry: "notify_and_offer_reissue",
+    },
+    dispatch: {
+      priority_levels: {} as SystemConfig["dispatch"]["priority_levels"],
+      outbound_budget: {} as SystemConfig["dispatch"]["outbound_budget"],
+      routing_rules: {},
+      collision_avoidance: {
+        description: "Default collision policy",
+        precedence_order: [],
+        same_precedence_strategy: "batch",
+      },
+    },
+    input_recognition: {
+      text: { description: "Plain text messages" },
+      structured_choice: { description: "Structured choices", formats: [] },
+      reaction: { positive: "positive", negative: "negative" },
+      image: { description: "Image attachments", examples: {} },
+      forwarded_content: { description: "Forwarded messages" },
+      silence: {
+        high_accountability: "escalate",
+        low_accountability: "disappear",
+        never: "never_escalate",
+      },
+      topic_disambiguation: { description: "Topic disambiguation rules", rules: [] },
+      intent_disambiguation: { description: "Intent disambiguation rules", rules: [] },
+    },
+    daily_rhythm: {} as SystemConfig["daily_rhythm"],
+    worker: {
+      processing_sequence: [],
+      max_thread_history_messages: 15,
+      stale_after_hours: 24,
+    },
+    data_ingest: {
+      sources: [],
+      future: [],
+    },
+    scenario_testing: {
+      description: "Default scenario testing configuration",
+      parts: [],
+    },
+  };
+}
+
 function validateStateSlices(state: SystemState): void {
   queueStateRecordSchema.parse(state.queue);
   confirmationsStateRecordSchema.parse(state.confirmations);
@@ -157,6 +224,38 @@ export class SqliteStateService implements StateService {
 
   public close(): void {
     this.db.close();
+  }
+
+  public getSystemConfig(): Promise<SystemConfig> {
+    const snapshot = this.db.prepare("SELECT payload FROM system_configs WHERE id = 1").get() as
+      | { payload: string }
+      | undefined;
+    if (!snapshot) {
+      return Promise.resolve(createMinimalSystemConfig());
+    }
+
+    return Promise.resolve(reviveDatesFromJson<SystemConfig>(snapshot.payload));
+  }
+
+  public saveSystemConfig(config: SystemConfig): Promise<void> {
+    const nowIso = new Date().toISOString();
+    this.db
+      .prepare(
+        `
+        INSERT INTO system_configs (id, payload, updated_at)
+        VALUES (1, @payload, @updated_at)
+        ON CONFLICT(id) DO UPDATE SET
+          payload = excluded.payload,
+          updated_at = excluded.updated_at
+        `,
+      )
+      .run({
+        payload: serializeForStorage(config),
+        updated_at: nowIso,
+      });
+
+    this.logger.info({ at: nowIso }, "System config snapshot persisted.");
+    return Promise.resolve();
   }
 
   public getSystemState(): Promise<SystemState> {
@@ -315,6 +414,8 @@ export class SqliteStateService implements StateService {
     scenarioState?: SystemState,
   ): Promise<StateSnapshotEnvelope> {
     if (mode === StateSnapshotMode.Seed) {
+      const { systemConfig: seedConfig } = await import("../../_seed/system-config.js");
+      await this.saveSystemConfig(seedConfig);
       await this.saveSystemState(seedSystemState);
       return {
         mode,
@@ -327,6 +428,8 @@ export class SqliteStateService implements StateService {
       if (!scenarioState) {
         throw new Error("Scenario snapshot mode requires a provided state.");
       }
+      const { systemConfig: seedConfig } = await import("../../_seed/system-config.js");
+      await this.saveSystemConfig(seedConfig);
       await this.saveSystemState(scenarioState);
       return {
         mode,
@@ -336,6 +439,8 @@ export class SqliteStateService implements StateService {
     }
 
     const emptyState = createDefaultStateSnapshot(new Date());
+    const { systemConfig: seedConfig } = await import("../../_seed/system-config.js");
+    await this.saveSystemConfig(seedConfig);
     await this.saveSystemState(emptyState);
     return {
       mode: StateSnapshotMode.Empty,

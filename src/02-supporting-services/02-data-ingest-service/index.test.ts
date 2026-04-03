@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { systemConfig } from "../../_seed/system-config.js";
 import { systemState } from "../../_seed/system-state.js";
 import { QueueItemSource, TopicKey } from "../../types.js";
 import type { SystemState } from "../03-state-service/types.js";
@@ -11,8 +12,11 @@ function resolved<T>(value: T): Promise<T> {
 }
 
 function createStateServiceStub() {
+  const config = structuredClone(systemConfig);
   const state: SystemState = structuredClone(systemState);
   return {
+    getSystemConfig: vi.fn(() => resolved(config)),
+    saveSystemConfig: vi.fn(() => resolved(undefined)),
     getSystemState: vi.fn(() => resolved(state)),
     saveSystemState: vi.fn((nextState: SystemState) => {
       Object.assign(state, nextState);

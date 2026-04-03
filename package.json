@@ -5,14 +5,17 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint . && prettier --check .",
-    "lint:fix": "eslint . --fix && prettier --write .",
+    "typecheck": "tsc --noEmit && npm run --prefix ui typecheck",
+    "lint": "eslint src && npm run --prefix ui lint && prettier --check .",
+    "lint:fix": "eslint src --fix && npm run --prefix ui lint:fix && prettier --write .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "start": "node dist/server.js",
     "start:seed": "node dist/bootstrap.js --seed",
     "dev": "tsx watch src/server.ts",
+    "ui:dev": "npm run --prefix ui dev",
+    "ui:build": "npm run --prefix ui build",
+    "ui:preview": "npm run --prefix ui preview",
     "ngrok:auth": "set -a; . ./.env; set +a; if [ -z \"$NGROK_AUTHTOKEN\" ]; then echo \"NGROK_AUTHTOKEN is missing in .env\"; exit 1; fi; ngrok config add-authtoken \"$NGROK_AUTHTOKEN\"",
     "test": "vitest run --passWithNoTests"
   },
@@ -37,6 +40,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
+    "@fastify/static": "^9.0.0",
     "better-sqlite3": "^12.8.0",
     "bullmq": "^5.73.0",
     "dotenv": "^17.4.0",

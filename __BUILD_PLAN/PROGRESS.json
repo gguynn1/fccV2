@@ -1,5 +1,5 @@
 {
-  "current_step": "step-43",
+  "current_step": "step-43-part-2",
   "status_notes": {
     "step-00-part-1": {
       "updated_at": "2026-04-03T13:55:03Z",
@@ -646,6 +646,28 @@
         "npm test passed"
       ],
       "next_action": "Proceed to step-43."
+    },
+    "step-43-part-1": {
+      "updated_at": "2026-04-03T18:21:16Z",
+      "checks_completed": [
+        "admin UI Vite scaffold created under ui/ with React 19 + TypeScript, Tailwind, shadcn-style primitives, hash routing, and TanStack Query defaults",
+        "root scripts added for ui:dev, ui:build, ui:preview, and npm run typecheck now verifies both backend and ui projects",
+        "Fastify admin API routes added for config, entities, topics, budget, scheduler, queue, escalations, confirmations, dispatches, and DLQ retry/discard",
+        "runtime system config persistence added to SQLite and loaded at startup for admin API PUT updates",
+        "Fastify now serves ui/dist at /admin and rejects forwarded-header admin requests with 403",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run ui:build passed",
+        "npm run build passed",
+        "http://127.0.0.1:3000/admin returned 200 after ui build",
+        "http://127.0.0.1:3000/api/admin/* endpoints returned valid JSON",
+        "http://127.0.0.1:5173/api/admin/config returned 200 through the Vite proxy",
+        "forwarded-header requests to /admin and /api/admin/config returned 403"
+      ],
+      "requires_manual_verification": [
+        "confirm the top navigation visually in a browser across all 8 routes"
+      ],
+      "next_action": "Proceed to step-43-part-2."
     }
   },
   "steps": {
@@ -694,7 +716,7 @@
     "step-40": { "status": "complete", "completed_at": "2026-04-03T17:41:36Z" },
     "step-41": { "status": "complete", "completed_at": "2026-04-03T17:47:36Z" },
     "step-42": { "status": "complete", "completed_at": "2026-04-03T17:47:36Z" },
-    "step-43-part-1": { "status": "pending" },
+    "step-43-part-1": { "status": "complete", "completed_at": "2026-04-03T18:21:16Z" },
     "step-43-part-2": { "status": "pending" },
     "step-43-part-3": { "status": "pending" },
     "step-43-part-4": { "status": "pending" },

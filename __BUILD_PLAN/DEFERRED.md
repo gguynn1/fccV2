@@ -80,6 +80,14 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolve at:** step-43 (state-validation hardening pass)
 - **Action:** Replace broad topic-record validation with per-topic runtime schemas and validate each topic state slice without `as unknown as` casts.
 
+### D-18 — Admin API config routes use unsafe type casts
+
+- **Identified:** step-43-part-1 review
+- **Severity:** Medium
+- **Description:** Admin routes in `src/admin/routes.ts` use `as unknown as typeof nextConfig.X` casts on lines 153, 154, 178, 198-201, 226-228, 249 to bypass Zod validation and force-cast parsed payloads to full config types. The Zod schemas use `.passthrough()` and `z.unknown()` extensively, making them permissive by design and allowing incomplete or extra fields.
+- **Resolve at:** step-43-part-2 (inline editing with strict validation)
+- **Action:** Replace permissive Zod schemas with strict per-field schemas for all config surfaces (entities, threads, topics, budget, scheduler). Remove unsafe casts and rely on Zod validation to enforce shape correctness.
+
 ---
 
 ## Accepted (no action needed)
@@ -459,3 +467,24 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolved:** same session
 - **Description:** `contract.test.ts` import scan used a single-line regex, missing multiline imports and under-reporting violations.
 - **Fix:** Updated scanning to parse import statements with multiline support, while still excluding `import type` statements from runtime-boundary checks.
+
+### R-30 — State Service runtime seed import removed
+
+- **Identified:** step-43-part-1 review
+- **Resolved:** same session
+- **Description:** State Service imported `systemConfig` from `_seed/system-config.js` at runtime and used it in `createDefaultSystemConfig()` and three `loadSnapshot()` calls. This violated the seed-data rule and reintroduced the pattern that D-14 claimed to have resolved.
+- **Fix:** Replaced `createDefaultSystemConfig()` with `createMinimalSystemConfig()` that returns a minimal valid config without importing seed. Updated `loadSnapshot()` to dynamically import seed config only when explicitly loading seed/scenario/empty snapshots during bootstrap.
+
+### R-31 — Queue service unnecessary type cast removed
+
+- **Identified:** step-43-part-1 review
+- **Resolved:** same session
+- **Description:** `extractQueueItemId()` in `src/01-service-stack/04-queue/index.ts` cast `item as Record<string, unknown>` to access `.id`, even though `StackQueueItem` has `id?: string`. This was previously resolved as R-19 but the cast remained.
+- **Fix:** Replaced `(item as Record<string, unknown>).id` with direct `item.id` access.
+
+### R-32 — Shared pino logger restored in Fastify instances
+
+- **Identified:** step-43-part-1 review
+- **Resolved:** same session
+- **Description:** `src/server.ts` changed `Fastify({ logger })` to `Fastify({ logger: { name: 'fcc-server' } })` for both main and CalDAV servers, replacing the shared pino instance with Fastify-internal loggers. This reversed R-05 from step-07-10 review.
+- **Fix:** Restored `Fastify({ logger })` for both instances to use the shared pino logger.

@@ -7,6 +7,7 @@ import {
   QueueItemSource,
   TopicKey,
 } from "../types.js";
+import { systemConfig } from "../_seed/system-config.js";
 import { RoutingRule } from "../02-supporting-services/05-routing-service/types.js";
 import type {
   ActionRouterContract,
@@ -142,6 +143,8 @@ function createWorkerOptions(hooks: {
       close: () => Promise.resolve(),
     },
     state_service: {
+      getSystemConfig: () => resolved(systemConfig),
+      saveSystemConfig: () => Promise.resolve(),
       getSystemState: () => resolved({} as never),
       saveSystemState: () => Promise.resolve(),
       getThreadHistory: () => resolved(null),

@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { systemConfig } from "../_seed/system-config.js";
 import { DispatchPriority } from "../types.js";
 import { SamePrecedenceStrategy } from "../01-service-stack/types.js";
 import type {
@@ -50,6 +51,8 @@ describe("Supporting-service contracts", () => {
 
   it("keeps worker-facing service contracts stable", async () => {
     const stateService: StateService = {
+      getSystemConfig: () => Promise.resolve(systemConfig),
+      saveSystemConfig: () => Promise.resolve(),
       getSystemState: () => Promise.resolve({} as never),
       saveSystemState: () => Promise.resolve(),
       getThreadHistory: () => Promise.resolve(fixtureThreadHistory()),

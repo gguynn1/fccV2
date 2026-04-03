@@ -32,6 +32,19 @@ export interface QueueStartupReconciliation {
   removed_stale: number;
 }
 
+export interface DeadLetterQueueEntry {
+  dead_letter_job_id: string;
+  item: PendingQueueItem;
+  failed_at: Date | null;
+}
+
+export interface QueueDepthSnapshot {
+  waiting: number;
+  delayed: number;
+  active: number;
+  dead_letter: number;
+}
+
 export class BullQueueService {
   private readonly queue: Queue<PendingQueueItem>;
 
@@ -234,10 +247,77 @@ export class BullQueueService {
     await Promise.all([this.queue.close(), this.deadLetterQueue.close()]);
   }
 
+  public async listPendingItems(): Promise<PendingQueueItem[]> {
+    const jobs = await this.queue.getJobs(["waiting", "delayed", "active"], 0, -1, true);
+    return jobs.map((job) => pendingQueueItemSchema.parse(job.data));
+  }
+
+  public async listDeadLetterItems(): Promise<DeadLetterQueueEntry[]> {
+    const jobs = await this.deadLetterQueue.getJobs(["waiting", "delayed"], 0, -1, true);
+    return jobs.map((job) => ({
+      dead_letter_job_id: String(job.id),
+      item: pendingQueueItemSchema.parse(job.data),
+      failed_at: job.finishedOn ? new Date(job.finishedOn) : null,
+    }));
+  }
+
+  public async getQueueDepthSnapshot(): Promise<QueueDepthSnapshot> {
+    const [waiting, delayed, active, dead_letter] = await Promise.all([
+      this.queue.getWaitingCount(),
+      this.queue.getDelayedCount(),
+      this.queue.getActiveCount(),
+      this.deadLetterQueue.getWaitingCount(),
+    ]);
+
+    return {
+      waiting,
+      delayed,
+      active,
+      dead_letter,
+    };
+  }
+
+  public async retryDeadLetterItem(deadLetterJobId: string): Promise<PendingQueueItem> {
+    const job = await this.deadLetterQueue.getJob(deadLetterJobId);
+    if (!job) {
+      throw new Error(`Dead-letter item ${deadLetterJobId} was not found.`);
+    }
+
+    const item = pendingQueueItemSchema.parse(job.data);
+    await job.remove();
+    await this.queue.add("pending", item, {
+      attempts: this.retryAttempts,
+      backoff: {
+        type: "exponential",
+        delay: this.retryBackoffMs,
+      },
+    });
+
+    this.logger.info(
+      { dead_letter_job_id: deadLetterJobId, queue_item_id: item.id },
+      "Dead-letter queue item retried.",
+    );
+    return item;
+  }
+
+  public async discardDeadLetterItem(deadLetterJobId: string): Promise<PendingQueueItem> {
+    const job = await this.deadLetterQueue.getJob(deadLetterJobId);
+    if (!job) {
+      throw new Error(`Dead-letter item ${deadLetterJobId} was not found.`);
+    }
+
+    const item = pendingQueueItemSchema.parse(job.data);
+    await job.remove();
+    this.logger.info(
+      { dead_letter_job_id: deadLetterJobId, queue_item_id: item.id },
+      "Dead-letter queue item discarded.",
+    );
+    return item;
+  }
+
   private extractQueueItemId(item: StackQueueItem): string {
-    const maybeId = (item as Record<string, unknown>).id;
-    if (typeof maybeId === "string" && maybeId.length > 0) {
-      return maybeId;
+    if (item.id && item.id.length > 0) {
+      return item.id;
     }
 
     return `q_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

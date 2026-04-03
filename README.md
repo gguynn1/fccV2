@@ -94,10 +94,10 @@ npm run start:seed     # Run and populate database from src/_seed/
 npm run dev            # Run in development with file watching
 
 # Build and verify
-npm run build          # Compile TypeScript
-npm run typecheck      # Type-check without emitting
-npm run lint           # ESLint + Prettier check
-npm run lint:fix       # ESLint + Prettier with auto-fix
+npm run build          # Compile backend TypeScript
+npm run typecheck      # Type-check backend and admin UI
+npm run lint           # Lint backend + admin UI and run Prettier check
+npm run lint:fix       # Auto-fix backend + admin UI lint issues, then format
 npm run format         # Format all files with Prettier
 npm run format:check   # Check formatting without writing
 npm test               # Run tests (stub until Vitest is wired)
@@ -111,10 +111,11 @@ npm run ui:preview     # Preview production build locally
 Typical first-boot workflow:
 
 ```bash
-npm run typecheck      # types clean?
-npm run lint           # lint clean?
-npm run build          # compile to dist/
-npm run start:seed     # first boot — seed the database, then serve
+npm run typecheck      # backend + admin UI types clean?
+npm run lint           # backend + admin UI lint clean?
+npm run build          # compile backend to dist/
+npm run ui:build       # build admin UI to ui/dist/
+npm run start:seed     # first boot — seed database, then serve backend + /admin
 ```
 
 Subsequent boots use `npm start` — the database is already populated.
@@ -153,9 +154,10 @@ Note the forwarding URL (e.g., `https://abc123.ngrok-free.app`) and configure it
 ### 5. Verify, build, and run
 
 ```bash
-npm run typecheck     # verify types compile clean
-npm run lint          # verify lint + formatting
-npm run build         # compile to dist/
+npm run typecheck     # verify backend + admin UI types compile clean
+npm run lint          # verify backend + admin UI lint + formatting
+npm run build         # compile backend to dist/
+npm run ui:build      # build admin UI bundle to ui/dist/
 npm run start:seed    # first boot — seed database and start server
 ```
 
@@ -164,6 +166,7 @@ For subsequent runs after the database is seeded:
 ```bash
 npm start             # start server with existing database
 npm run dev           # start with file watching (development)
+npm run ui:dev        # admin UI dev server on :5173 with API proxy to :3000
 ```
 
 ## Production Deployment (Mac Mini)
@@ -376,10 +379,10 @@ The `ui/` directory is a standalone React project. In production, Fastify serves
 
 | Script               | Purpose                                        |
 | -------------------- | ---------------------------------------------- |
-| `npm run build`      | Compile TypeScript to `dist/`                  |
-| `npm run typecheck`  | Type check without emitting                    |
-| `npm run lint`       | ESLint + Prettier check                        |
-| `npm run lint:fix`   | Auto-fix lint issues                           |
+| `npm run build`      | Compile backend TypeScript to `dist/`          |
+| `npm run typecheck`  | Type check backend and admin UI                |
+| `npm run lint`       | Lint backend and admin UI, then run Prettier   |
+| `npm run lint:fix`   | Auto-fix backend and admin UI lint issues      |
 | `npm run format`     | Format with Prettier                           |
 | `npm test`           | Run tests (Vitest, once configured)            |
 | `npm run ui:dev`     | Start admin UI dev server (Vite, port 5173)    |

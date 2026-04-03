@@ -4,6 +4,7 @@ import { type SystemState } from "../../02-supporting-services/03-state-service/
 import { createTopicProfileService } from "../../02-supporting-services/04-topic-profile-service/index.js";
 import { createRoutingService } from "../../02-supporting-services/05-routing-service/index.js";
 import { type ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
+import { systemConfig } from "../../_seed/system-config.js";
 import { systemState } from "../../_seed/system-state.js";
 import { ClassifierIntent, DispatchPriority, QueueItemSource, TopicKey } from "../../types.js";
 import type {
@@ -20,12 +21,15 @@ function resolved<T>(value: T): Promise<T> {
 }
 
 function createStateServiceStub(threadHistory?: ThreadHistory | null) {
+  const config = structuredClone(systemConfig);
   const state: SystemState = structuredClone(systemState);
   if (threadHistory) {
     state.threads.family = threadHistory;
   }
 
   return {
+    getSystemConfig: vi.fn(() => resolved(config)),
+    saveSystemConfig: vi.fn(() => resolved(undefined)),
     getSystemState: vi.fn(() => resolved(state)),
     saveSystemState: vi.fn((nextState: SystemState) => {
       Object.assign(state, nextState);

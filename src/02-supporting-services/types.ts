@@ -17,6 +17,7 @@ import type {
 } from "../01-service-stack/types.js";
 import type { DataIngestState } from "./02-data-ingest-service/types.js";
 import type { SystemState } from "./03-state-service/types.js";
+import type { SystemConfig } from "../index.js";
 import type { TopicProfileConfig } from "./04-topic-profile-service/types.js";
 import type { RoutingDecision, Thread, ThreadHistory } from "./05-routing-service/types.js";
 import type { OutboundBudgetTracker } from "./06-budget-service/types.js";
@@ -54,6 +55,8 @@ export interface DataIngestService extends DataIngestQueueProducer {
 }
 
 export interface StateService {
+  getSystemConfig(): Promise<SystemConfig>;
+  saveSystemConfig(config: SystemConfig): Promise<void>;
   getSystemState(): Promise<SystemState>;
   saveSystemState(state: SystemState): Promise<void>;
   getThreadHistory(thread_id: string): Promise<ThreadHistory | null>;
