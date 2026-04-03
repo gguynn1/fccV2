@@ -1,58 +1,29 @@
-# External Sources to Data Ingest
-
-emails -----------> DATA INGEST
-calendar changes -> DATA INGEST
-future sources ---> DATA INGEST
-
-Data Ingest watches external sources independently
-
-When something relevant arrives:
-extracts content
-pre-classifies topic
-creates a queue item
-drops it into THE QUEUE
-tagged as ingest-originated
-
-## Sources
+# External sources → Data Ingest
 
 ```
-MONITORED INBOX
-  School emails, appointment confirmations,
-  bill notifications, booking confirmations
-  Extracted, classified, queued
-         |
-         v
-    Same queue, same worker,
-    same dispatch rules
-
-CALENDAR CONNECTOR
-  Events added or changed externally
-  Detected, queued as a calendar topic item
-         |
-         v
-    Same queue, same worker,
-    same dispatch rules
-
-FORWARDED MESSAGES
-  A family member forwards a message or
-  image to the assistant's messaging identity
-  Parsed, classified, queued
-         |
-         v
-    Same queue, same worker,
-    same dispatch rules
-
-FUTURE INTEGRATIONS
-  Financial alerts
-  School systems
-  Care-provider systems
-  Weather alerts
-  Delivery updates
-  Each one just produces queue items
-         |
-         v
-    Same queue, same worker,
-    same dispatch rules
+MONITORED INBOX (IMAP / imapflow) -----> extract / classify -----> THE QUEUE
+Forwarded phone-native content --------> normalize ----------------> THE QUEUE
+(Future: same pattern) ----------------> producer -----------------> THE QUEUE
 ```
 
-Adding a new data source never requires rethinking the dispatch logic. It just feeds the queue.
+## Email monitoring
+
+- **imapflow** maintains a long-lived IMAP connection when real credentials are configured; placeholder credentials skip live connect at runtime.
+- Messages are normalized into ingest payloads with **inbox attribution**, freshness / stale awareness, and optional **structured extraction** (headers, body fragments, attachments).
+
+## Calendar-related input
+
+- Calendar facts enter through **email parsing** (for example appointment confirmations and **`.ics`** attachments) or **conversational** capture.
+- The system does **not** poll or subscribe to an external calendar SaaS API; the served calendar (CalDAV) is local/read-oriented. Wording here matches `data-input-boundaries`.
+
+## Forwarded content
+
+- Phone-native forwarded payloads and email forwards share the same idea: Transport or Data Ingest extracts an inner narrative, classifies when needed, and enqueues a `PendingQueueItem` with an ingest-appropriate `QueueItemSource`.
+
+## Pre-classification
+
+- Ingest may set `topic` and `ClassifierIntent` on the queue item. The Worker treats trusted ingest sources as **preclassified** for step 1 (skips a fresh Claude classification call when policy matches).
+
+## Future integrations
+
+- Each new source should **enqueue queue items** (and optional pre-classification) through the same schema. Prefer parsing mail, conversational capture, or a dedicated producer — not unapproved third-party APIs — per project boundaries.

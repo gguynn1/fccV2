@@ -1,21 +1,39 @@
 # Inbound Flow
 
+Three doors into the system — each produces **queue items** for the same BullMQ funnel:
+
 ```
 External world
     |
-    |--- phone-native messages ---> TRANSPORT
-    |--- emails -----------> DATA INGEST
-    |--- calendar changes -> DATA INGEST
-    |--- future sources ---> DATA INGEST
+    |--- phone-native channel ---> TRANSPORT ---> IDENTITY ---> THE QUEUE
+    |--- email / parsing --------> DATA INGEST ---------------> THE QUEUE
+    |--- scheduled triggers -----> SCHEDULER ----------------> THE QUEUE
 ```
 
-## What Enters the System
+## Door 1 — Phone-native channel → Transport → Identity
 
-- Human messages from any thread
-- Reactions on assistant messages (for example, positive or negative reactions)
-- Images and attachments sent to the assistant
-- Forwarded messages or emails
-- Emails arriving in monitored inboxes
-- Calendar events added or changed via connector
-- Scheduled triggers (timers, reminder deadlines, follow-up windows expiring, digest times)
-- Future integration events (financial alerts, school systems, care-provider systems, weather alerts, delivery updates)
+- Inbound segments are validated and normalized by the Transport layer, then Identity resolves the sender to an entity and originating thread before enqueue.
+- See `01.1-phone-to-transport/CLAUDE.md` and `01-inbound-flow/notes.txt`.
+
+## Door 2 — Email and structured ingest → Data Ingest
+
+- Monitored inbox via **IMAP (imapflow)**; forwarded content and attachments can be normalized into ingest-originated items.
+- Calendar-relevant material enters through **email parsing** (for example `.ics` attachments) or **conversational** capture — not by calling an external calendar API. See `01.2-external-to-ingest/CLAUDE.md`.
+
+## Door 3 — Scheduled triggers → Scheduler
+
+- **BullMQ** repeatable and delayed jobs produce items (morning digest, evening check-in, escalation timers, confirmation expiry, and other scheduled work).
+- See `01.3-scheduled-triggers/CLAUDE.md`.
+
+## What can enter (by shape)
+
+- Human-authored content in any configured thread
+- Positive or negative **reactions** on assistant messages (where the client exposes them; mapping is conservative across clients)
+- **Images / attachments** (media downloaded and interpreted in context)
+- Forwarded blocks (phone-native or email) normalized by Transport or Data Ingest
+- Email messages and extracted fields from monitored inboxes
+- Scheduler-fired and timer-driven work items
+
+## Extending sources
+
+New external facts should feed the queue the same way: parse from email, accept via conversation, or add a small producer that enqueues validated `PendingQueueItem` shapes — consistent with `data-input-boundaries` and `architecture` rules.

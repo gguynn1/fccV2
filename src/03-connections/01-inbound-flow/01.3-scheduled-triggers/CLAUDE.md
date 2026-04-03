@@ -1,40 +1,39 @@
-# Scheduled Triggers
+# Scheduled triggers → Scheduler → Queue
 
-SCHEDULER ----> THE QUEUE
+```
+SCHEDULER (BullMQ repeatable + delayed jobs) -----> validated PendingQueueItem -----> THE QUEUE
+```
 
-Scheduler runs independently on a timer
+## Mechanism
 
-When a trigger fires:
-creates a queue item
-drops it into THE QUEUE
-tagged as scheduler-originated
+- **Repeatable jobs** — cron-like rhythms (e.g. morning digest, evening check-in).
+- **Delayed jobs** — one-shot fire-at times (escalations, confirmation expiry follow-ups, reminders).
+- All Scheduler output is validated against **`pendingQueueItemSchema`** before enqueue so Worker-side consumption matches stack types.
 
-## Scheduled Events
-
-Morning digests, evening check-ins, reminder timers, follow-up windows, escalation deadlines, relationship nudge cooldowns, bill due date alerts.
-
-## Daily Rhythm
+## Daily rhythm (design intent)
 
 ```
 MORNING
-  Digest delivered to each person
-  in their private thread
-  What's ahead today
-  What's due
-  What's unresolved from yesterday
+  Digest-style touchpoint per participant (private thread)
+  Summarize “today”, due items, and carry-over unresolved items where policy allows
 
 DAYTIME
-  Quiet unless:
-    Something immediate comes up
-    Someone messages the assistant
+  Quiet unless user-driven input or an immediate/scheduled exception fires
 
 EVENING
-  Brief check-in if anything
-  is still open
-  Otherwise, nothing
+  Light check-in when open items remain; otherwise silence
 
-DEFAULT STATE
-  The assistant is quiet
-  It earns the right to speak
-  by being useful when it does
+DEFAULT
+  Quiet earns trust; speak when useful
 ```
+
+Exact job names and times live in Scheduler service configuration — this page describes the connection pattern, not production crontab literals.
+
+## Missed-window recovery
+
+- On **startup**, the Scheduler reconciles repeatable / delayed work that should have fired during downtime.
+- Fired jobs **check relevance** (digest still meaningful, window not expired) before emitting a queue item — stale or irrelevant windows are dropped or adapted per implementation, **not** dispatched “late as if on time”.
+
+## Queue tagging
+
+- Items use `QueueItemSource.ScheduledTrigger` (and related metadata). The Worker may treat them as **preclassified** when `topic` / `intent` are present.

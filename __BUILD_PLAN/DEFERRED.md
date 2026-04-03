@@ -261,6 +261,27 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** The build change set modifies `.cursor/rules/architecture.mdc`, which normally violates build-plan integrity restrictions for build-agent output.
 - **Decision:** Accepted — step-41 explicitly requires correcting the pipeline wording to reflect the implemented flow (Classifier runs inside Worker step 1).
 
+### A-28 — Steps 44–54 share identical completion timestamp
+
+- **Identified:** step-44–54 review
+- **Severity:** Low
+- **Description:** All 11 steps have `completed_at: "2026-04-03T19:00:00Z"`, indicating they were completed in a single Build Agent session.
+- **Decision:** Accepted — consistent with prior decisions A-03, A-06, A-12, A-13, A-17, A-20, A-26. Documentation quality is high; human review happened during this review session.
+
+### A-29 — No status_notes entries for steps 44–54
+
+- **Identified:** step-44–54 review
+- **Severity:** Low
+- **Description:** Every prior step (00 through 43-part-1) has detailed `status_notes` with `checks_completed` and verification details. Steps 44–54 have no status_notes — just status and completion timestamps. No Build Agent audit trail for what was verified.
+- **Decision:** Accepted — documentation-only steps have fewer checkable artifacts than code steps. Acceptance criteria verification happened during this review session.
+
+### A-30 — Build agent modified 13 CLAUDE.md files in `03-connections/`
+
+- **Identified:** step-44–54 review
+- **Severity:** Low (borderline rule violation)
+- **Description:** Build plan integrity rule says the Build Agent must not modify CLAUDE.md files. However, `src/03-connections/` is documentation-only per architecture rules, and the CLAUDE.md files there are the deliverable — not behavioral specifications for code. Steps 44–54 explicitly instruct "verify/update" these files.
+- **Decision:** Accepted — the rule's intent (protect behavioral specifications) doesn't apply to documentation deliverables. Same precedent as A-27.
+
 ---
 
 ## Resolved

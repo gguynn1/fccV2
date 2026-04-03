@@ -1,21 +1,33 @@
-# Outbound Flow
+# Outbound flow
 
 ```
-ACTION ROUTER
-    |
-    |______________|____________
-    |              |            |
- DISPATCH       HOLD        STORE
-    |              |            |
-    v              v            v
-TRANSPORT    SCHEDULER     STATE
-(send it)    (batch it)   (save it)
+                         ACTION ROUTER
+                               |
+               _______________|_______________
+              |               |               |
+           DISPATCH         HOLD            STORE
+              |               |               |
+              v               v               v
+         TRANSPORT       SCHEDULER         STATE
+    (immediate outbound) (batch / delay)  (silent persist)
 ```
 
-## Dispatch Priority Mapping
+## Three paths
 
-**Immediate → DISPATCH → TRANSPORT** — time-sensitive, send now.
+| Route | When | Side effects |
+| ----- | ---- | ------------ |
+| **Dispatch** | Send now through Transport | Provider REST send + status callback path; updates dispatch audit / thread history |
+| **Hold** | Batched / collision / quiet-window batching | Encodes `hold_until` / scheduler hand-off for a future touchpoint |
+| **Store** | Silent / halted / stale capture | SQLite via State only — no Transport send |
 
-**Batched → HOLD → SCHEDULER** — important but not urgent, collected and delivered at natural touchpoints.
+## Priority mapping (`DispatchPriority` in `src/types.ts`)
 
-**Silent → STORE → STATE** — tracked internally, surfaced only when asked.
+| Priority | Typical Action Router outcome | Notes |
+| -------- | ----------------------------- | ----- |
+| `immediate` | **Dispatch** → Transport | Time-sensitive, direct replies, clarifications |
+| `batched` | **Hold** → Scheduler | Digest windows, collision merge, rate limits |
+| `silent` | **Store** → State | Logging, audit-only, or non-messaging outcomes |
+
+Exact mapping is implemented in Action Router + Budget collision rules; this table is the conceptual contract.
+
+See sub-pages: `03.1-dispatch-to-transport`, `03.2-hold-to-scheduler`, `03.3-store-to-state`.

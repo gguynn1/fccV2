@@ -1,19 +1,37 @@
-# Transport to Identity to Classifier
+# Transport → Identity → Classifier (logical) vs implemented order
 
-TRANSPORT -----> IDENTITY -----> CLASSIFIER
+## What the code actually does
 
-Transport receives inbound message
-Identity resolves who sent this, maps sender identifier to entity
-Classifier determines what this is about, reads message content and thread context
+1. **Transport** — Validates inbound webhook, normalizes payload (text, structured choice, reaction, media, forwarded envelope) into stack inbound types.
+2. **Identity** — Resolves sender **messaging identity** to entity id, `EntityType`, permissions, and **target_thread** for phone-originated items.
+3. **Enqueue** — Produces a `PendingQueueItem`. For typical phone traffic, **`topic` and `ClassifierIntent` are omitted**; `QueueItemSource` distinguishes human message / reaction / image / forwarded / etc. (`src/types.ts`, `04-queue/types.ts`).
+4. **Worker step 1** — Calls **Classifier** with capped thread history. Claude returns structured fields; the stack validates and maps them to **`ClassificationResult`** (`TopicKey`, `ClassifierIntent`, `concerning`). On API failure, classifier service supplies a bounded fallback path per implementation.
 
-## Identity Resolution
+**Preclassified path:** Data Ingest or Scheduler may enqueue items with `topic` / `intent` already set; Worker step 1 trusts that policy and records `classification_source` as `preclassified_email` or `preclassified_scheduled` in the processing trace.
 
-Maps a sender identifier to an entity. Most often this is a phone number, but the interface does not depend on that. Knows: type (adult/child/pet), permissions, thread memberships. Returns: entity ID, entity type, which thread this came from.
+## Identity resolution (step 2 inside Worker; after Transport for phone)
 
-## Classification
+- Maps messaging identities to **participant_*** / **pet** entity ids (anonymized configuration).
+- Supplies thread membership used later by Routing and Escalation.
 
-Returns a typed `ClassificationResult`:
+## Classification output (aligns with `src/types.ts`)
 
-- **topic**: Calendar, Chores, Finances, Grocery, Health, Pets, School, Travel, Vendors, Business, Relationship, Family Status, Meals, Maintenance
-- **intent**: Request, Update, Cancellation, Query, Response, Completion, Confirmation, ForwardedData
-- **entities**: which entities this message involves
+- **TopicKey** — all 14 topic enum values (`calendar` … `maintenance`).
+- **ClassifierIntent** — `request`, `update`, `cancellation`, `query`, `response`, `completion`, `confirmation`, `forwarded_data`.
+- **concerning** — string entity ids the message bears on.
+
+## Diagrams
+
+**Physical (enqueue + worker):**
+
+```
+TRANSPORT ---> IDENTITY ---> THE QUEUE ---> WORKER step 1: CLASSIFIER
+```
+
+**Logical (mental model):**
+
+```
+TRANSPORT ---> IDENTITY ---> CLASSIFIER ---> THE QUEUE ---> WORKER (steps 2–8)
+```
+
+Both diagrams are correct when labelled; connection docs should **never** imply the Classifier runs before the queue for phone-native traffic.
