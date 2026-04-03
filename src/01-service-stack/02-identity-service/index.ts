@@ -1,7 +1,7 @@
 import { pino, type Logger } from "pino";
 import { z } from "zod";
 
-import { systemConfig as seedSystemConfig } from "../../_seed/system-config.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import type { SystemConfig } from "../../index.js";
 import type { Thread } from "../../02-supporting-services/05-routing-service/types.js";
 import { entitiesSchema, EntityType, type Entity, type IdentityResolutionResult } from "./types.js";
@@ -35,7 +35,7 @@ export class IdentityService {
   private readonly threadsByEntityId: Map<string, string[]>;
 
   public constructor(options?: IdentityServiceOptions) {
-    const config = options?.config ?? seedSystemConfig;
+    const config = options?.config ?? runtimeSystemConfig;
     const parsed = identityConfigSchema.parse(config);
 
     this.logger = options?.logger ?? DEFAULT_LOGGER;

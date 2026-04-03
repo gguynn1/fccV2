@@ -1,4 +1,11 @@
-export * from "./types.js";
+export {
+  ClarificationReason,
+  ClassifierIntent,
+  EscalationLevel,
+  GrocerySection,
+  InputMethod,
+  TopicKey,
+} from "./types.js";
 export * from "./01-service-stack/types.js";
 export * from "./02-supporting-services/types.js";
 

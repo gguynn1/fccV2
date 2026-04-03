@@ -5,15 +5,14 @@ import { createTopicProfileService } from "../../02-supporting-services/04-topic
 import { createRoutingService } from "../../02-supporting-services/05-routing-service/index.js";
 import { type ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
 import { systemState } from "../../_seed/system-state.js";
-import { ClassifierIntent, TopicKey } from "../../types.js";
-import { QueueItemSource } from "../04-queue/types.js";
-import { DispatchPriority } from "../06-action-router/types.js";
+import { ClassifierIntent, DispatchPriority, QueueItemSource, TopicKey } from "../../types.js";
 import type {
   IdentityResolutionResult,
   StackClassificationResult,
   StackQueueItem,
   TransportOutboundEnvelope,
 } from "../types.js";
+import { ConfirmationResult } from "../../02-supporting-services/08-confirmation-service/types.js";
 import { createWorker } from "./index.js";
 
 function resolved<T>(value: T): Promise<T> {
@@ -64,6 +63,9 @@ function createRuntimeStubs(
       threadHistory?: ThreadHistory | null,
     ) => Promise<StackClassificationResult>;
     now?: () => Date;
+    budgetPriority?: DispatchPriority;
+    escalationDecision?: { should_escalate: boolean; next_target_thread?: string };
+    confirmationResolution?: ConfirmationResult | null;
   } = {},
 ) {
   const transportCalls: TransportOutboundEnvelope[] = [];
@@ -97,7 +99,7 @@ function createRuntimeStubs(
         getBudgetTracker: vi.fn(() => resolved(systemState.outbound_budget_tracker)),
         evaluateOutbound: vi.fn(() =>
           resolved({
-            priority: DispatchPriority.Immediate,
+            priority: overrides.budgetPriority ?? DispatchPriority.Immediate,
             reason: "send now",
           }),
         ),
@@ -105,14 +107,20 @@ function createRuntimeStubs(
       },
       escalation_service: {
         getStatus: vi.fn(() => resolved(systemState.escalation_status)),
-        evaluate: vi.fn(() => resolved({ should_escalate: false })),
+        evaluate: vi.fn(() =>
+          resolved(
+            overrides.escalationDecision ?? {
+              should_escalate: false,
+            },
+          ),
+        ),
         reconcileOnStartup: vi.fn(() => resolved([])),
       },
       confirmation_service: {
         getState: vi.fn(() => resolved(systemState.confirmations)),
         requiresConfirmation: vi.fn(() => false),
         openConfirmation: vi.fn(),
-        resolveFromQueueItem: vi.fn(() => resolved(null)),
+        resolveFromQueueItem: vi.fn(() => resolved(overrides.confirmationResolution ?? null)),
         expirePending: vi.fn(() => resolved([])),
         reconcileOnStartup: vi.fn(() => resolved({ expired: [], notifications: [] })),
         close: vi.fn(() => resolved(undefined)),
@@ -253,6 +261,56 @@ describe("Worker", () => {
 
     expect(trace.outcome).toBe("dropped_stale");
     expect(runtime.transportCalls).toHaveLength(0);
+  });
+
+  it("halts execution when a confirmation reply rejects", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Finances,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_1"],
+        }),
+      confirmationResolution: ConfirmationResult.Rejected,
+    });
+
+    const trace = await runtime.worker.process({
+      id: "confirm_reject_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1"],
+      target_thread: "couple",
+      created_at: new Date("2026-04-03T19:00:00.000Z"),
+      content: "log $45 for groceries",
+    });
+
+    expect(trace.outcome).toBe("stored");
+    expect(runtime.transportCalls).toHaveLength(0);
+  });
+
+  it("uses escalation target thread when escalation requests broader visibility", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Chores,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_1"],
+        }),
+      escalationDecision: {
+        should_escalate: true,
+        next_target_thread: "family",
+      },
+    });
+
+    await runtime.worker.process({
+      id: "escalate_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1"],
+      target_thread: "participant_1_private",
+      created_at: new Date("2026-04-03T19:05:00.000Z"),
+      content: "Please remind me to take out trash tomorrow",
+    });
+
+    expect(runtime.transportCalls[0]?.target_thread).toBe("family");
   });
 
   it("produces distinct profile-shaped outputs across topics", async () => {

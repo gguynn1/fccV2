@@ -1,7 +1,7 @@
 import { pino, type Logger } from "pino";
 
-import { systemConfig } from "../../_seed/system-config.js";
-import { EntityType } from "../../01-service-stack/02-identity-service/types.js";
+import { EntityType } from "../../types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import type { RoutingRequest, RoutingService } from "../types.js";
 import type {
   ContextTransitionPolicy,
@@ -28,7 +28,7 @@ export interface RoutingServiceOptions {
 }
 
 function toResponsibleAdultIdForPet(entityId: string): string | null {
-  const petEntity = systemConfig.entities.find((entity) => entity.id === entityId);
+  const petEntity = runtimeSystemConfig.entities.find((entity) => entity.id === entityId);
   if (!petEntity || petEntity.type !== EntityType.Pet) {
     return null;
   }
@@ -51,7 +51,7 @@ export class StaticRoutingService implements RoutingService {
   private readonly logger: Logger;
 
   public constructor(options?: RoutingServiceOptions) {
-    this.threads = options?.threads ?? systemConfig.threads;
+    this.threads = options?.threads ?? runtimeSystemConfig.threads;
     this.threadById = new Map(this.threads.map((thread) => [thread.id, thread]));
     this.contextPolicy = options?.context_transition_policy ?? DEFAULT_CONTEXT_TRANSITION_POLICY;
     this.logger = options?.logger ?? DEFAULT_LOGGER;

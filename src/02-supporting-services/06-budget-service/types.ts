@@ -1,5 +1,4 @@
-import type { TopicKey } from "../../types.js";
-import type { DispatchPriority } from "../../01-service-stack/06-action-router/types.js";
+import type { DispatchPriority, TopicKey } from "../../types.js";
 
 export type BudgetTopicKey = TopicKey | "digest";
 

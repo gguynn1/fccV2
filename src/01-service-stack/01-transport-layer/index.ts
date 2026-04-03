@@ -5,10 +5,11 @@ import { pino, type Logger } from "pino";
 import twilio from "twilio";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
-import { systemConfig as seedSystemConfig } from "../../_seed/system-config.js";
+import { QueueItemSource } from "../../types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import { toRedisConnection } from "../../lib/redis.js";
 import type { StackQueueItem } from "../types.js";
-import { QueueItemSource, type QueueConsumerOptions } from "../04-queue/types.js";
+import type { QueueConsumerOptions } from "../04-queue/types.js";
 import { ThreadType } from "../../02-supporting-services/05-routing-service/types.js";
 import {
   DeliveryStatusType,
@@ -421,7 +422,7 @@ export class TwilioTransportLayer {
   }
 
   private resolveParticipantsForThread(threadId: string): string[] {
-    const thread = seedSystemConfig.threads.find((candidate) => candidate.id === threadId);
+    const thread = runtimeSystemConfig.threads.find((candidate) => candidate.id === threadId);
     if (!thread) {
       throw new Error(`Unknown thread id: ${threadId}`);
     }
@@ -429,14 +430,14 @@ export class TwilioTransportLayer {
   }
 
   private initializeThreadParticipantMaps(): void {
-    for (const entity of seedSystemConfig.entities) {
+    for (const entity of runtimeSystemConfig.entities) {
       if (entity.messaging_identity !== null) {
         this.entityIdByIdentity.set(entity.messaging_identity, entity.id);
         this.participantIdentityById.set(entity.id, entity.messaging_identity);
       }
     }
 
-    for (const thread of seedSystemConfig.threads) {
+    for (const thread of runtimeSystemConfig.threads) {
       if (thread.type !== ThreadType.Private) {
         continue;
       }

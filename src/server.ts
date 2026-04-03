@@ -14,7 +14,7 @@ import type {
 import { createClassifierService } from "./01-service-stack/03-classifier-service/index.js";
 import { BullQueueService } from "./01-service-stack/04-queue/index.js";
 import { createWorker, createWorkerIdentityService } from "./01-service-stack/05-worker/index.js";
-import { systemConfig } from "./_seed/system-config.js";
+import { runtimeSystemConfig } from "./config/runtime-system-config.js";
 import { createDataIngestService } from "./02-supporting-services/02-data-ingest-service/index.js";
 import {
   createStateService,
@@ -204,7 +204,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
   const classifierService = createClassifierService({
     anthropic_api_key: env.ANTHROPIC_API_KEY,
     state_service: stateService,
-    context_window_limit: systemConfig.worker.max_thread_history_messages ?? 15,
+    context_window_limit: runtimeSystemConfig.worker.max_thread_history_messages ?? 15,
     logger,
   });
   const topicProfileService = createTopicProfileService({ logger });
@@ -223,7 +223,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
   const confirmationService = createConfirmationService({
     redis_url: env.REDIS_URL,
     state_service: stateService,
-    gates: systemConfig.confirmation_gates,
+    gates: runtimeSystemConfig.confirmation_gates,
     logger,
   });
   const dataIngestService = createDataIngestService({
@@ -263,7 +263,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
     queue_service: queueService,
     transport_service: createTransportContract(transportLayer),
     logger,
-    config: systemConfig.worker,
+    config: runtimeSystemConfig.worker,
   });
 
   const worker = queueService.registerWorker(

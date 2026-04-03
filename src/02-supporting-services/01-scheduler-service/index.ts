@@ -1,13 +1,15 @@
 import { Queue } from "bullmq";
 import { pino, type Logger } from "pino";
 
-import { ClassifierIntent } from "../../types.js";
 import {
+  ClassifierIntent,
+  DispatchPriority,
+  EntityType,
   QueueItemSource,
   QueueItemType,
-  type PendingQueueItem,
-} from "../../01-service-stack/04-queue/types.js";
-import { DispatchPriority } from "../../01-service-stack/06-action-router/types.js";
+} from "../../types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
+import { type PendingQueueItem } from "../../01-service-stack/04-queue/types.js";
 import { toRedisConnection } from "../../lib/redis.js";
 import type { StateService } from "../types.js";
 import type {
@@ -229,7 +231,13 @@ export class BullSchedulerService {
       return [participantId];
     }
 
-    return ["participant_1"];
+    const thread = runtimeSystemConfig.threads.find((candidate) => candidate.id === threadId);
+    if (thread?.participants.length) {
+      return thread.participants;
+    }
+
+    const fallback = runtimeSystemConfig.entities.find((entity) => entity.type !== EntityType.Pet);
+    return fallback ? [fallback.id] : [];
   }
 }
 

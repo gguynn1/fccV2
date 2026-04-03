@@ -18,7 +18,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolve at:** step-33 (third window — no further deferrals)
 - **Action:** Replace the generic `topicRecordSchema` with per-topic Zod schemas derived from the TypeScript interfaces defined in steps 10–24. Add runtime validation on State Service read/write paths.
 
-### D-05 — Scheduler hardcodes participant_1 fallback
+### D-05 — ~~Scheduler hardcodes participant_1 fallback~~ MOVED TO RESOLVED (R-26)
 
 - **Identified:** step-05 review
 - **Severity:** Low
@@ -32,7 +32,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 
 ### D-08 — ~~Routing and budget services import seed config at runtime~~ CONSOLIDATED INTO D-14
 
-### D-09 — Cross-boundary runtime enum imports (EntityType, DispatchPriority, QueueItemSource, QueueItemType)
+### D-09 — ~~Cross-boundary runtime enum imports (EntityType, DispatchPriority, QueueItemSource, QueueItemType)~~ MOVED TO RESOLVED (R-27)
 
 - **Identified:** step-24–27 review (updated step-28, step-29–32 reviews, and step-0–32 reassessment)
 - **Severity:** Medium
@@ -48,7 +48,7 @@ Flags identified during code review that were accepted or deferred for resolutio
 
 ### D-13 — ~~resolveRoutingDecision uses duck-typing cast~~ MOVED TO RESOLVED (R-24)
 
-### D-14 — Seed config imported at runtime across 7 files
+### D-14 — ~~Seed config imported at runtime across 7 files~~ MOVED TO RESOLVED (R-28)
 
 - **Identified:** step-06 through step-29–32 reviews (consolidates D-03, D-06, D-08, D-11)
 - **Severity:** Medium
@@ -71,6 +71,14 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** `suggestGroceryItemsFromMealDescription()` in `04.13-meals/profile.ts` only handles "taco" and "pasta" keywords. The Worker's Meals→Grocery cross-topic path calls this function. The step spec says Claude API should interpret meal ideas and suggest grocery items.
 - **Resolve at:** step-35+ (action router / composition refinement)
 - **Action:** Replace the hardcoded keyword matching with a Claude API call that extracts grocery items from meal descriptions. Wire through the Worker's composition step.
+
+### D-17 — D-04 still unresolved after step-42
+
+- **Identified:** step-42 review
+- **Severity:** High
+- **Description:** D-04 (shallow topic state validation in `src/02-supporting-services/03-state-service/index.ts`) remained unresolved past its `Resolve at: step-33` target. State validation still relies on broad `topicRecordSchema` parsing with `as unknown as Record<string, unknown>` casts for each topic slice.
+- **Resolve at:** step-43 (state-validation hardening pass)
+- **Action:** Replace broad topic-record validation with per-topic runtime schemas and validate each topic state slice without `as unknown as` casts.
 
 ---
 
@@ -237,6 +245,13 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Severity:** Low
 - **Description:** `RedisBudgetService` creates `Queue("fcc-budget-counters")` but never adds jobs — only uses `this.queue.client` to access the underlying ioredis connection. Creates unnecessary BullMQ metadata keys in Redis.
 - **Decision:** Accepted — pragmatic reuse of BullMQ's connection management via the shared `toRedisConnection` utility.
+
+### A-27 — Architecture rule update in `.cursor/rules/architecture.mdc`
+
+- **Identified:** step-42 review
+- **Severity:** High (rule violation), accepted by user
+- **Description:** The build change set modifies `.cursor/rules/architecture.mdc`, which normally violates build-plan integrity restrictions for build-agent output.
+- **Decision:** Accepted — step-41 explicitly requires correcting the pipeline wording to reflect the implemented flow (Classifier runs inside Worker step 1).
 
 ---
 
@@ -416,3 +431,31 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolved:** same session (reassessment)
 - **Description:** Worker cast `routingService` to `RoutingService & { resolveRoutingDecision?: ... }` to check for an optional method. The method already existed on `StaticRoutingService` but was not declared on the `RoutingService` interface.
 - **Fix:** Added `resolveRoutingDecision(request: RoutingRequest): RoutingDecision` to the `RoutingService` interface. Removed the cast, the fallback path (~20 lines), and the unused `RoutingRule` runtime import from the Worker. Method changed from async to sync.
+
+### R-26 — D-05: Scheduler fallback now derives from configuration
+
+- **Identified:** step-03 review
+- **Resolved:** step-42 review
+- **Description:** `inferConcerningFromThread()` in scheduler defaulted shared/unknown threads to `["participant_1"]`.
+- **Fix:** Replaced hardcoded fallback with thread-membership lookup from `runtimeSystemConfig.threads`, with a non-hardcoded entity fallback when the thread is unknown.
+
+### R-27 — D-09: Shared enums moved to src/types
+
+- **Identified:** step-24–27 review
+- **Resolved:** step-42 review
+- **Description:** Cross-boundary runtime enums (`EntityType`, `DispatchPriority`, `QueueItemSource`, `QueueItemType`) were owned by service-local modules and imported across boundaries.
+- **Fix:** Moved enum ownership to `src/types.ts` and updated runtime consumers across stack/supporting services to import from the shared location.
+
+### R-28 — D-14: Runtime modules no longer import `_seed/system-config.js` directly
+
+- **Identified:** step-06 through step-29–32 reviews
+- **Resolved:** step-42 review
+- **Description:** Seven runtime modules imported configuration directly from `_seed/system-config.js`.
+- **Fix:** Introduced `src/config/runtime-system-config.ts` as the single configuration bridge and migrated all seven previous direct imports to use the bridge.
+
+### R-29 — Cross-service import contract test now handles multiline imports
+
+- **Identified:** step-42 review
+- **Resolved:** same session
+- **Description:** `contract.test.ts` import scan used a single-line regex, missing multiline imports and under-reporting violations.
+- **Fix:** Updated scanning to parse import statements with multiline support, while still excluding `import type` statements from runtime-boundary checks.

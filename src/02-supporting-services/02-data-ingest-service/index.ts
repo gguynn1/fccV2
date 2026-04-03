@@ -2,16 +2,19 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ImapFlow } from "imapflow";
 import { pino, type Logger } from "pino";
 
-import { systemConfig } from "../../_seed/system-config.js";
-import { EntityType } from "../../01-service-stack/02-identity-service/types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import type {
   ClassifierServiceContract,
   StackClassificationResult,
   StackQueueItem,
 } from "../../01-service-stack/types.js";
-import { QueueItemSource } from "../../01-service-stack/04-queue/types.js";
-import { DispatchPriority } from "../../01-service-stack/06-action-router/types.js";
-import { ClassifierIntent, TopicKey } from "../../types.js";
+import {
+  ClassifierIntent,
+  DispatchPriority,
+  EntityType,
+  QueueItemSource,
+  TopicKey,
+} from "../../types.js";
 import type { DataIngestService as DataIngestServiceContract, StateService } from "../types.js";
 import {
   DataIngestSourceType,
@@ -173,7 +176,7 @@ export class DataIngestService implements DataIngestServiceContract {
       ? new Anthropic({ apiKey: options.anthropic_api_key })
       : undefined;
     this.logger = options.logger ?? DEFAULT_LOGGER;
-    this.config = options.config ?? systemConfig.data_ingest;
+    this.config = options.config ?? runtimeSystemConfig.data_ingest;
     this.relevanceWindowMinutes =
       options.relevance_window_minutes ?? DEFAULT_RELEVANCE_WINDOW_MINUTES;
     this.imapConfig = {
@@ -579,7 +582,7 @@ export class DataIngestService implements DataIngestServiceContract {
     }
 
     // Shared inbox fallback keeps the item visible without pretending we know the owner.
-    const adults = systemConfig.entities
+    const adults = runtimeSystemConfig.entities
       .filter((entity) => entity.type !== EntityType.Pet && entity.messaging_identity !== null)
       .map((entity) => entity.id);
     return {
@@ -589,7 +592,7 @@ export class DataIngestService implements DataIngestServiceContract {
   }
 
   private resolveThreadParticipants(threadId: string): string[] {
-    const thread = systemConfig.threads.find((candidate) => candidate.id === threadId);
+    const thread = runtimeSystemConfig.threads.find((candidate) => candidate.id === threadId);
     return thread?.participants ?? ["participant_1"];
   }
 

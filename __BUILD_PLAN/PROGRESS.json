@@ -1,5 +1,5 @@
 {
-  "current_step": "step-33",
+  "current_step": "step-43",
   "status_notes": {
     "step-00-part-1": {
       "updated_at": "2026-04-03T13:55:03Z",
@@ -522,6 +522,130 @@
         "npm test passed"
       ],
       "next_action": "Proceed to step-33."
+    },
+    "step-33": {
+      "updated_at": "2026-04-03T17:41:36Z",
+      "checks_completed": [
+        "worker step 4 now passes budget priority through action routing (immediate dispatch, batched hold, silent store)",
+        "budget-aware collision handling and hold-window routing are enforced via action router integration",
+        "worker tests still verify dispatch for immediate flows and now cover rejection/store and escalation targeting scenarios",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-34."
+    },
+    "step-34": {
+      "updated_at": "2026-04-03T17:41:36Z",
+      "checks_completed": [
+        "worker step 5 now applies escalation next_target_thread when escalation asks for broader visibility",
+        "escalation-aware routing preserves follow-up target metadata and re-evaluates budget for escalated thread changes",
+        "worker test coverage verifies broader-thread escalation dispatch target behavior",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-35."
+    },
+    "step-35": {
+      "updated_at": "2026-04-03T17:41:36Z",
+      "checks_completed": [
+        "worker step 6 now gates execution on confirmation resolution (approved executes, rejected/expired store and halt)",
+        "confirmation gate mapping covers sending_on_behalf, financial_action, and system_change categories",
+        "reaction-based and reply-based confirmation resolution remains handled by confirmation service without expired auto-execution",
+        "worker test coverage verifies rejection prevents outbound dispatch",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-36."
+    },
+    "step-36": {
+      "updated_at": "2026-04-03T17:41:36Z",
+      "checks_completed": [
+        "worker state integration now persists hold/store/dispatch outcomes with richer action payloads",
+        "state service appendDispatchResult now writes hold metadata (including hold_until) and records store actions without transport side effects",
+        "thread history persistence and dispatch audit logging remain intact across all worker outcomes",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-37."
+    },
+    "step-37": {
+      "updated_at": "2026-04-03T17:41:36Z",
+      "checks_completed": [
+        "action router implementation added in src/01-service-stack/06-action-router/index.ts",
+        "dispatch/hold/store discriminated outcomes are validated and logged through router-level decision handling",
+        "collision precedence and same-precedence strategy hooks are applied before final route result selection",
+        "vitest coverage added for immediate, batched, silent, and collision-batch router scenarios",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-38."
+    },
+    "step-38": {
+      "updated_at": "2026-04-03T17:41:36Z",
+      "checks_completed": [
+        "dispatch handler module added in 06.1-dispatch/index.ts with Zod validation for outbound payloads",
+        "action router dispatch path now validates thread/content/priority/concerning envelope before outbound handling",
+        "worker dispatch flow remains wired to transport delivery and status callback tracking via transport layer contracts",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-39."
+    },
+    "step-39": {
+      "updated_at": "2026-04-03T17:41:36Z",
+      "checks_completed": [
+        "hold handler module added in 06.2-hold/index.ts with Zod validation for hold_until and queue item shape",
+        "router and worker hold flows preserve scheduling metadata for next natural touchpoint processing",
+        "state persistence now records hold metadata needed for missed-window and staleness-aware recovery logic",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-40."
+    },
+    "step-40": {
+      "updated_at": "2026-04-03T17:41:36Z",
+      "checks_completed": [
+        "store handler module added in 06.3-store/index.ts with Zod validation for silent record payloads",
+        "silent-priority outcomes now persist without outbound transport side effects",
+        "worker/store integration keeps silent items available for explicit retrieval paths only",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-41."
+    },
+    "step-41": {
+      "updated_at": "2026-04-03T17:47:36Z",
+      "checks_completed": [
+        "service stack barrel entry added at src/01-service-stack/index.ts for single-point stack imports",
+        "stack scenario runner suite added at src/01-service-stack/scenario-runner.test.ts with mocked services and pipeline-order assertions",
+        "pipeline invariant verified in tests: classification happens exactly once per item and only after queue dequeue inside worker step 1",
+        "architecture rule flow text updated to reflect physical pipeline order (Transport -> Identity -> Queue -> Worker -> Action Router)",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-42."
+    },
+    "step-42": {
+      "updated_at": "2026-04-03T17:47:36Z",
+      "checks_completed": [
+        "supporting-services barrel entry added at src/02-supporting-services/index.ts for single-entry service imports",
+        "shared fixtures added in src/02-supporting-services/test-fixtures.ts for queue items and thread history",
+        "contract suite added in src/02-supporting-services/contract.test.ts for worker-facing interfaces and cross-service runtime import boundary checks",
+        "no runtime cross-service imports detected between numbered supporting services by automated contract test",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm test passed"
+      ],
+      "next_action": "Proceed to step-43."
     }
   },
   "steps": {
@@ -560,17 +684,20 @@
     "step-30": { "status": "complete", "completed_at": "2026-04-03T17:02:30Z" },
     "step-31": { "status": "complete", "completed_at": "2026-04-03T17:02:30Z" },
     "step-32": { "status": "complete", "completed_at": "2026-04-03T17:02:30Z" },
-    "step-33": { "status": "pending" },
-    "step-34": { "status": "pending" },
-    "step-35": { "status": "pending" },
-    "step-36": { "status": "pending" },
-    "step-37": { "status": "pending" },
-    "step-38": { "status": "pending" },
-    "step-39": { "status": "pending" },
-    "step-40": { "status": "pending" },
-    "step-41": { "status": "pending" },
-    "step-42": { "status": "pending" },
-    "step-43": { "status": "pending" },
+    "step-33": { "status": "complete", "completed_at": "2026-04-03T17:41:36Z" },
+    "step-34": { "status": "complete", "completed_at": "2026-04-03T17:41:36Z" },
+    "step-35": { "status": "complete", "completed_at": "2026-04-03T17:41:36Z" },
+    "step-36": { "status": "complete", "completed_at": "2026-04-03T17:41:36Z" },
+    "step-37": { "status": "complete", "completed_at": "2026-04-03T17:41:36Z" },
+    "step-38": { "status": "complete", "completed_at": "2026-04-03T17:41:36Z" },
+    "step-39": { "status": "complete", "completed_at": "2026-04-03T17:41:36Z" },
+    "step-40": { "status": "complete", "completed_at": "2026-04-03T17:41:36Z" },
+    "step-41": { "status": "complete", "completed_at": "2026-04-03T17:47:36Z" },
+    "step-42": { "status": "complete", "completed_at": "2026-04-03T17:47:36Z" },
+    "step-43-part-1": { "status": "pending" },
+    "step-43-part-2": { "status": "pending" },
+    "step-43-part-3": { "status": "pending" },
+    "step-43-part-4": { "status": "pending" },
     "step-44": { "status": "pending" },
     "step-45": { "status": "pending" },
     "step-46": { "status": "pending" },

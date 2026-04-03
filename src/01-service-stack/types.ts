@@ -7,11 +7,10 @@ export * from "./06-action-router/types.js";
 
 import { z } from "zod";
 
-import { ClassifierIntent, TopicKey } from "../types.js";
-import type { ClarificationReason } from "../types.js";
-import { DispatchPriority } from "./06-action-router/types.js";
+import { ClassifierIntent, DispatchPriority, QueueItemSource, TopicKey } from "../types.js";
 import type { CollisionPrecedence } from "./06-action-router/types.js";
-import { inboundEmailContentSchema, QueueItemSource } from "./04-queue/types.js";
+import type { ClarificationReason } from "../types.js";
+import { inboundEmailContentSchema } from "./04-queue/types.js";
 import type { ThreadHistory } from "../02-supporting-services/05-routing-service/types.js";
 
 export const stackQueueItemSchema = z.object({

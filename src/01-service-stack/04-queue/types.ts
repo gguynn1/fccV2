@@ -1,24 +1,14 @@
 import { z } from "zod";
 
-import { ClassifierIntent, TopicKey } from "../../types.js";
-import { DispatchPriority } from "../06-action-router/types.js";
+import {
+  ClassifierIntent,
+  DispatchPriority,
+  QueueItemSource,
+  QueueItemType,
+  TopicKey,
+} from "../../types.js";
 
-export enum QueueItemType {
-  Outbound = "outbound",
-  Inbound = "inbound",
-}
-
-export enum QueueItemSource {
-  HumanMessage = "human_message",
-  Reaction = "reaction",
-  ForwardedMessage = "forwarded_message",
-  ImageAttachment = "image_attachment",
-  EmailMonitor = "email_monitor",
-  DataIngest = "data_ingest",
-  InternalStateChange = "internal_state_change",
-  ScheduledTrigger = "scheduled_trigger",
-  CrossTopic = "cross_topic",
-}
+export { QueueItemSource, QueueItemType };
 
 export enum QueuePendingStatus {
   PendingClassification = "pending_classification",

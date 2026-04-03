@@ -1,7 +1,38 @@
-export enum DispatchPriority {
-  Immediate = "immediate",
-  Batched = "batched",
-  Silent = "silent",
+import { DispatchPriority } from "../../types.js";
+
+export { DispatchPriority };
+
+export interface DispatchResult {
+  decision: "dispatch";
+  outbound: {
+    target_thread: string;
+    content: string;
+    priority: DispatchPriority;
+    concerning: string[];
+  };
+}
+
+export interface HoldResult {
+  decision: "hold";
+  queue_item: {
+    id?: string;
+    target_thread: string;
+    concerning: string[];
+    created_at: Date;
+  };
+  hold_until: Date;
+  reason: string;
+}
+
+export interface StoreResult {
+  decision: "store";
+  queue_item: {
+    id?: string;
+    target_thread: string;
+    concerning: string[];
+    created_at: Date;
+  };
+  reason: string;
 }
 
 export interface PriorityLevel {

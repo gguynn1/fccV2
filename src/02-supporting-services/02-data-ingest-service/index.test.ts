@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { systemState } from "../../_seed/system-state.js";
+import { QueueItemSource, TopicKey } from "../../types.js";
 import type { SystemState } from "../03-state-service/types.js";
-import { QueueItemSource } from "../../01-service-stack/04-queue/types.js";
 import type { StackQueueItem } from "../../01-service-stack/types.js";
-import { TopicKey } from "../../types.js";
 import { createDataIngestService } from "./index.js";
 
 function resolved<T>(value: T): Promise<T> {

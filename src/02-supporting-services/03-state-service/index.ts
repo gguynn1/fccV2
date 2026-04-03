@@ -240,7 +240,7 @@ export class SqliteStateService implements StateService {
     const tx = this.db.transaction(() => {
       this.db.prepare("DELETE FROM queue_pending WHERE id = ?").run(queueItemId);
 
-      if (action.decision === "hold" || action.decision === "store") {
+      if (action.decision === "hold") {
         this.db
           .prepare(
             `
@@ -253,8 +253,36 @@ export class SqliteStateService implements StateService {
           )
           .run({
             id: queueItemId,
-            payload: serializeForStorage(queue_item),
+            payload: serializeForStorage({
+              ...action.queue_item,
+              hold_until: action.hold_until,
+              priority: queue_item.priority,
+              topic: queue_item.topic,
+              intent: queue_item.intent,
+              source: queue_item.source,
+              content: queue_item.content,
+              clarification_of: queue_item.clarification_of,
+              idempotency_key: queue_item.idempotency_key,
+            }),
             created_at: actionRecordedAt,
+          });
+      }
+
+      if (action.decision === "store") {
+        this.db
+          .prepare(
+            `
+            INSERT INTO queue_recently_dispatched (id, payload, dispatched_at)
+            VALUES (@id, @payload, @dispatched_at)
+            ON CONFLICT(id) DO UPDATE SET
+              payload = excluded.payload,
+              dispatched_at = excluded.dispatched_at
+            `,
+          )
+          .run({
+            id: queueItemId,
+            payload: serializeForStorage(action),
+            dispatched_at: actionRecordedAt,
           });
       }
 

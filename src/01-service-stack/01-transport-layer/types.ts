@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { QueueItemSource } from "../04-queue/types.js";
+import type { QueueItemSource } from "../../types.js";
 
 export enum TransportInputKind {
   Text = "text",

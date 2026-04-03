@@ -2,9 +2,9 @@ import BetterSqlite3 from "better-sqlite3";
 import { Queue } from "bullmq";
 import { pino, type Logger } from "pino";
 
-import { systemConfig } from "../../_seed/system-config.js";
+import { DispatchPriority } from "../../types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import type { StackQueueItem, CollisionPolicy } from "../../01-service-stack/types.js";
-import { DispatchPriority } from "../../01-service-stack/06-action-router/types.js";
 import { toRedisConnection } from "../../lib/redis.js";
 import type { BudgetDecision, BudgetService, StateService } from "../types.js";
 import type { OutboundBudgetTracker } from "./types.js";
@@ -77,7 +77,7 @@ export class RedisBudgetService implements BudgetService {
     }
 
     const byThread: OutboundBudgetTracker["by_thread"] = {};
-    for (const thread of systemConfig.threads) {
+    for (const thread of runtimeSystemConfig.threads) {
       const count = this.asNumber(await client.get(this.threadHourlyKey(thread.id, now)));
       byThread[thread.id] = {
         last_hour_count: count,
@@ -191,7 +191,7 @@ export class RedisBudgetService implements BudgetService {
   }
 
   private participantIds(): string[] {
-    return systemConfig.entities
+    return runtimeSystemConfig.entities
       .filter((entity) => entity.messaging_identity !== null)
       .map((entity) => entity.id);
   }
@@ -238,7 +238,9 @@ export class RedisBudgetService implements BudgetService {
     const now = new Date();
     const client = await this.queue.client;
     const participantKeys = this.participantIds().map((id) => this.personDailyKey(id, now));
-    const threadKeys = systemConfig.threads.map((thread) => this.threadHourlyKey(thread.id, now));
+    const threadKeys = runtimeSystemConfig.threads.map((thread) =>
+      this.threadHourlyKey(thread.id, now),
+    );
     const [personValues, threadValues] = await Promise.all([
       client.mget(participantKeys),
       client.mget(threadKeys),
@@ -276,7 +278,7 @@ export class RedisBudgetService implements BudgetService {
       pipeline.set(key, value);
       pipeline.expire(key, this.secondsUntilEndOfDay(now));
     }
-    for (const thread of systemConfig.threads) {
+    for (const thread of runtimeSystemConfig.threads) {
       const value = threadCounts.get(thread.id) ?? 0;
       const key = this.threadHourlyKey(thread.id, now);
       pipeline.set(key, value);
@@ -363,7 +365,7 @@ export class RedisBudgetService implements BudgetService {
   }
 
   private resolveParticipantsForThread(threadId: string): string[] {
-    const thread = systemConfig.threads.find((candidate) => candidate.id === threadId);
+    const thread = runtimeSystemConfig.threads.find((candidate) => candidate.id === threadId);
     if (!thread) {
       return [];
     }

@@ -43,6 +43,35 @@ export enum ClassifierIntent {
   ForwardedData = "forwarded_data",
 }
 
+export enum EntityType {
+  Adult = "adult",
+  Child = "child",
+  Pet = "pet",
+}
+
+export enum DispatchPriority {
+  Immediate = "immediate",
+  Batched = "batched",
+  Silent = "silent",
+}
+
+export enum QueueItemType {
+  Outbound = "outbound",
+  Inbound = "inbound",
+}
+
+export enum QueueItemSource {
+  HumanMessage = "human_message",
+  Reaction = "reaction",
+  ForwardedMessage = "forwarded_message",
+  ImageAttachment = "image_attachment",
+  EmailMonitor = "email_monitor",
+  DataIngest = "data_ingest",
+  InternalStateChange = "internal_state_change",
+  ScheduledTrigger = "scheduled_trigger",
+  CrossTopic = "cross_topic",
+}
+
 export enum ClarificationReason {
   AmbiguousIntent = "ambiguous_intent",
   AmbiguousReference = "ambiguous_reference",

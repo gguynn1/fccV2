@@ -7,7 +7,7 @@ export * from "./06-budget-service/types.js";
 export * from "./07-escalation-service/types.js";
 export * from "./08-confirmation-service/types.js";
 
-import type { ClassifierIntent, TopicKey } from "../types.js";
+import type { ClassifierIntent, DispatchPriority, TopicKey } from "../types.js";
 import type {
   ActionRouterResult,
   CollisionPolicy,
@@ -15,7 +15,6 @@ import type {
   StackQueueItem,
   WorkerDecision,
 } from "../01-service-stack/types.js";
-import type { DispatchPriority } from "../01-service-stack/06-action-router/types.js";
 import type { DataIngestState } from "./02-data-ingest-service/types.js";
 import type { SystemState } from "./03-state-service/types.js";
 import type { TopicProfileConfig } from "./04-topic-profile-service/types.js";

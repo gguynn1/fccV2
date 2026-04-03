@@ -1,10 +1,8 @@
 import { z } from "zod";
 
-export enum EntityType {
-  Adult = "adult",
-  Child = "child",
-  Pet = "pet",
-}
+import { EntityType } from "../../types.js";
+
+export { EntityType };
 
 export enum Permission {
   ApproveFinancial = "approve_financial",

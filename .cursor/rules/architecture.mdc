@@ -7,7 +7,7 @@ alwaysApply: true
 
 Three roots under `src/`:
 
-- `01-service-stack/` — Core pipeline. Messages flow top-to-bottom: Transport → Identity → Classifier → Queue → Worker → Action Router.
+- `01-service-stack/` — Core pipeline. Messages flow top-to-bottom: Transport → Identity → Queue → Worker → Action Router. (Classifier runs inside Worker step 1.)
 - `02-supporting-services/` — Called by the Worker or feed the Queue. Never call each other. Never reach back into the stack.
 - `03-connections/` — Documentation only. Describes how services interact. No code lives here.
 

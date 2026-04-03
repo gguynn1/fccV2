@@ -1,6 +1,13 @@
 import { pino, type Logger } from "pino";
 
-import { systemConfig } from "../../_seed/system-config.js";
+import {
+  ClarificationReason,
+  ClassifierIntent,
+  DispatchPriority,
+  QueueItemSource,
+  TopicKey,
+} from "../../types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import type {
   ActionRouterContract,
   ActionRouterResult,
@@ -17,8 +24,7 @@ import type {
   WorkerDecision,
 } from "../types.js";
 import { SamePrecedenceStrategy } from "../types.js";
-import { DispatchPriority } from "../06-action-router/types.js";
-import { QueueItemSource } from "../04-queue/types.js";
+import { createActionRouter } from "../06-action-router/index.js";
 import { createIdentityService } from "../02-identity-service/index.js";
 import {
   type BudgetDecision,
@@ -48,8 +54,10 @@ import {
   MaintenanceStatus,
 } from "../../02-supporting-services/04-topic-profile-service/04.14-maintenance/types.js";
 import { PetCareCategory } from "../../02-supporting-services/04-topic-profile-service/04.06-pets/types.js";
-import { ConfirmationActionType } from "../../02-supporting-services/08-confirmation-service/types.js";
-import { ClarificationReason, ClassifierIntent, TopicKey } from "../../types.js";
+import {
+  ConfirmationActionType,
+  ConfirmationResult,
+} from "../../02-supporting-services/08-confirmation-service/types.js";
 import {
   type ClarificationRequest,
   type ProcessingTrace,
@@ -120,7 +128,7 @@ function summarizeContent(content: StackQueueItem["content"]): string {
 
 function toCollisionPolicy(): CollisionPolicy {
   return {
-    precedence_order: systemConfig.dispatch.collision_avoidance.precedence_order,
+    precedence_order: runtimeSystemConfig.dispatch.collision_avoidance.precedence_order,
     same_precedence_strategy: SamePrecedenceStrategy.Batch,
   };
 }
@@ -215,12 +223,12 @@ export class Worker {
     this.stateService = options.state_service;
     this.queueService = options.queue_service;
     this.transportService = options.transport_service;
-    this.actionRouter = options.action_router;
     this.logger = options.logger ?? DEFAULT_LOGGER;
+    this.actionRouter = options.action_router ?? createActionRouter({ logger: this.logger });
     this.now = options.now ?? (() => new Date());
     this.config = {
       processing_sequence:
-        options.config?.processing_sequence ?? systemConfig.worker.processing_sequence,
+        options.config?.processing_sequence ?? runtimeSystemConfig.worker.processing_sequence,
       max_thread_history_messages:
         options.config?.max_thread_history_messages ?? DEFAULT_MAX_THREAD_HISTORY_MESSAGES,
       stale_after_hours: options.config?.stale_after_hours ?? DEFAULT_STALE_AFTER_HOURS,
@@ -413,6 +421,11 @@ export class Worker {
       }),
     );
 
+    const escalationTargetThread =
+      escalation.should_escalate && escalation.next_target_thread
+        ? escalation.next_target_thread
+        : provisionalTargetThread;
+
     const confirmationResult = await this.traceStep(
       traceSteps,
       6,
@@ -423,7 +436,7 @@ export class Worker {
         this.handleConfirmation(
           classifiedQueueItem,
           determined.typed_action,
-          provisionalTargetThread,
+          escalationTargetThread,
         ),
       (output) => ({
         output_summary: output.kind,
@@ -438,6 +451,27 @@ export class Worker {
         started_at: startedAt,
         completed_at: completedAt,
         outcome: "held",
+        steps: traceSteps,
+        classification_source: classificationSource,
+      };
+    }
+
+    if (
+      confirmationResult.kind === "resolved_reply" &&
+      confirmationResult.resolution !== ConfirmationResult.Approved
+    ) {
+      const haltedAction = this.toStoreAction(
+        { ...classifiedQueueItem, target_thread: escalationTargetThread },
+        `Confirmation resolved as ${confirmationResult.resolution}; action execution halted.`,
+      );
+      await this.appendInboundHistory(classifiedQueueItem, classification.topic);
+      await this.stateService.appendDispatchResult(classifiedQueueItem, haltedAction);
+      const completedAt = this.now();
+      return {
+        queue_item_id: queueItemId,
+        started_at: startedAt,
+        completed_at: completedAt,
+        outcome: "stored",
         steps: traceSteps,
         classification_source: classificationSource,
       };
@@ -485,7 +519,7 @@ export class Worker {
       8,
       WorkerAction.RouteAndDispatch,
       WorkerService.Routing,
-      provisionalTargetThread,
+      escalationTargetThread,
       async () => {
         const routingDecision = this.resolveRoutingDecision({
           topic: classification.topic,
@@ -494,19 +528,33 @@ export class Worker {
           origin_thread: classifiedQueueItem.target_thread,
           is_response: determined.is_response,
         });
+        const routedTargetThread =
+          escalation.should_escalate && escalation.next_target_thread
+            ? escalation.next_target_thread
+            : routingDecision.target.thread_id;
+        const effectiveRoutingDecision =
+          routedTargetThread === routingDecision.target.thread_id
+            ? routingDecision
+            : {
+                ...routingDecision,
+                target: {
+                  ...routingDecision.target,
+                  thread_id: routedTargetThread,
+                },
+              };
         const effectiveBudget =
-          routingDecision.target.thread_id === provisionalTargetThread
+          effectiveRoutingDecision.target.thread_id === provisionalTargetThread
             ? budget
             : await this.budgetService.evaluateOutbound(
                 classifiedQueueItem,
-                routingDecision.target.thread_id,
+                effectiveRoutingDecision.target.thread_id,
                 toCollisionPolicy(),
               );
         const finalAction = await this.routeToAction(
           classifiedQueueItem,
           classification,
           identity,
-          routingDecision,
+          effectiveRoutingDecision,
           effectiveBudget,
           profileResult.composed,
         );
@@ -516,12 +564,12 @@ export class Worker {
           classification,
           finalAction,
           profileResult.composed,
-          routingDecision,
+          effectiveRoutingDecision,
           effectiveBudget,
         );
 
         return {
-          routingDecision,
+          routingDecision: effectiveRoutingDecision,
           action: finalAction,
           budget: effectiveBudget,
           escalation,
@@ -966,8 +1014,12 @@ export class Worker {
     action: TopicAction,
     targetThread: string,
   ): Promise<
-    | { kind: "none"; metadata: Record<string, unknown> }
-    | { kind: "resolved_reply"; metadata: Record<string, unknown> }
+    | { kind: "none"; metadata: Record<string, unknown>; resolution?: undefined }
+    | {
+        kind: "resolved_reply";
+        metadata: Record<string, unknown>;
+        resolution: ConfirmationResult;
+      }
     | { kind: "confirmation_prompted"; metadata: Record<string, unknown> }
   > {
     const replyResolution = await this.confirmationService.resolveFromQueueItem(queueItem);
@@ -975,6 +1027,7 @@ export class Worker {
       return {
         kind: "resolved_reply",
         metadata: { result: replyResolution },
+        resolution: replyResolution,
       };
     }
 
@@ -1021,6 +1074,16 @@ export class Worker {
     }
     if (action.type === "stage_client_draft" || action.type === "approve_client_draft") {
       return ConfirmationActionType.SendingOnBehalf;
+    }
+    if (
+      [
+        "add_data_source",
+        "modify_dispatch_rules",
+        "change_escalation_timing",
+        "add_entity",
+      ].includes(action.type)
+    ) {
+      return ConfirmationActionType.SystemChange;
     }
     return null;
   }
@@ -1090,11 +1153,34 @@ export class Worker {
     composedMessage: string,
   ): Promise<ActionRouterResult> {
     if (this.actionRouter) {
+      const routedQueueItem: StackQueueItem = {
+        ...queueItem,
+        target_thread: routingDecision.target.thread_id,
+        priority: budget.priority,
+      };
+      const candidateAction: ActionRouterResult =
+        budget.priority === DispatchPriority.Silent
+          ? this.toStoreAction(routedQueueItem, budget.reason)
+          : budget.priority === DispatchPriority.Batched
+            ? this.toHoldAction(
+                routedQueueItem,
+                budget.hold_until ?? new Date(queueItem.created_at.getTime() + 30 * 60 * 1000),
+                budget.reason,
+              )
+            : {
+                decision: "dispatch",
+                outbound: {
+                  target_thread: routingDecision.target.thread_id,
+                  content: composedMessage,
+                  priority: budget.priority,
+                  concerning: queueItem.concerning,
+                },
+              };
       const workerDecision: WorkerDecision = {
-        queue_item: { ...queueItem, target_thread: routingDecision.target.thread_id },
+        queue_item: routedQueueItem,
         classification,
         identity,
-        action: this.toStoreAction(queueItem, "Pending action-router decision."),
+        action: candidateAction,
       };
       return this.actionRouter.route(workerDecision, toCollisionPolicy());
     }

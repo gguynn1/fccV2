@@ -3,8 +3,7 @@ import { pino, type Logger } from "pino";
 import { assign, createActor, setup } from "xstate";
 
 import type { StackQueueItem } from "../../01-service-stack/types.js";
-import { QueueItemSource } from "../../01-service-stack/04-queue/types.js";
-import { ClassifierIntent, EscalationLevel, TopicKey } from "../../types.js";
+import { ClassifierIntent, EscalationLevel, QueueItemSource, TopicKey } from "../../types.js";
 import { toRedisConnection } from "../../lib/redis.js";
 import type { EscalationDecision, EscalationService, StateService } from "../types.js";
 import {

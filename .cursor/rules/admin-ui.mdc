@@ -1,0 +1,116 @@
+# Admin UI
+
+## Purpose
+
+The admin UI is a **management tool** for system configuration and state. It is not a monitoring dashboard, not a message reader, and not an eval interface. Every page exists to let the operator view and change something actionable. If data cannot be managed through the UI, it does not belong in the UI.
+
+## Design Decisions
+
+### Visual Identity
+
+- **Dark mode only.** No light mode, no toggle, no system preference detection.
+- Use shadcn/ui's default zinc/neutral dark palette. Do not introduce custom brand colors.
+- No decorative elements, illustrations, or empty-state artwork. Typography and spacing do the visual work.
+
+### Layout
+
+- **Top navigation bar** with horizontal links to all pages. Full-width content area below.
+- No sidebar. No collapsible rail. No nested navigation.
+- Pages: Dashboard, Entities, Threads, Topics, Budget, Scheduler, Queue, Activity.
+
+### Responsiveness
+
+- **Optimized for desktop, readable on phone.** Tables should horizontally scroll on narrow viewports. Forms should stack vertically. No mobile-specific layouts or breakpoint gymnastics.
+
+### Interaction Patterns
+
+- **Inline editing.** Click a value, edit it in place, auto-save on blur or Enter. No modal forms, no edit pages, no save/discard bars.
+- **No confirmation dialogs.** This is a trusted-operator tool. All changes apply immediately. The operator can fix forward.
+- **No undo/revert.** No config versioning, no changelog, no rollback UI. Config changes are rare and reversible by the operator.
+- **Polling, not push.** TanStack Query `refetchInterval` (5–10 seconds) for state pages (Queue, Activity, Dashboard). No WebSocket, no SSE, no new backend transport.
+
+### Scope Boundaries
+
+- **Show only what can be managed.** No read-only display pages. Every piece of data shown is either editable or actionable (retry, discard).
+- **No message content.** The UI never displays raw message bodies from participant threads. Queue items and dispatch records show metadata only: timestamps, topics, threads, entity IDs, status.
+- **No manual enqueue.** The UI cannot create new queue items. Queue page is inspect + retry/discard for DLQ items only.
+- **No eval integration.** The eval framework is a CLI/developer tool. No eval pages, no eval results, no tuner candidate management in the UI.
+
+### Topic Profile Editability
+
+Topics are broadly editable through the UI: enabled/disabled toggle, tone, format, escalation profile, and confirmation gate settings. Cross-topic connections and framework grounding remain code-managed — they are structural decisions, not operational knobs.
+
+### Dashboard
+
+- The dashboard shows **visual indicators** for system health: color-coded status cards, warning badges for DLQ depth, exhausted budgets, stuck escalations.
+- Not a passive number display — problems should be visually obvious at a glance.
+
+### Activity & History
+
+- Default to last 24 hours of dispatch, escalation, and confirmation history.
+- Date range filter available to expand to 7 days or custom range.
+- Paginated, not infinite scroll.
+
+### Error & Empty States
+
+- **Minimal.** Loading spinners while data fetches. Empty tables when there's no data. No special empty-state illustrations or explanatory text. No global "system offline" page — sections that can't load show their own spinner/error inline.
+
+## Technology Constraints
+
+| Layer          | Technology                   | Notes                                                                                                            |
+| -------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Framework      | React 19                     |                                                                                                                  |
+| Components     | shadcn/ui (Radix + Tailwind) | No raw HTML buttons, inputs, selects, or dialogs. Always use the shadcn primitive.                               |
+| Build          | Vite                         |                                                                                                                  |
+| Data fetching  | TanStack Query               | Polling via `refetchInterval` for live data                                                                      |
+| Form handling  | React Hook Form + Zod        | Inline editing wired through RHF for validation                                                                  |
+| Routing        | React Router (hash mode)     | Single Fastify catch-all serves the SPA                                                                          |
+| Schema sharing | TypeScript path aliases      | UI tsconfig maps `@backend/*` to `../src/*`. Vite resolves via alias config. No shared package, no type copying. |
+
+## Component Quality Standards
+
+- **Named exports only.** No default exports. Every component is `export function ComponentName()`.
+- **TypeScript props interfaces.** Every component that accepts props has a named `ComponentNameProps` interface.
+- **shadcn primitives exclusively.** No raw `<button>`, `<input>`, `<select>`, `<dialog>`, `<table>`. Always use the shadcn/ui component. If a shadcn component doesn't exist for the need, use Radix directly.
+- **No inline styles.** All styling through Tailwind utility classes. No `style={}` props.
+- **Consistent file structure.** One component per file. File name matches component name in kebab-case. Colocate component-specific hooks and utilities in the same directory.
+
+## Project Structure
+
+```
+ui/
+├── src/
+│   ├── main.tsx
+│   ├── App.tsx
+│   ├── routes/          ← one file per page
+│   ├── components/      ← shared UI components
+│   ├── hooks/           ← shared data-fetching hooks (TanStack Query)
+│   └── lib/             ← utilities, API client, constants
+├── index.html
+├── vite.config.ts
+├── tailwind.config.ts
+├── tsconfig.json
+├── package.json
+└── components.json      ← shadcn/ui config
+```
+
+## API Layer
+
+- All admin API routes under `/api/admin/*`.
+- Both `/admin` (UI) and `/api/admin/*` (API) are **local-network only** — reject requests arriving through the ngrok tunnel via `X-Forwarded-For` / `X-Forwarded-Host` header inspection.
+- No authentication required (local network trust model).
+
+## Testing
+
+- **Manual testing only.** No automated UI tests, no component tests, no E2E tests. The backend pipeline is where correctness matters. The UI is a convenience layer.
+- The build agent must verify `npm run typecheck` passes for both `src/` and `ui/` projects.
+- The build agent must verify `npm run lint` passes.
+
+## Build Agent Guardrails
+
+- The admin UI is built in **sub-steps**, not a single monolithic step. Each sub-step is a complete, typechecking, linting deliverable.
+- The build agent must not introduce dependencies beyond those listed in the Technology Constraints table without explicit approval.
+- The build agent must not create pages that display message content from participant threads.
+- The build agent must not add WebSocket or SSE routes to the Fastify server.
+- The build agent must not create automated tests for UI components.
+- Every component must use shadcn/ui primitives. The build agent must not render raw HTML form elements or layout primitives that have a shadcn equivalent.
