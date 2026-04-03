@@ -8,9 +8,7 @@
       "title": "Complete manual and external verification",
       "status": "in_progress",
       "notes": [
-        "Completed: scheduler runtime wiring, admin UI parity cleanup, typecheck/lint/test/build/ui:build, eval:run, admin route verification, forwarded-header rejection checks, invalid Twilio signature rejection, and CalDAV PROPFIND/REPORT/GET smoke tests.",
-        "Completed: SQLite backup job now captures both the SQLite snapshot and Redis AOF files; com.fcc.app launch agent is loaded and survives a hard-crash restart.",
-        "Remaining external/manual gates: live Twilio verification, live IMAP credentials/reconnect checks, local calendar-app subscription validation, ngrok launch-agent takeover while the static endpoint is already online elsewhere, and root-only macOS sleep/auto-login/reboot verification."
+        "Remaining: live Twilio verification, live IMAP credentials/reconnect checks, local calendar-app subscription validation, ngrok launch-agent reboot takeover, and macOS sleep/auto-login/reboot verification."
       ]
     }
   }

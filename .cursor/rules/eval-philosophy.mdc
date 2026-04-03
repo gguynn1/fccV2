@@ -17,13 +17,13 @@ In the current implementation, each scenario runs sequentially, records structur
 
 - **No feature without scenarios.** Adding a topic, a disambiguation rule, a cross-topic connection, or an escalation profile means adding eval scenarios that exercise it. If you can't write the scenario, the feature isn't specified well enough.
 - **Failures are refinements, not bugs.** A wrong classification or wrong tone is a model refinement signal, not a code defect. The tuner adjusts prompts and few-shot examples — it does not modify runtime logic.
-- **Coverage remains the target.** The default scenario set covers five topics. Generated scenario sets cover ten topics across all major categories. Future expansion should push toward full topic and edge-case coverage.
+- **Coverage remains the target.** The default scenario set covers five topics. Generated scenario sets cover ten of the fourteen topics (Calendar, Grocery, Finances, Business, Vendors, School, Health, Meals, Chores, Maintenance). The four remaining topics (Pets, Travel, Relationship, FamilyStatus) are not yet represented in generated sets. Future expansion should push toward full topic and edge-case coverage.
 - **Negative scenarios are as important as positive ones.** The system must prove what it does NOT do: no financial data in a child's thread, no auto-execution of expired confirmations, no late dispatch of stale items, no escalation of low-accountability topics.
 - **Sequential execution is the current default.** One scenario runs at a time, and the UI polls the persisted JSON run state for progress and logs.
 
 ## Scenario Generation
 
-The Eval page can generate scenario scaffolds into `eval/scenarios/generated/`. Each scaffold covers 10 topics (Calendar, Grocery, Finances, Business, Vendors, School, Health, Meals, Chores, Maintenance) and is immediately runnable. Successive generation clicks produce varied messages via a deterministic hash-based variant selector.
+The Eval page can generate scenario scaffolds into `eval/scenarios/generated/`. Each scaffold covers 10 of the 14 system topics (Calendar, Grocery, Finances, Business, Vendors, School, Health, Meals, Chores, Maintenance) and is immediately runnable. Successive generation clicks produce varied messages via a deterministic hash-based variant selector. Pets, Travel, Relationship, and FamilyStatus are not yet included in generated sets.
 
 ## How the Runner Works
 
