@@ -17,7 +17,7 @@
 
 The inbound path for phone-native messages is: Transport normalizes → Identity resolves sender → item enters the Queue with source, sender entity, thread, raw content, and timestamp. Topic and intent are **not yet classified** at this point.
 
-The Worker owns classification. When it pulls an item, step 1 calls the Classifier Service and step 2 resolves which entities are **concerned** (distinct from step 6 in the Identity Service, which resolves who **sent** it). Data Ingest items may arrive pre-classified; the Worker validates or re-classifies as needed.
+The Worker owns classification. When it pulls an item, step 1 calls the Classifier Service — which returns a typed `ClassificationResult` containing `topic` (TopicKey), `intent` (ClassifierIntent), `entities`, and optional `confidence` — and step 2 resolves which entities are **concerned** (distinct from step 6 in the Identity Service, which resolves who **sent** it). Data Ingest items may arrive pre-classified; the Worker validates or re-classifies as needed.
 
 The connection documentation (step-48) shows "Transport → Identity → Classifier → Queue" as the **logical end-to-end flow** a phone message traverses, not a pre-queue pipeline. Physically, the Classifier is invoked by the Worker after the item is dequeued.
 
@@ -25,9 +25,9 @@ The connection documentation (step-48) shows "Transport → Identity → Classif
 
 Data Ingest items (Step 29) may arrive with topic/intent pre-populated. The Worker applies this policy:
 
-1. If `topic` is null → call the Classifier (always true for phone-originated items)
-2. If `topic` is set AND the source is `ingest` → trust the pre-classification, skip the Classifier call (saves API quota)
-3. If `topic` is set AND the source is `scheduler` → trust the pre-classification (scheduler items are system-generated with known topics)
+1. If `topic` is absent → call the Classifier, which returns `ClassificationResult` (always true for phone-originated items — topic/intent are optional on `PendingQueueItem`)
+2. If `topic` is set AND the source is `QueueItemSource.EmailMonitor` or ingest → trust the pre-classification, skip the Classifier call (saves API quota)
+3. If `topic` is set AND the source is `QueueItemSource.ScheduledTrigger` → trust the pre-classification (scheduler items are system-generated with known topics)
 4. Log the classification source (pre-classified vs. worker-classified) in the decision trace for debugging
 
 ### Cross-Topic Event Wiring
@@ -36,7 +36,7 @@ When the Worker processes an item, it must check for cross-topic side effects de
 
 1. After step 7 (apply topic behavior profile), check if the current action triggers a cross-topic event
 2. If triggered, create a new queue item for the target topic (e.g., Meals→Grocery generates grocery list additions)
-3. The new item enters the queue as a system-generated event with source `cross_topic`
+3. The new item enters the queue as a system-generated event with source `QueueItemSource.CrossTopic`
 4. Cross-topic items are processed by the same Worker pipeline — no special handling
 
 Declared connections to wire: Meals→Grocery, Maintenance→Vendors, Maintenance→Finances, Maintenance→Calendar, Health→Calendar, Pets→Calendar, Business→Finances, Business→Calendar, Travel→Calendar, Travel→Pets, Travel→Finances, Travel→Grocery.

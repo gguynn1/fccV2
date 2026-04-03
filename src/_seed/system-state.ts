@@ -29,6 +29,7 @@ import {
   MaintenanceAssetType,
   MaintenanceInterval,
   MaintenanceStatus,
+  ClassifierIntent,
 } from "../index.js";
 
 export const systemState: SystemState = {
@@ -45,6 +46,7 @@ export const systemState: SystemState = {
         source: QueueItemSource.ScheduledTrigger,
         type: QueueItemType.Outbound,
         topic: TopicKey.Health,
+        intent: ClassifierIntent.Query,
         concerning: ["participant_1"],
         content: "Post-appointment follow-up: any notes from today's dentist visit?",
         priority: DispatchPriority.Batched,
@@ -57,6 +59,7 @@ export const systemState: SystemState = {
         source: QueueItemSource.EmailMonitor,
         type: QueueItemType.Inbound,
         topic: TopicKey.School,
+        intent: ClassifierIntent.ForwardedData,
         concerning: ["participant_3"],
         content: {
           from: "teacher@school.edu",

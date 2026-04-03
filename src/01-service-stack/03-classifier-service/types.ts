@@ -1,4 +1,11 @@
-import type { EscalationLevel, GrocerySection, TopicKey } from "../../types.js";
+import type { EscalationLevel, GrocerySection, TopicKey, ClassifierIntent } from "../../types.js";
+
+export interface ClassificationResult {
+  topic: TopicKey;
+  intent: ClassifierIntent;
+  entities: string[];
+  confidence?: number;
+}
 
 export interface TopicRouting {
   [key: string]: string | boolean | string[];

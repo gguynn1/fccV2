@@ -12,4 +12,8 @@ Maps a sender identifier to an entity. Most often this is a phone number, but th
 
 ## Classification
 
-Returns: topic (Calendar, Chores, Finances, Grocery, Health, Pets, School, Travel, Vendors, Business, Relationship, Family Status, Meals, Maintenance) and intent (request, response, completion, question, forwarded data).
+Returns a typed `ClassificationResult`:
+
+- **topic**: Calendar, Chores, Finances, Grocery, Health, Pets, School, Travel, Vendors, Business, Relationship, Family Status, Meals, Maintenance
+- **intent**: Request, Update, Cancellation, Query, Response, Completion, Confirmation, ForwardedData
+- **entities**: which entities this message involves

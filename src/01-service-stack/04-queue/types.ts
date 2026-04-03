@@ -1,4 +1,4 @@
-import type { TopicKey } from "../../types.js";
+import type { TopicKey, ClassifierIntent } from "../../types.js";
 import type { DispatchPriority } from "../06-action-router/types.js";
 
 export enum QueueItemType {
@@ -14,6 +14,7 @@ export enum QueueItemSource {
   EmailMonitor = "email_monitor",
   InternalStateChange = "internal_state_change",
   ScheduledTrigger = "scheduled_trigger",
+  CrossTopic = "cross_topic",
 }
 
 export enum QueuePendingStatus {
@@ -33,7 +34,8 @@ export interface PendingQueueItem {
   id: string;
   source: QueueItemSource;
   type: QueueItemType;
-  topic: TopicKey;
+  topic?: TopicKey;
+  intent?: ClassifierIntent;
   concerning: string[];
   content: string | InboundEmailContent;
   priority?: DispatchPriority;

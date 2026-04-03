@@ -83,7 +83,7 @@ Mirrors the five-part framework already defined in the architecture, typed in Ty
     }
     expected: {
       topic: TopicKey
-      intent: string
+      intent: ClassifierIntent
       entities: string[]
       target_thread: string
       priority: DispatchPriority
@@ -311,6 +311,7 @@ Scoring
 
 Deterministic (pass/fail, no ambiguity):
 - Topic classification matches expected TopicKey.
+- Intent classification matches expected ClassifierIntent.
 - Target thread matches expected thread ID.
 - Priority matches expected DispatchPriority.
 - Entities involved match expected set.

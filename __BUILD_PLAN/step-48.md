@@ -11,7 +11,7 @@
 
 ### Pipeline Order Clarification
 
-The connection diagram "Transport → Identity → Classifier → Queue" shows the **logical** end-to-end flow a phone message traverses. The **physical** flow is: Transport normalizes inbound input → Identity resolves who sent it → item enters the Queue without topic classification → Worker pulls the item and calls the Classifier as its first step. This distinction matters for the queue item schema (topic/intent may be null on enqueue) and for Data Ingest items that arrive pre-classified. Update the diagram and prose to make this clear.
+The connection diagram "Transport → Identity → Classifier → Queue" shows the **logical** end-to-end flow a phone message traverses. The **physical** flow is: Transport normalizes inbound input → Identity resolves who sent it → item enters the Queue without topic classification → Worker pulls the item and calls the Classifier as its first step, which returns a typed `ClassificationResult` (TopicKey + ClassifierIntent). This distinction matters for the queue item schema (`topic` and `intent` are optional on `PendingQueueItem` — absent for phone-originated items, may be pre-populated for Data Ingest and Scheduler items). Update the diagram and prose to make this clear.
 
 ## Dependencies
 

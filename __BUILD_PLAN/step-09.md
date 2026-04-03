@@ -6,7 +6,7 @@
 
 Build the LLM-powered topic and intent classification service.
 
-- `src/01-service-stack/03-classifier-service/types.ts` — classification result type with topic (TopicKey), intent (request, response, completion, question, forwarded data), entities, confidence
+- `src/01-service-stack/03-classifier-service/types.ts` — ClassificationResult type with topic (TopicKey), intent (ClassifierIntent — 8 values: Request, Update, Cancellation, Query, Response, Completion, Confirmation, ForwardedData), entities, confidence
 - `src/01-service-stack/03-classifier-service/index.ts` — ClassifierService implementation
 - Claude API integration for topic classification
 - Reads message content plus recent thread context for disambiguation
@@ -41,7 +41,7 @@ Define a maximum number of recent messages included in the classification prompt
 ## Acceptance Criteria
 
 - Classifies messages into one of 14 TopicKey values
-- Returns intent type alongside topic
+- Returns ClassifierIntent alongside topic as a typed ClassificationResult
 - Uses thread context for ambiguous messages
 - Disambiguation rules produce correct results for edge cases
 - Structured outputs are Zod-validated

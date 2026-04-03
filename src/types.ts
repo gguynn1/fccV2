@@ -32,6 +32,17 @@ export enum GrocerySection {
   Other = "other",
 }
 
+export enum ClassifierIntent {
+  Request = "request",
+  Update = "update",
+  Cancellation = "cancellation",
+  Query = "query",
+  Response = "response",
+  Completion = "completion",
+  Confirmation = "confirmation",
+  ForwardedData = "forwarded_data",
+}
+
 export enum InputMethod {
   Text = "text",
   Image = "image",
