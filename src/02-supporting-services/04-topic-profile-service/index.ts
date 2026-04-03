@@ -22,6 +22,7 @@ import { BUSINESS_TOPIC_PROFILE } from "./04.10-business/profile.js";
 import { RELATIONSHIP_TOPIC_PROFILE } from "./04.11-relationship/profile.js";
 import { FAMILY_STATUS_TOPIC_PROFILE } from "./04.12-family-status/profile.js";
 import { MEALS_TOPIC_PROFILE } from "./04.13-meals/profile.js";
+import { MAINTENANCE_TOPIC_PROFILE } from "./04.14-maintenance/profile.js";
 
 const DEFAULT_LOGGER = pino({ name: "topic-profile-service" });
 
@@ -51,15 +52,7 @@ const TOPIC_PROFILES: TopicProfileConfig = {
   [TopicKey.Relationship]: RELATIONSHIP_TOPIC_PROFILE,
   [TopicKey.FamilyStatus]: FAMILY_STATUS_TOPIC_PROFILE,
   [TopicKey.Meals]: MEALS_TOPIC_PROFILE,
-  [TopicKey.Maintenance]: {
-    tone: "practical and reminder-driven",
-    format: "service schedules and history logs",
-    initiative_style: "cycle-based reminders for due items",
-    escalation_level: EscalationLevel.Low,
-    framework_grounding: null,
-    response_format: "maintenance schedule snapshots",
-    cross_topic_connections: [TopicKey.Vendors, TopicKey.Finances, TopicKey.Calendar],
-  },
+  [TopicKey.Maintenance]: MAINTENANCE_TOPIC_PROFILE,
 };
 
 export interface TopicProfileServiceOptions {

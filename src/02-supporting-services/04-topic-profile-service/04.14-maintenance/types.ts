@@ -19,11 +19,21 @@ export enum MaintenanceStatus {
   Overdue = "overdue",
 }
 
+export interface MaintenanceCycle {
+  interval: MaintenanceInterval;
+  interval_days?: number;
+  mileage_interval?: number;
+}
+
 export interface MaintenanceHistoryEntry {
+  id?: string;
   date: Date;
   performed_by: string;
   cost: number | null;
   notes: string;
+  handled_by_vendor_id?: string;
+  linked_finance_record_id?: string;
+  linked_calendar_event_id?: string;
 }
 
 export interface MaintenanceAsset {
@@ -38,9 +48,13 @@ export interface MaintenanceItem {
   asset_id: string;
   task: string;
   interval: MaintenanceInterval;
+  cycle?: MaintenanceCycle;
   last_performed: Date | null;
   next_due: Date | null;
+  mileage_last_performed?: number | null;
+  mileage_next_due?: number | null;
   responsible: string;
+  household_wide?: boolean;
   status: MaintenanceStatus;
   history: MaintenanceHistoryEntry[];
 }
@@ -48,6 +62,12 @@ export interface MaintenanceItem {
 export interface MaintenanceState {
   assets: MaintenanceAsset[];
   items: MaintenanceItem[];
+}
+
+export interface MaintenanceCrossTopicLinks {
+  vendor_topic: "vendors";
+  finance_topic: "finances";
+  calendar_topic: "calendar";
 }
 
 export type MaintenanceAction =
@@ -64,5 +84,17 @@ export type MaintenanceAction =
       task: string;
       interval: MaintenanceInterval;
       responsible: string;
+    }
+  | {
+      type: "schedule_maintenance";
+      item_id: string;
+      due_at: Date;
+      linked_calendar_event_id?: string;
+    }
+  | {
+      type: "set_professional_service";
+      item_id: string;
+      vendor_name: string;
+      vendor_record_id?: string;
     }
   | { type: "query_maintenance"; asset_type?: MaintenanceAssetType; status?: MaintenanceStatus };

@@ -1,3 +1,5 @@
+import type { ClassifierIntent, TopicKey } from "../../types.js";
+
 export enum ThreadType {
   Private = "private",
   Shared = "shared",
@@ -32,4 +34,28 @@ export interface ThreadHistory {
   active_topic_context: string;
   last_activity: Date;
   recent_messages: ThreadMessage[];
+}
+
+export interface RoutingDecisionInput {
+  topic: TopicKey;
+  intent: ClassifierIntent;
+  concerning: string[];
+  origin_thread: string;
+  is_response: boolean;
+}
+
+export enum RoutingRule {
+  ResponseInPlace = "response_in_place",
+  ProactiveNarrowest = "proactive_narrowest",
+}
+
+export interface ThreadTarget {
+  thread_id: string;
+  rule_applied: RoutingRule;
+  reason: string;
+}
+
+export interface RoutingDecision {
+  target: ThreadTarget;
+  follow_up_target?: ThreadTarget;
 }

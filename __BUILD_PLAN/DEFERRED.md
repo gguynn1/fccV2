@@ -35,8 +35,8 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Identified:** step-05 review
 - **Severity:** Low
 - **Description:** `BullSchedulerService.inferConcerningFromThread()` returns `["participant_1"]` as a hardcoded fallback when the thread ID doesn't match the `_private` suffix pattern. This is a silent assumption that produces wrong results for shared threads.
-- **Resolve at:** step where real digest routing is built (depends on Routing Service integration)
-- **Action:** Replace with a thread-membership lookup from the identity/routing service to determine which entities belong to the target thread.
+- **Resolve at:** Worker wiring step (step-28+, when the Routing Service is integrated with the Scheduler)
+- **Action:** Replace with a thread-membership lookup from the Routing Service to determine which entities belong to the target thread.
 
 ### D-06 — Transport layer imports seed config at runtime
 
@@ -53,6 +53,30 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** `src/02-supporting-services/04-topic-profile-service/04.05-health/types.ts` defines `upcoming_appointments: Array<string | HealthAppointment>`. The union type forces every consumer to use runtime type guards before accessing appointment fields, propagating type unsafety to the Worker, composition logic, and state validation.
 - **Resolve at:** step-24+ (health Worker integration, when health state is read/written)
 - **Action:** Migrate to `HealthAppointment[]` as the single type. Update any seed data that uses plain strings to use `HealthAppointment` objects.
+
+### D-08 — Routing and budget services import seed config at runtime
+
+- **Identified:** step-24–27 review
+- **Severity:** Medium
+- **Description:** `src/02-supporting-services/05-routing-service/index.ts` (lines 3, 31, 54) and `src/02-supporting-services/06-budget-service/index.ts` (lines 5, 80, 194, 241, 279, 366) import `systemConfig` from `../../_seed/system-config.js` and use it at runtime. The seed-data rule says "The running application reads from the database, never from seed files." Same anti-pattern as D-03 (IdentityService) and D-06 (Transport Layer).
+- **Resolve at:** Worker wiring step (step-28+, alongside D-03 and D-06)
+- **Action:** Accept entity/thread configuration via constructor injection from the State Service or system configuration loaded at boot. Remove the seed import from both files.
+
+### D-09 — Cross-boundary runtime enum imports (EntityType, DispatchPriority, QueueItemSource)
+
+- **Identified:** step-24–27 review
+- **Severity:** Medium
+- **Description:** Three enums are imported across the 01↔02 service boundary as runtime values: `EntityType` from `02-identity-service/types.js` (routing service), `DispatchPriority` from `06-action-router/types.js` (budget service), and `QueueItemSource` from `04-queue/types.js` (escalation service). The type-boundaries rule says: "If an enum is used across the 01↔02 boundary, it belongs in `src/types.ts`."
+- **Resolve at:** Worker wiring step (step-28+, when cross-service enum usage is finalized)
+- **Action:** Move `EntityType`, `DispatchPriority`, and `QueueItemSource` to `src/types.ts`. Update all imports across the codebase to reference the shared location.
+
+### D-10 — Unsafe type casts in routing, budget, and escalation services
+
+- **Identified:** step-24–27 review
+- **Severity:** Medium
+- **Description:** Three services use `as` casts to access properties not on the declared types: routing service casts entity to `{ routes_to?: string[] }` (line 36), budget service casts `StackQueueItem` to `Record<string, unknown>` for `.priority` (line 200), escalation service casts `StackQueueItem` to `Record<string, unknown>` for `.id` (line 98). These bypass type safety instead of extending the type definitions.
+- **Resolve at:** Worker wiring step (step-28+, when `StackQueueItem` and entity types are finalized)
+- **Action:** Add `id` and `priority` to `StackQueueItem`. Add `routes_to` to the pet entity type definition. Remove all `as` casts.
 
 ---
 
@@ -191,6 +215,34 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Description:** `suggestGroceryItemsFromMealDescription()` in meals/profile.ts only handles "taco" and "pasta" keywords. The step spec says Claude API should interpret meal ideas and suggest grocery items.
 - **Decision:** Accepted — placeholder fallback pattern. Real meal-to-grocery mapping will use Claude at Worker integration.
 
+### A-20 — Steps 24–27 share identical completion timestamp
+
+- **Identified:** step-24–27 review
+- **Severity:** Low
+- **Description:** All four steps have `completed_at: "2026-04-03T16:07:54Z"`, indicating they were completed in a single Build Agent session.
+- **Decision:** Accepted — consistent with prior decisions A-03, A-06, A-12, A-13, A-17. Code quality is fine; human review happened during this review session.
+
+### A-21 — Six unused type definitions (scaffolding)
+
+- **Identified:** step-24–27 review
+- **Severity:** Low
+- **Description:** `MaintenanceCrossTopicLinks` (maintenance/types.ts), `BudgetDecisionTyped`, `BudgetCounterSnapshot`, `BudgetCollisionCheck` (budget/types.ts), `AccountabilityLevel`, `EscalationTransitionResult` (escalation/types.ts) are defined but not consumed by any implementation.
+- **Decision:** Accepted — scaffolding types for Worker integration. Will be consumed when the Worker wires these services together.
+
+### A-22 — Hardcoded "family" thread ID as fallback
+
+- **Identified:** step-24–27 review
+- **Severity:** Low
+- **Description:** Routing service (line 129), budget service (line 351), and escalation service (line 349) hardcode `"family"` as a fallback thread ID rather than deriving it from thread configuration.
+- **Decision:** Accepted — stable convention for a single-deployment system. Consistent with A-09.
+
+### A-23 — BullMQ Queue used solely for Redis client access in budget service
+
+- **Identified:** step-24–27 review
+- **Severity:** Low
+- **Description:** `RedisBudgetService` creates `Queue("fcc-budget-counters")` but never adds jobs — only uses `this.queue.client` to access the underlying ioredis connection. Creates unnecessary BullMQ metadata keys in Redis.
+- **Decision:** Accepted — pragmatic reuse of BullMQ's connection management via the shared `toRedisConnection` utility.
+
 ---
 
 ## Resolved
@@ -292,3 +344,10 @@ Flags identified during code review that were accepted or deferred for resolutio
 - **Resolved:** same session
 - **Description:** `MEALS_TOPIC_PROFILE` had `cross_topic_connections: [TopicKey.Grocery]`, dropping `TopicKey.Health` from the previous inline definition. Dietary notes connect meals to health awareness.
 - **Fix:** Restored `TopicKey.Health` to the meals profile cross-topic connections. Same pattern as R-09 (Pets/Vendors).
+
+### R-15 — XState machine ignored persisted escalation state
+
+- **Identified:** step-27 review
+- **Resolved:** same session
+- **Description:** `buildMachine()` in `07-escalation-service/index.ts` created the XState machine with hardcoded `context: { current_step: 1 }`, ignoring the actual `ActiveEscalation.current_step`. This caused `advanceEscalation()` to always compute the next step from step 1, producing incorrect progression during `reconcileOnStartup()`.
+- **Fix:** Added `initialContext` parameter to `buildMachine()`. `advanceEscalation()` now passes `{ current_step: active.current_step, responsible_entity: active.responsible_entity }` so the machine starts from the actual persisted state.

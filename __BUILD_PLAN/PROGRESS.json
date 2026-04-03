@@ -1,5 +1,5 @@
 {
-  "current_step": "step-24",
+  "current_step": "step-28",
   "status_notes": {
     "step-00-part-1": {
       "updated_at": "2026-04-03T13:55:03Z",
@@ -391,6 +391,60 @@
         "npm run build passed"
       ],
       "next_action": "Proceed to step-24."
+    },
+    "step-24": {
+      "updated_at": "2026-04-03T16:07:54Z",
+      "checks_completed": [
+        "maintenance topic profile module added in 04.14-maintenance/profile.ts and registered in topic profile service",
+        "maintenance types expanded for cycle metadata, interval-aware due tracking, and cross-topic reference fields",
+        "cycle-driven helpers added for next-due calculation, overdue detection, and maintenance history logging",
+        "maintenance routing helper added for responsible private-thread vs shared household maintenance targeting",
+        "maintenance cross-topic references codified for vendors, finances, and calendar linkage",
+        "npm run typecheck passed",
+        "npm run lint passed",
+        "npm run build requires manual verification (not run in this invocation)"
+      ],
+      "next_action": "Proceed to step-25."
+    },
+    "step-25": {
+      "updated_at": "2026-04-03T16:07:54Z",
+      "checks_completed": [
+        "routing decision types expanded with thread target metadata and explicit routing rule identifiers",
+        "routing service implemented in 05-routing-service/index.ts with Rule 1 response-in-place and Rule 2 proactive narrowest-thread behavior",
+        "thread definitions now load from system configuration with pet-to-responsible-adult private-thread mapping",
+        "context transition policy helper added for topic reset on new classification, idle timeout, and explicit switch signals",
+        "routing decision table tests added and passed in vitest (response, private proactive, narrowest shared, pet mapping)",
+        "npm run typecheck passed",
+        "npm test passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-26."
+    },
+    "step-26": {
+      "updated_at": "2026-04-03T16:07:54Z",
+      "checks_completed": [
+        "budget decision and counter types expanded for typed priority outcomes, collision checks, and Redis counter snapshots",
+        "budget service implemented in 06-budget-service/index.ts with Redis-backed per-person daily and per-thread hourly counters",
+        "collision avoidance implemented by inspecting pending and recently dispatched items, with batched hold decisions when collisions are detected",
+        "budget reconstruction path implemented to rebuild Redis counters from SQLite recently-dispatched history (with state snapshot fallback)",
+        "reconstruction events logged via pino and counter TTLs aligned to daily/hourly budget windows",
+        "npm run typecheck passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-27."
+    },
+    "step-27": {
+      "updated_at": "2026-04-03T16:07:54Z",
+      "checks_completed": [
+        "escalation types expanded with accountability-level aliasing, reassignment policy support, and escalation transition result contracts",
+        "xstate v5 escalation service implemented in 07-escalation-service/index.ts using createActor/setup patterns",
+        "all four escalation profiles implemented (HIGH, MEDIUM, LOW, NONE) with topic-level mapping and reassignment policy behavior",
+        "timed escalation scheduling integrated through BullMQ delayed jobs and startup reconciliation logic for expired timers",
+        "silence handling codified by profile (high/medium advance, low disappear, none no escalation) with never-approval behavior preserved",
+        "npm run typecheck passed",
+        "npm run lint passed"
+      ],
+      "next_action": "Proceed to step-28."
     }
   },
   "steps": {
@@ -420,10 +474,10 @@
     "step-21": { "status": "complete", "completed_at": "2026-04-03T15:29:19Z" },
     "step-22": { "status": "complete", "completed_at": "2026-04-03T15:29:19Z" },
     "step-23": { "status": "complete", "completed_at": "2026-04-03T15:29:19Z" },
-    "step-24": { "status": "pending" },
-    "step-25": { "status": "pending" },
-    "step-26": { "status": "pending" },
-    "step-27": { "status": "pending" },
+    "step-24": { "status": "complete", "completed_at": "2026-04-03T16:07:54Z" },
+    "step-25": { "status": "complete", "completed_at": "2026-04-03T16:07:54Z" },
+    "step-26": { "status": "complete", "completed_at": "2026-04-03T16:07:54Z" },
+    "step-27": { "status": "complete", "completed_at": "2026-04-03T16:07:54Z" },
     "step-28": { "status": "pending" },
     "step-29": { "status": "pending" },
     "step-30": { "status": "pending" },
