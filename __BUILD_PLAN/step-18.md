@@ -22,6 +22,14 @@ SQLite via State Service, BullMQ for countdown reminders
 
 - `types.ts` and `profile.ts` in `04.08-travel/`
 
+### Eval Scenario Specifications
+
+- **Classification:** "flight to Denver on the 15th" → travel; "need to book a hotel" → travel
+- **Routing:** broadest shared thread including all travelers for group trips; private for solo
+- **Composition:** organized, anticipatory
+- **Escalation:** MEDIUM — countdown reminders
+- **Cross-topic:** travel dates → calendar, pet boarding → pets, trip budget → finances, pre-trip shopping → grocery
+
 ## Acceptance Criteria
 
 Countdown reminders, cross-topic connections to calendar/pets/finances/grocery, audience-appropriate routing

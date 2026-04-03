@@ -30,6 +30,14 @@ Step 0, Step 1, Step 3 (State Service for thread history).
 - `src/01-service-stack/03-classifier-service/index.ts`
 - `src/01-service-stack/03-classifier-service/prompts.ts` (classification system prompt)
 
+### Bootstrap Note
+
+During early development, thread history is empty because no items have been processed yet. Use seed data from Step 0 Part 2 to populate initial thread history for testing. Classification tests that depend on thread context require the seeded state to be loaded first.
+
+### Context Window Limit
+
+Define a maximum number of recent messages included in the classification prompt (e.g., last 10–20 messages per thread). Without a cap, thread history grows unboundedly, increasing Claude API latency and cost per classification call. Document the chosen limit in the Classifier's configuration.
+
 ## Acceptance Criteria
 
 - Classifies messages into one of 14 TopicKey values

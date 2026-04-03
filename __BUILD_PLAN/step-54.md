@@ -32,7 +32,22 @@
 - **Auto-correction loop** with depth limit (max 2 retry attempts)
 - **Cost management:** cheapest model for scoring, caching deterministic inputs, incremental runs
 
-- **Package.json scripts:** `eval`, `eval:run`, `eval:coverage`
+### Eval Cost Estimate
+
+A full suite of ~200 single-turn + ~30 multi-step scenarios produces ~600–900 Claude API calls per run. Approximate cost per full run:
+
+| Model for scoring/judging | Cost per run (approx.) |
+| ------------------------- | ---------------------- |
+| Claude Haiku (cheapest)   | $2–5                   |
+| Claude Sonnet             | $15–30                 |
+| Claude Opus               | $50–100                |
+
+**Recommendation:** Use the cheapest capable model (Haiku) for deterministic scoring and qualitative judging. Use the production model (Sonnet or Opus) only for the actual pipeline calls that generate the outputs being scored. Cache deterministic inputs to avoid redundant calls. Set a per-run budget ceiling in the eval config and abort with a warning if exceeded.
+
+- **Package.json scripts** (owned by this step — Step 0 Part 1 defers eval script creation here):
+  - `"eval": "vitest --config eval/vitest.config.ts"`
+  - `"eval:run": "vitest run --config eval/vitest.config.ts"`
+  - `"eval:coverage": "vitest run --config eval/vitest.config.ts -- coverage"`
 
 ## Dependencies
 

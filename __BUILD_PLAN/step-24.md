@@ -22,6 +22,14 @@ SQLite via State Service, BullMQ Scheduler for cycle reminders
 
 - `types.ts` and `profile.ts` in `04.14-maintenance/`
 
+### Eval Scenario Specifications
+
+- **Classification:** "when was the oil changed?" → maintenance; "the plumber is coming Tuesday" → vendors (NOT maintenance); "change the furnace filter" → chores (NOT maintenance — it's a one-off task, not a cycle-tracked item)
+- **Routing:** responsible adult's private thread for individual items; shared for household-wide
+- **Composition:** practical, reminder-driven
+- **Escalation:** LOW
+- **Cross-topic:** maintenance cost → finances; scheduled maintenance → calendar; professional service needed → vendors
+
 ## Acceptance Criteria
 
 Cycle-based due date calculation, overdue detection, cross-topic vendor/finance/calendar links, history logging, practical tone

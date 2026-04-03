@@ -15,11 +15,19 @@ Step 0, Step 3, Step 10.
 
 ## Technologies
 
-SQLite via State Service, BullMQ scheduling, XState for accountability state
+SQLite via State Service, BullMQ scheduling for reminders. Chores' HIGH escalation behavior flows through the Escalation Service (Step 27), which owns the XState state machines — the chores profile does not manage its own escalation machine
 
 ## Files to Create/Modify
 
 - `types.ts` and `profile.ts` in `04.02-chores/`
+
+### Eval Scenario Specifications
+
+- **Classification:** "take out the trash" → chores; "change the furnace filter" → chores (not maintenance — this is a household task, not a maintenance cycle item)
+- **Routing:** assigned entity's private thread; escalates to broader shared thread if unresolved
+- **Composition:** direct tone, clear deadlines, no softening
+- **Escalation:** HIGH — reminder → follow-up → broader thread → digest flag. Multi-step scenario: silence → follow-up → silence → thread escalation → another entity handles it
+- **Negative:** silence never treated as completion
 
 ## Acceptance Criteria
 

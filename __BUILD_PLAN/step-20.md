@@ -23,6 +23,15 @@ SQLite via State Service, Claude API for draft composition, BullMQ for quiet-per
 
 - `types.ts` and `profile.ts` in `04.10-business/`
 
+### Eval Scenario Specifications
+
+- **Classification:** "I got a new portrait inquiry" → business; "the electrician can come Thursday" → vendors (NOT business)
+- **Routing:** business owner's private thread
+- **Composition:** professional, business_type-aware tone
+- **Escalation:** NONE — pipeline-driven alerts, no escalation
+- **Confirmation:** drafts sent on behalf of business owner require approval
+- **Negative:** one entity's business leads never exposed to another entity
+
 ## Acceptance Criteria
 
 Per-entity business profiles, pipeline stage tracking, `business_type`-aware tone, confirmation before sending drafts, lead privacy between entities

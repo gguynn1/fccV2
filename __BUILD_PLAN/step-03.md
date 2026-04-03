@@ -31,6 +31,16 @@ Step 0 (both parts), Step 1, Step 2 must be complete.
 - `src/02-supporting-services/03-state-service/index.ts`
 - `src/02-supporting-services/03-state-service/schema.ts` (SQLite table definitions)
 
+### Migration Strategy
+
+Since Drizzle ORM is not used (see Step 0 Part 2 decision), schema migrations use numbered SQL files:
+
+- `src/02-supporting-services/03-state-service/migrations/` — directory of sequential SQL files (`001-initial-schema.sql`, `002-add-maintenance-table.sql`, etc.)
+- A `schema_version` table in SQLite tracks which migrations have been applied
+- On startup, the State Service checks `schema_version` and applies any pending migrations in order
+- The `--seed` flag applies all migrations before loading seed data
+- Migrations are append-only — never modify a previously applied migration file; create a new one instead
+
 ## Acceptance Criteria
 
 - Database initializes in WAL mode

@@ -6,14 +6,14 @@
 
 This is the foundation step. It covers installing and configuring all developer tooling and runtime dependencies before any application code is written.
 
-- Install runtime dependencies: fastify, bullmq, better-sqlite3 (or drizzle-orm + better-sqlite3), zod, pino, xstate (v5), imapflow, twilio, @anthropic-ai/sdk
+- Install runtime dependencies: fastify, bullmq, better-sqlite3, zod, pino, xstate (v5), imapflow, twilio, @anthropic-ai/sdk
 - Install dev dependencies: vitest, @types/better-sqlite3
 - Configure Vitest in package.json scripts
 - Add dev script using tsx or node --watch for development
 - Verify Redis is installed (`brew install redis`) and AOF config is ready
 - Verify ngrok is installed (`brew install --cask ngrok`), authenticate with `ngrok config add-authtoken`, and reserve a static subdomain on the ngrok dashboard
 - Create `data/` directory for SQLite database with `.gitignore` entry
-- Update package.json with all new scripts (eval, eval:run, eval:coverage)
+- Update package.json scripts (eval scripts are added later in Step 54)
 - Verify `tsconfig.json` strict mode, ESM, NodeNext module resolution
 - Verify ESLint and Prettier configurations are correct
 
@@ -26,7 +26,7 @@ None — this is the first step.
 - Node.js v22 LTS, TypeScript 6, ESM
 - Fastify (HTTP server)
 - BullMQ + Redis (queue, scheduling, rate-limiting)
-- better-sqlite3 (persistence), optional Drizzle ORM
+- better-sqlite3 (persistence — native module, may require `npm rebuild better-sqlite3` after Node.js version upgrades on Apple Silicon)
 - Zod (validation)
 - pino (structured logging)
 - XState v5 (escalation state machines)
@@ -63,7 +63,27 @@ redis-cli CONFIG GET appendonly    # must return "yes"
 redis-cli CONFIG GET appendfsync   # should return "everysec"
 ```
 
-If not configured, edit `redis.conf` and restart Redis before continuing. Without AOF, a crash loses the queue, all scheduled jobs, and budget counters.
+### Redis Configuration Setup
+
+```bash
+# Find or create the Redis config file
+brew info redis                    # shows config file location
+# Typical location: /opt/homebrew/etc/redis.conf
+
+# Add these lines to redis.conf:
+#   appendonly yes
+#   appendfsync everysec
+
+# Restart Redis with the config
+brew services restart redis
+# Or manually: redis-server /opt/homebrew/etc/redis.conf
+```
+
+Without AOF, a crash loses the queue, all scheduled jobs, and budget counters.
+
+### ngrok Paid Plan Requirement
+
+A free ngrok account assigns a random URL on every restart, breaking the Twilio webhook configuration. A paid plan with a static subdomain is **required** before any webhook testing begins. Verify the subdomain is reserved on the [ngrok dashboard](https://dashboard.ngrok.com) before proceeding.
 
 ## Acceptance Criteria
 

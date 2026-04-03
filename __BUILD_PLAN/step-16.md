@@ -22,6 +22,15 @@ SQLite via State Service, BullMQ for care reminders
 
 - `types.ts` and `profile.ts` in `04.06-pets/`
 
+### Eval Scenario Specifications
+
+- **Classification:** "when was PET's last vet visit?" → pets; "PET needs heartworm medication" → pets
+- **Routing:** responsible adult's private thread
+- **Composition:** warm, practical caretaker tone
+- **Escalation:** LOW — send once, no follow-up if ignored
+- **Cross-topic:** vet appointment → calendar event
+- **Negative:** PET never receives a message directly
+
 ## Acceptance Criteria
 
 Caretaker tone, responsible adult routing, care history tracking, LOW escalation profile (send once — no follow-up if ignored), cross-topic calendar events

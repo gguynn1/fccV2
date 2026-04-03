@@ -22,7 +22,7 @@ Step 0, Step 3 (State Service for calendar event data), Step 7 (shares Fastify s
 
 ## Technologies
 
-- Fastify routes on localhost:3000/caldav/*
+- Fastify routes on localhost:3000/caldav/\*
 - iCalendar formatting (ical.js or hand-rolled)
 - ngrok tunnel for off-network access
 
@@ -35,7 +35,7 @@ Step 0, Step 3 (State Service for calendar event data), Step 7 (shares Fastify s
 
 - PROPFIND returns calendar metadata
 - GET returns valid VCALENDAR/VEVENT data
-- Events from all topics (health, school, calendar, pets, travel, business) appear
+- Events from all topics (health, school, calendar, pets, travel, business) appear — **note:** full topic coverage requires topic profiles from Steps 11–24; at Step 8 completion, test with seed data calendar events only. Full CalDAV acceptance is verified during Step 41 integration
 - Read-only: no writes accepted from calendar apps
 - UIDs are stable across polls
 - Standard calendar apps can subscribe and display events

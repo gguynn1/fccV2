@@ -12,6 +12,8 @@ Build the Twilio-powered messaging adapter for inbound and outbound phone-native
 - Twilio request signature validation on the webhook endpoint
 - Inbound normalization: phone-native messages, structured choices, reactions, images/attachments (media download), forwarded content
 - Outbound delivery via Twilio REST API with status callbacks
+- Fastify route at `/webhook/twilio/status` for delivery status callbacks — validates payload, logs delivery confirmations/failures
+- Media storage decision: downloaded media files are stored in `data/media/` on the local filesystem, referenced by queue item ID. Add `data/media/` to `.gitignore`
 - Thread-to-participants mapping for the five allowed threads
 - Retry with exponential backoff on network failure (via BullMQ)
 
@@ -49,3 +51,5 @@ Before proceeding past this step, the following must be verified:
 - [ ] Send a test inbound message to the messaging identity — webhook receives it, signature validates, transport normalizes the input
 - [ ] Send a test outbound message via the Twilio REST API — delivery status callback received
 - [ ] Confirm ngrok tunnel is forwarding to localhost:3000 and the Fastify route responds
+- [ ] **Negative test:** send a request with an invalid Twilio signature — verify it is rejected with 403
+- [ ] **Curl smoke test:** before using a real phone, test with `curl -X POST` using a mock Twilio payload and valid signature to verify the webhook handler processes the request correctly

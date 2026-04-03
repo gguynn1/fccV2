@@ -22,6 +22,15 @@ SQLite via State Service, Claude API for item extraction
 
 - `types.ts` and `profile.ts` in `04.04-grocery/`
 
+### Eval Scenario Specifications
+
+- **Classification:** "we need ground beef" → grocery; "add eggs and milk" → grocery; "what should we have for dinner?" → meals (NOT grocery)
+- **Routing:** broadest shared thread for shared lists, or reply in originating thread
+- **Composition:** utilitarian, minimal commentary
+- **Escalation:** NONE — no follow-up
+- **Cross-topic:** receives items from Meals topic
+- **Negative:** no nagging about groceries
+
 ## Acceptance Criteria
 
 Utilitarian brief responses, section-organized list, duplicate handling, cross-topic receives from meals

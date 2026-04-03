@@ -21,6 +21,14 @@ SQLite via State Service, BullMQ for reminders, Claude API for note extraction
 
 - `types.ts` and `profile.ts` in `04.05-health/`
 
+### Eval Scenario Specifications
+
+- **Classification:** "doctor appointment next week" → health; "need to refill prescription" → health
+- **Routing:** individual's private thread (health is personal)
+- **Composition:** attentive, specific, privacy-respecting
+- **Escalation:** MEDIUM — appointment reminders, follow-up after visits
+- **Cross-topic:** health appointment → calendar event
+
 ## Acceptance Criteria
 
 Private thread routing, attentive tone, appointment reminders, medication tracking, cross-topic calendar events

@@ -9,7 +9,7 @@
 - Shared test fixtures for state, timers, and queue items across services
 - Verify no supporting service directly imports from another supporting service at runtime
 
-*(Integrates all supporting services built in Steps 3, 5, and 10–29.)*
+_(Integrates all supporting services built in Steps 3, 5, and 10–29.)_
 
 ## Dependencies
 

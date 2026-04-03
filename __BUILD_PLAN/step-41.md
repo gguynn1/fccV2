@@ -10,7 +10,11 @@
 - Mocks for supporting-service calls for isolated stack testing
 - Vitest scenario suites that validate the full top-to-bottom pipeline with mocked services
 
-*(This step focuses on barrel exports and stack-level integration; contracts were established in Step 1.)*
+_(This step focuses on barrel exports and stack-level integration; contracts were established in Step 1.)_
+
+### Architecture Rule Update
+
+The cursor rule `architecture.mdc` shows the flow as "Transport → Identity → Classifier → Queue → Worker." Now that implementation is complete, update this rule to reflect the physical reality: Transport → Identity → Queue → Worker (Classifier is called by the Worker as step 1). This prevents new developers or AI assistants from having the wrong mental model of the pipeline.
 
 ## Dependencies
 

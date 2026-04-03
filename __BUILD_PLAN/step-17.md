@@ -22,6 +22,14 @@ SQLite via State Service, BullMQ for deadline reminders
 
 - `types.ts` and `profile.ts` in `04.07-school/`
 
+### Eval Scenario Specifications
+
+- **Classification:** "math homework due Thursday" → school; "parent-teacher conference next week" → school
+- **Routing:** student's private thread for tasks; parent's private thread for awareness
+- **Composition:** encouraging with student, concise and actionable with parents
+- **Escalation:** MEDIUM — deadline reminders; escalation from child thread to parent thread when important items ignored
+- **Negative:** no LMS API calls
+
 ## Acceptance Criteria
 
 Dual-audience tone, deadline reminders, child-to-parent escalation, email-based input

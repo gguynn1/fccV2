@@ -20,6 +20,8 @@ Step 0, Step 2, Step 3 (State Service), Step 5 (Scheduler Service for timer infr
 
 XState v5 state machines, BullMQ/Redis scheduling (AOF required), SQLite persistence
 
+> **XState v5 Warning:** XState v5 has a significantly different API from v4. Most online examples and tutorials reference v4 patterns (`createMachine`, `interpret`). In v5, use `createActor` and the new `setup()` API. Reference the [official v5 migration guide](https://stately.ai/docs/migration) and v5 docs exclusively. Do not use v4 patterns — they will fail silently or produce incorrect behavior.
+
 ## Files to Create/Modify
 
 `types.ts` and `index.ts` in `07-escalation-service/`

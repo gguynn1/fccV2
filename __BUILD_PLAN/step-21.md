@@ -23,6 +23,14 @@ SQLite via State Service, Claude API for personalized prompts, BullMQ for quiet-
 
 - `types.ts` and `profile.ts` in `04.11-relationship/`
 
+### Eval Scenario Specifications
+
+- **Classification:** relationship nudges are system-initiated, not user-classified
+- **Routing:** adults-only shared thread ONLY
+- **Composition:** warm, brief, never clinical; grounded in IFS/EFT frameworks
+- **Escalation:** LOW — send once; if ignored, quietly disappear with zero follow-up
+- **Negative:** never pressure, never escalate, never follow up on ignored nudge
+
 ## Acceptance Criteria
 
 Warm non-clinical tone, zero escalation on ignore, framework-grounded prompts, quiet-window respect, adults-only routing

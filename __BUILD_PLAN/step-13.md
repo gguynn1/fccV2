@@ -21,6 +21,15 @@ SQLite via State Service, BullMQ for bill alerts
 
 - `types.ts` and `profile.ts` in `04.03-finances/`
 
+### Eval Scenario Specifications
+
+- **Classification:** "mortgage is due Friday" → finances; "how much did we spend on groceries?" → finances
+- **Routing:** adults-only shared thread exclusively
+- **Composition:** calm, factual, numbers-based, no opinions on spending
+- **Escalation:** HIGH — deadline-driven alerts, milestone notifications
+- **Confirmation:** all financial actions require explicit approval
+- **Negative:** financial data NEVER appears in participant_3's (child) thread
+
 ## Acceptance Criteria
 
 Factual tone, numbers-based snapshots, adults-only routing, confirmation gates on all financial actions, never leaks to child thread

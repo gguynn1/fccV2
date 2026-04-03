@@ -23,6 +23,14 @@ SQLite via State Service, Claude API for meal interpretation
 
 - `types.ts` and `profile.ts` in `04.13-meals/`
 
+### Eval Scenario Specifications
+
+- **Classification:** "what should we have for dinner?" → meals; "we need ground beef" → grocery (NOT meals — this is a specific item, not meal planning)
+- **Routing:** broadest shared thread for family meal planning; private for individual dietary notes
+- **Composition:** collaborative, practical
+- **Escalation:** NONE
+- **Cross-topic:** meal plan generates grocery list items (meals→grocery connection)
+
 ## Acceptance Criteria
 
 Collaborative tone, grocery cross-topic link, dietary notes tracking, no external API, timing-aware suggestions

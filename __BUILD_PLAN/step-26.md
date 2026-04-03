@@ -26,3 +26,13 @@ Redis counters (shared with BullMQ, AOF required), Vitest fake timers for budget
 ## Acceptance Criteria
 
 Counters track per-person and per-thread sends, collision avoidance batches correctly, counters reconstruct from SQLite on loss, priority decisions are typed
+
+### Budget Reconstruction Algorithm
+
+When Redis counters are lost despite AOF (e.g., catastrophic failure), the Budget Service must reconstruct from SQLite `recently_dispatched` records:
+
+1. Query `recently_dispatched` for messages sent within the current budget window (today for per-person daily limits, current hour for per-thread hourly limits)
+2. Count messages per entity and per thread from the query results
+3. Set Redis counters to match the reconstructed counts
+4. Handle edge cases: partial outage periods where some sends are in Redis but not SQLite, duplicate records, and defining "recent" as a configurable window (default: 24 hours)
+5. Log the reconstruction event via pino so the operator knows counters were rebuilt

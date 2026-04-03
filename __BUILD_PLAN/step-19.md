@@ -22,6 +22,13 @@ SQLite via State Service, BullMQ for follow-up reminders
 
 - `types.ts` and `profile.ts` in `04.09-vendors/`
 
+### Eval Scenario Specifications
+
+- **Classification:** "the plumber is coming Tuesday" → vendors; "who fixed the dishwasher last time?" → vendors (not maintenance — this is about the vendor relationship)
+- **Routing:** managing adult's private thread
+- **Composition:** businesslike
+- **Escalation:** NONE — no proactive outbound unless flagged pending
+
 ## Acceptance Criteria
 
 Businesslike tone, follow-up reminders for pending vendors, historical query support, no escalation
