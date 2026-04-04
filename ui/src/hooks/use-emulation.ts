@@ -43,7 +43,7 @@ export function useEmulationMessages(threadId: string | null) {
       adminFetch<EmulationMessagesResponse>(
         `/emulation/messages?thread_id=${encodeURIComponent(threadId ?? "")}`,
       ),
-    enabled: threadId !== null,
+    enabled: typeof threadId === "string" && threadId.length > 0,
     refetchInterval: 1_000,
   });
 }

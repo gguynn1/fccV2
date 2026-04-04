@@ -12,10 +12,15 @@ Calls out to other services for each step:
 |--- calls ROUTING SERVICE
 |      which thread does the
 |      output go to?
+|      and is that thread
+|      actually allowed?
 |
 |--- calls BUDGET SERVICE
 |      has this person or thread
 |      been messaged too recently?
+|      are quiet hours active?
+|      did someone just signal
+|      "not now"?
 |      should this batch with
 |      other pending items?
 |
@@ -29,7 +34,9 @@ Calls out to other services for each step:
 |      does this action require
 |      approval? is there a
 |      pending confirmation
-|      to resolve?
+|      to resolve? can the
+|      requester confirm from
+|      private thread?
 ```
 
 Once all decisions are made, passes to Action Router.
@@ -41,12 +48,12 @@ The worker pulls one item at a time and runs it through a fixed sequence:
 1. Classify the topic
 2. Identify the entities involved
 3. Determine the action type (response, proactive outbound, or silent storage)
-4. Check the outbound budget (priority, collision avoidance, batching)
+4. Check the outbound budget (priority, collision avoidance, batching, quiet hours, pause signals)
 5. Check escalation (is this a follow-up? what step? should we escalate?)
 6. Check confirmation (does this action require approval?)
    — `applyStateMutation` runs here, after confirmation and before composition —
 7. Apply the topic's behavior profile (tone, format, initiative style)
-8. Route and dispatch (target thread, then dispatch, hold, or store)
+8. Route and dispatch (target thread, Action Router outcome, then final topic-delivery guard)
 
 State mutation (`applyStateMutation`) executes after confirmation resolution (step 6) and before topic profile composition (step 7). Composition and routing in steps 7-8 operate against already-mutated state. This is intentional: the composed message should reflect the current state, not the pre-action state.
 
@@ -84,10 +91,12 @@ STEP 2 — Who does it concern?
          v
 STEP 3 — Is this a response or proactive?
          Response ----------> reply in the same
-                              thread it came from
+                              thread it came from,
+                              unless topic policy
+                              forces a safer thread
          Proactive ----------> send to the narrowest
-                               thread that fits
-                               the audience
+                               allowed thread that
+                               fits the audience
          |
          v
 STEP 4 — Check outbound budget
@@ -134,4 +143,12 @@ STEP 8 — Route and dispatch
          then dispatch immediately,
          hold for later,
          or store silently
+         after a final privacy /
+         allowed-thread check
 ```
+
+## Additional Runtime Truth
+
+- Topic delivery policy is enforced during routing and again just before outbound transport. If a chosen thread is unsafe for the topic, the worker reroutes to a safer private thread or stores instead of leaking the topic.
+- The worker can emit small secondary notices in addition to the main composed outbound, such as shared-awareness notices or paired-thread follow-up notices, but only when topic delivery policy allows them.
+- The worker also handles participant-facing explanation requests such as `what did you see today`, `why did you message me`, and `what are you holding for later` by reading persisted state instead of inventing answers.

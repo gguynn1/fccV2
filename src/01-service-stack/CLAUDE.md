@@ -25,7 +25,8 @@ THREADS
 
   Shared:
     declared subsets of entities + Assistant
-    (defined in system configuration)
+    (defined in system configuration and, at the transport layer,
+     backed by Twilio Conversations when shared-thread messaging is enabled)
           |
           |  all inbound messages,
           |  reactions, images,
@@ -131,6 +132,8 @@ to top)              asked
 ## System Promises
 
 The assistant never sends more than it should. Outbound is budgeted, batched, and routed to the narrowest audience.
+
+The assistant never leaks a topic into the wrong thread. Topic delivery policy and a final outbound privacy guard block or reroute unsafe dispatches before transport.
 
 The assistant never acts without permission on sends, financial actions, or system changes.
 

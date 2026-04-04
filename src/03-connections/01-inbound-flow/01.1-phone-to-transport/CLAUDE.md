@@ -34,4 +34,6 @@ Transport is responsible for recognizing and normalizing:
 
 ## Identity after Transport
 
-Pre-enqueue identity maps the sender **messaging identity** to an **entity id** and **target_thread**. This is a lightweight lookup inside the Transport layer, not a full Identity Service call. Full identity resolution — `EntityType`, permissions, thread memberships — happens post-dequeue in Worker step 2. Pets do not carry personal messaging identities; rules in Identity enforce invariants from configuration.
+Pre-enqueue identity maps the sender **messaging identity** to an **entity id** and **target_thread**. For private-thread traffic, that target is the sender's private thread. For shared-thread traffic under Twilio Conversations, the transport layer maps `ConversationSid` directly to the configured shared thread id and rejects unmapped shared conversations instead of rerouting them privately.
+
+This is still a lightweight lookup inside the Transport layer, not a full Identity Service call. Full identity resolution — `EntityType`, permissions, thread memberships — happens post-dequeue in Worker step 2. Pets do not carry personal messaging identities; rules in Identity enforce invariants from configuration.

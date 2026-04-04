@@ -3,6 +3,7 @@ import { pino, type Logger } from "pino";
 
 import { type PendingQueueItem } from "../../01-service-stack/04-queue/types.js";
 import type { StackQueueItem } from "../../01-service-stack/types.js";
+import { resolveRequesterPrivateThread } from "../../config/topic-delivery-policy.js";
 import { toRedisConnection } from "../../lib/redis.js";
 import { QueueItemSource, QueueItemType } from "../../types.js";
 import type { ConfirmationRequest, ConfirmationService, StateService } from "../types.js";
@@ -78,7 +79,21 @@ interface PendingConfirmationStateUpdate {
 interface ConfirmationReplyMatch {
   confirmation: PendingConfirmation;
   result: ConfirmationResult.Approved | ConfirmationResult.Rejected;
-  wrong_thread: boolean;
+  matched_thread_policy: "exact_thread" | "requester_private_allowed";
+}
+
+export function isAllowedConfirmationReplyThread(
+  confirmation: Pick<PendingConfirmation, "approval_thread_policy" | "requested_by">,
+  attemptedThread: string,
+): boolean {
+  if (confirmation.approval_thread_policy !== "requester_private_allowed") {
+    return false;
+  }
+  const requesterPrivateThread = resolveRequesterPrivateThread(confirmation.requested_by);
+  if (!requesterPrivateThread) {
+    return false;
+  }
+  return requesterPrivateThread === attemptedThread;
 }
 
 function normalizeText(value: string): string {
@@ -175,6 +190,8 @@ export class BullConfirmationService implements ConfirmationService {
       action: request.action,
       requested_by: request.requested_by,
       requested_in_thread: request.requested_in_thread,
+      origin_thread: request.origin_thread ?? request.requested_in_thread,
+      approval_thread_policy: request.approval_thread_policy ?? "exact_thread",
       requested_at: requestedAt,
       expires_at: expiresAt,
       status: ConfirmationStatus.Pending,
@@ -224,18 +241,12 @@ export class BullConfirmationService implements ConfirmationService {
       return null;
     }
 
-    const resolved = replyMatch.wrong_thread
-      ? this.resolveWrongThread(
-          replyMatch.confirmation,
-          queueItem.target_thread,
-          queueItem.created_at,
-        )
-      : this.resolveConfirmation(
-          replyMatch.confirmation,
-          replyMatch.result,
-          queueItem.target_thread,
-          queueItem.created_at,
-        );
+    const resolved = this.resolveConfirmation(
+      replyMatch.confirmation,
+      replyMatch.result,
+      queueItem.target_thread,
+      queueItem.created_at,
+    );
 
     pending = pending.filter((confirmation) => confirmation.id !== replyMatch.confirmation.id);
     recent = [...recent, resolved];
@@ -315,11 +326,15 @@ export class BullConfirmationService implements ConfirmationService {
     );
 
     for (const confirmation of sorted) {
-      const threadMatches = confirmation.requested_in_thread === queueItem.target_thread;
-      if (threadMatches === allowWrongThreadMatch) {
+      const exactThread = confirmation.requested_in_thread === queueItem.target_thread;
+      const fallbackThreadAllowed =
+        !exactThread &&
+        allowWrongThreadMatch &&
+        this.isApprovalReplyThreadAllowed(confirmation, queueItem.target_thread);
+      if ((!exactThread && !fallbackThreadAllowed) || (exactThread && allowWrongThreadMatch)) {
         continue;
       }
-      if (allowWrongThreadMatch && !queueItem.concerning.includes(confirmation.requested_by)) {
+      if (!queueItem.concerning.includes(confirmation.requested_by)) {
         continue;
       }
 
@@ -331,7 +346,7 @@ export class BullConfirmationService implements ConfirmationService {
       return {
         confirmation,
         result,
-        wrong_thread: !threadMatches,
+        matched_thread_policy: exactThread ? "exact_thread" : "requester_private_allowed",
       };
     }
 
@@ -382,18 +397,11 @@ export class BullConfirmationService implements ConfirmationService {
     };
   }
 
-  private resolveWrongThread(
+  private isApprovalReplyThreadAllowed(
     confirmation: PendingConfirmation,
     attemptedThread: string,
-    resolvedAt: Date,
-  ): ResolvedConfirmation {
-    return {
-      ...confirmation,
-      status: ConfirmationStatus.Resolved,
-      result: ConfirmationResult.Rejected,
-      resolved_at: resolvedAt,
-      resolved_in_thread: attemptedThread,
-    };
+  ): boolean {
+    return isAllowedConfirmationReplyThread(confirmation, attemptedThread);
   }
 
   // Expiry is recorded before any later reply is considered so downtime or delayed delivery never

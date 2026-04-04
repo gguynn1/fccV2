@@ -17,6 +17,7 @@ import type { ActiveEscalation, EscalationStatus } from "./07-escalation-service
 import type {
   Confirmation,
   ConfirmationActionType,
+  ConfirmationApprovalPolicy,
   ConfirmationRecoveryResult,
   ConfirmationReplyOption,
   ConfirmationsState,
@@ -100,6 +101,10 @@ export interface BudgetDecision {
 
 export interface BudgetService {
   getBudgetTracker(): Promise<OutboundBudgetTracker>;
+  recordHumanSignal?(
+    queue_item: StackQueueItem,
+    classification?: StackClassificationResult,
+  ): Promise<void>;
   evaluateOutbound(
     queue_item: StackQueueItem,
     target_thread: string,
@@ -127,6 +132,8 @@ export interface ConfirmationRequest {
   requested_action_payload?: TopicAction;
   requested_by: string;
   requested_in_thread: string;
+  origin_thread?: string;
+  approval_thread_policy?: ConfirmationApprovalPolicy;
   expires_at: Date;
   requested_at?: Date;
   reply_options?: ConfirmationReplyOption[];

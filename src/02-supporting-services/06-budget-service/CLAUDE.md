@@ -9,6 +9,9 @@ messages sent per person today
 messages sent per thread this hour
 pending batched items
 batch window timing
+quiet hours
+human quiet / pause signals
+per-topic cooldowns and quotas
 
 Returns:
 send now
@@ -18,6 +21,8 @@ or hold until next digest
 ## Outbound Budget
 
 The outbound budget limits unprompted messages per person per day. If multiple batched items are pending for the same person within a window, they combine into one message. The system never stacks multiple messages back to back.
+
+The budget service also refreshes quiet windows from inbound human activity and can apply longer pause windows when someone clearly signals "not now", "quiet", or "stop".
 
 ## Dispatch Priority
 
@@ -32,6 +37,14 @@ Every outbound message is one of three priority levels:
 ## Collision Avoidance
 
 Before dispatching any outbound message, the budget service checks what else is pending or recently sent for the same person or thread. If multiple items would stack up, it batches them into one combined message. If someone has already received several messages today, non-urgent items hold until tomorrow's digest. The goal is that no one ever feels bombarded.
+
+Quiet hours and per-topic notification policy are part of the same suppression layer. The governor now considers:
+
+- thread and participant quiet TTLs
+- participant and participant+topic pause TTLs
+- configured quiet hours
+- topic-level cooldowns and notification quotas
+- pending-confirmation and active-escalation pressure as additional suppression reasons
 
 ## Counter Storage
 

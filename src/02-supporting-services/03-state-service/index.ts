@@ -644,7 +644,7 @@ export class SqliteStateService implements StateService {
     };
   }
 
-  public async importSnapshot(envelope: ExportedSnapshotEnvelope): Promise<void> {
+  public importSnapshot(envelope: ExportedSnapshotEnvelope): Promise<void> {
     const tx = this.db.transaction(() => {
       if (envelope.config) {
         this.db
@@ -671,6 +671,7 @@ export class SqliteStateService implements StateService {
       { exported_at: envelope.exported_at, schema_version: envelope.schema_version },
       "State snapshot imported.",
     );
+    return Promise.resolve();
   }
 }
 

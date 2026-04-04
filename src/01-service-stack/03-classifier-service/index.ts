@@ -571,7 +571,10 @@ export class ClaudeClassifierService {
 
   private inferImageExtraction(topic: TopicKey, classifierResponse: string): ImageExtraction {
     const lowered = classifierResponse.toLowerCase();
-    if (topic === TopicKey.Finances && (lowered.includes("receipt") || lowered.includes("expense"))) {
+    if (
+      topic === TopicKey.Finances &&
+      (lowered.includes("receipt") || lowered.includes("expense"))
+    ) {
       const amountMatch = /\$?([\d,]+\.?\d*)/u.exec(classifierResponse);
       const vendorMatch = /(?:at|from)\s+([A-Z][a-zA-Z\s]+)/u.exec(classifierResponse);
       return {
@@ -583,14 +586,20 @@ export class ClaudeClassifierService {
         confidence: amountMatch ? 0.8 : 0.4,
       };
     }
-    if (topic === TopicKey.School && (lowered.includes("flyer") || lowered.includes("notice") || lowered.includes("event"))) {
+    if (
+      topic === TopicKey.School &&
+      (lowered.includes("flyer") || lowered.includes("notice") || lowered.includes("event"))
+    ) {
       return {
         type: "school_flyer",
         extracted_fields: {},
         confidence: 0.6,
       };
     }
-    if (topic === TopicKey.Maintenance && (lowered.includes("photo") || lowered.includes("work") || lowered.includes("repair"))) {
+    if (
+      topic === TopicKey.Maintenance &&
+      (lowered.includes("photo") || lowered.includes("work") || lowered.includes("repair"))
+    ) {
       return {
         type: "maintenance_photo",
         extracted_fields: {},

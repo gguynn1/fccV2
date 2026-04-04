@@ -38,3 +38,15 @@ Every outbound message is one of three priority levels:
 ## Outbound Budget
 
 The outbound budget limits unprompted messages per person per day. If multiple batched items are pending for the same person within a window, they combine into one message. The system never stacks multiple messages back to back.
+
+## Governor Semantics
+
+The budget step is the system-wide outbound governor. In addition to priority and collision pressure, it now considers:
+
+- quiet hours from runtime config
+- thread and participant quiet windows refreshed by human activity
+- pause signals such as `not now`, `quiet`, or `stop`
+- per-topic quotas and cooldown hints from topic delivery policy
+- pending confirmations and active escalations as additional suppression pressure
+
+The goal is not just rate limiting. The goal is to keep the assistant useful without teaching the family to ignore it.

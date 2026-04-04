@@ -36,3 +36,7 @@ thread        anything —
               surface only
               when asked
 ```
+
+## Final Guard
+
+The Action Router decides `dispatch`, `hold`, or `store`, but the Worker still applies a final topic-delivery guard before transport. A dispatch result can be rerouted to a safer private thread or converted to store if the selected thread violates topic privacy policy.

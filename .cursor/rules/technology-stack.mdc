@@ -7,10 +7,10 @@ alwaysApply: true
 
 ## External Dependencies (only two paid subscriptions)
 
-| Service                           | Purpose                                                                              |
-| --------------------------------- | ------------------------------------------------------------------------------------ |
-| Twilio Programmable Messaging API | All inbound/outbound phone-native messaging across all threads                       |
-| Anthropic Claude API              | Classification, message composition, image parsing, email extraction, digest merging |
+| Service                                                | Purpose                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Twilio messaging stack (Programmable Messaging + Conversations API) | All inbound/outbound phone-native messaging; Conversations is the canonical shared-thread substrate when enabled |
+| Anthropic Claude API                                   | Classification, message composition, image parsing, email extraction, digest merging |
 
 Email (IMAP via imapflow) connects to existing family inboxes — no new subscription.
 
@@ -19,7 +19,7 @@ Email (IMAP via imapflow) connects to existing family inboxes — no new subscri
 | Layer                     | Technology                                                                                       |
 | ------------------------- | ------------------------------------------------------------------------------------------------ |
 | Runtime                   | Node.js (LTS) + TypeScript (strict, ESM)                                                         |
-| HTTP server               | Fastify — Twilio webhooks on localhost:3000; CalDAV on a separate local-only port (default 3001) |
+| HTTP server               | Fastify — Twilio messaging webhooks on localhost:3000; CalDAV on a separate local-only port (default 3001) |
 | Queue + scheduling        | BullMQ backed by Redis (AOF persistence required)                                                |
 | Persistence               | SQLite via better-sqlite3 — WAL mode required                                                    |
 | Calendar serving          | Local CalDAV endpoint — the system serves events outward; calendar apps subscribe to it          |
@@ -32,7 +32,7 @@ Email (IMAP via imapflow) connects to existing family inboxes — no new subscri
 
 ## Tunnel
 
-ngrok (paid plan, static subdomain) exposes localhost:3000 to the internet for Twilio webhooks only. CalDAV runs on a separate local-only port and is never tunneled. See `hosting-model.mdc` for tunnel exposure guardrails and process supervision details.
+ngrok (paid plan, static subdomain) exposes localhost:3000 to the internet for Twilio messaging webhooks only. CalDAV runs on a separate local-only port and is never tunneled. See `hosting-model.mdc` for tunnel exposure guardrails and process supervision details.
 
 ## Boundaries
 

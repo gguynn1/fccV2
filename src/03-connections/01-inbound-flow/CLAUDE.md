@@ -12,7 +12,8 @@ External world
 
 ## Door 1 — Phone-native channel → Transport → Identity
 
-- Inbound segments are validated and normalized by the Transport layer, then a lightweight identity lookup resolves the sender to an entity id and their **private thread** before enqueue. SMS is inherently 1:1, so the Transport cannot determine a shared-thread origin — routing to shared threads is a Worker decision based on topic and audience.
+- Private-thread phone traffic is validated and normalized by the Transport layer, then a lightweight identity lookup resolves the sender to an entity id and their **private thread** before enqueue.
+- When Twilio Conversations is enabled, shared-thread phone traffic enters through the Conversations webhook and is mapped directly to the configured shared thread id at the transport layer. Shared-thread meaning no longer degrades into private fallback.
 - See `01.1-phone-to-transport/CLAUDE.md`.
 
 ## Door 2 — Email and structured ingest → Data Ingest

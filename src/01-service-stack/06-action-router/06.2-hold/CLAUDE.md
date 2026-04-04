@@ -34,4 +34,11 @@ DEFAULT STATE
 
 ## Implementation
 
-Held items are stored as BullMQ delayed jobs in shared Redis. When multiple held items are ready for the same participant at the same touchpoint, Anthropic Claude API merges them into a single natural-language digest message rather than dispatching back-to-back segments.
+Held items are persisted into queue/state with a `hold_until` timestamp. Scheduler touchpoints later re-read those held rows, re-check relevance, and enqueue fresh outbound work when the hold window matures.
+
+This is not a direct "one delayed BullMQ job per held item" path. The important truth is:
+
+- Worker decides `hold`
+- state persists `hold_until`
+- scheduler windows release relevant held rows back into the main queue
+- later composition may combine or summarize material, but the hold itself is state-driven first

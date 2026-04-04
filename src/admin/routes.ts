@@ -12,7 +12,7 @@ import type { PendingQueueItem } from "../01-service-stack/04-queue/types.js";
 import { CollisionPrecedence } from "../01-service-stack/06-action-router/types.js";
 import { type SqliteStateService } from "../02-supporting-services/03-state-service/index.js";
 import { ThreadType } from "../02-supporting-services/05-routing-service/types.js";
-import { applyRuntimeSystemConfig } from "../config/runtime-system-config.js";
+import { applyRuntimeSystemConfig, runtimeSystemConfig } from "../config/runtime-system-config.js";
 import { EntityType, QueueItemSource } from "../types.js";
 import {
   AdminConfigInvariantError,
@@ -44,6 +44,7 @@ const threadSchema = z.object({
   type: z.nativeEnum(ThreadType),
   participants: z.array(z.string().min(1)).min(1),
   description: z.string().min(1),
+  conversation_sid: z.string().min(1).optional(),
 });
 
 const digestScheduleBlockSchema = z.object({
@@ -69,6 +70,12 @@ const outboundBudgetSchema = z.object({
   max_unprompted_per_person_per_day: z.number().int().positive(),
   max_messages_per_thread_per_hour: z.number().int().positive(),
   batch_window_minutes: z.number().int().nonnegative(),
+  quiet_hours: z
+    .object({
+      start: z.string().min(1),
+      end: z.string().min(1),
+    })
+    .optional(),
   description: z.string().min(1),
 });
 
@@ -212,10 +219,16 @@ function toDispatchMetadata(
     ReturnType<SqliteStateService["getSystemState"]>
   >["queue"]["recently_dispatched"][number],
 ) {
+  // Dispatch history stores target thread reliably; derive the visible audience
+  // from the current thread map so UI filters can line up with the routing model.
+  const concerning =
+    runtimeSystemConfig.threads.find((thread) => thread.id === item.target_thread)?.participants ??
+    [];
   return {
     id: item.id,
     topic: item.topic,
     target_thread: item.target_thread,
+    concerning,
     dispatched_at: item.dispatched_at,
     priority: item.priority,
     included_in: item.included_in ?? null,
@@ -270,7 +283,7 @@ function toEmulationMessageMetadata(message: StoredEmulationMessage) {
     id: message.id,
     thread_id: message.thread_id,
     sender: message.sender,
-    content: "",
+    content: message.content,
     direction: message.direction,
     source_type: message.source_type,
     created_at: message.created_at,
@@ -676,6 +689,13 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     const systemState = await options.state_service.getSystemState();
     return {
       recent: systemState.queue.recently_dispatched.map(toDispatchMetadata),
+    };
+  });
+
+  fastify.get("/state/budget-usage", async () => {
+    const systemState = await options.state_service.getSystemState();
+    return {
+      outbound_budget_tracker: systemState.outbound_budget_tracker,
     };
   });
 

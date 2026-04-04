@@ -7,7 +7,10 @@ ACTION ROUTER (decision: hold)
  HOLD handler (validates hold_until + queue metadata)
         |
         v
- SCHEDULER / BullMQ delayed / repeatable jobs
+ STATE (`queue_pending` with `hold_until`)
+        |
+        v
+ SCHEDULER touchpoints re-read held rows
         |
         v
  Future queue item(s) at natural touchpoints
@@ -29,3 +32,5 @@ ACTION ROUTER (decision: hold)
 ## Relation to digest jobs
 
 - Morning digest / evening check-in **repeatable jobs** also originate items directly (inbound door #3). **Hold** is the outbound path when the Worker already decided “not now” and handed timing off to the scheduler subsystem.
+
+The important runtime truth is that held items are state-driven first. A hold decision persists `hold_until`; scheduler windows later release relevant held rows back into the main queue after re-checking freshness and eligibility.

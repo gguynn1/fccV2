@@ -18,7 +18,7 @@ function localDate(year: number, month: number, day: number, hour: number, minut
   return new Date(year, month - 1, day, hour, minute, 0, 0);
 }
 
-function createStateService() {
+function createStateService(relationshipBusy: boolean = false) {
   const state = createTestSystemState();
   state.queue.pending = [
     {
@@ -83,6 +83,12 @@ function createStateService() {
       included_in: "morning_digest",
     },
   ];
+  if (relationshipBusy) {
+    state.relationship.quiet_window = {
+      is_busy_period: true,
+      is_stressful_period: false,
+    };
+  }
 
   return {
     getSystemState: () => Promise.resolve(state),
@@ -90,13 +96,13 @@ function createStateService() {
   };
 }
 
-function createService() {
+function createService(relationshipBusy: boolean = false) {
   const config = installTestSystemConfig();
   return createSchedulerService({
     redis_url: "redis://127.0.0.1:6379",
     timezone: config.system.timezone,
     daily_rhythm: config.daily_rhythm,
-    state_service: createStateService() as never,
+    state_service: createStateService(relationshipBusy) as never,
   });
 }
 
@@ -159,5 +165,18 @@ describe("BullSchedulerService", () => {
 
     expect(result.produced).toEqual([]);
     expect(result.skipped_stale).toBe(2);
+  });
+
+  it("suppresses relationship nudges while the quiet window is marked busy", async () => {
+    const scheduler = createService(true);
+
+    const items = await scheduler.produceScheduledItemsForEvent({
+      id: "evening_checkin_tick",
+      type: ScheduledEventType.EveningCheckin,
+      due_at: localDate(2026, 4, 3, 20, 0),
+      payload: {},
+    });
+
+    expect(items.some((item) => item.topic === TopicKey.Relationship)).toBe(false);
   });
 });

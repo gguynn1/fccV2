@@ -10,6 +10,7 @@ export interface ConfigPayload {
     type: string;
     participants: string[];
     description: string;
+    conversation_sid?: string;
   }>;
 }
 

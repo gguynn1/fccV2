@@ -326,6 +326,10 @@ const defaultDispatch: SystemConfig["dispatch"] = {
     max_unprompted_per_person_per_day: 5,
     max_messages_per_thread_per_hour: 2,
     batch_window_minutes: 30,
+    quiet_hours: {
+      start: "21:00",
+      end: "07:00",
+    },
     description:
       "If multiple batched proactive items are pending for the same person or thread within the batch window, combine them into one message. Participant-initiated inbound requests should remain near real-time.",
   },

@@ -44,6 +44,10 @@ export interface OutboundBudget {
   max_unprompted_per_person_per_day: number;
   max_messages_per_thread_per_hour: number;
   batch_window_minutes: number;
+  quiet_hours?: {
+    start: string;
+    end: string;
+  };
   description: string;
 }
 

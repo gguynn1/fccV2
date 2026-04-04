@@ -86,4 +86,23 @@ END:VCALENDAR`,
     expect(items.some((item) => item.topic === TopicKey.Calendar)).toBe(true);
     expect(queued.some((item) => item.topic === TopicKey.Calendar)).toBe(true);
   });
+
+  it("quarantines ambiguous inbox attribution into the operator private thread", async () => {
+    const service = createDataIngestService({
+      state_service: createStateServiceStub(),
+    });
+
+    const items = await service.processInboxMessage({
+      message_id: "msg-2",
+      inbox_address: "unknown@example.com",
+      received_at: new Date("2026-04-03T19:20:00.000Z"),
+      from: "updates@example.com",
+      subject: "General reminder",
+      text: "Reminder: something changed.",
+      attachments: [],
+    });
+
+    expect(items[0]?.target_thread).toBe("participant_1_private");
+    expect(items[0]?.priority).toBe("silent");
+  });
 });

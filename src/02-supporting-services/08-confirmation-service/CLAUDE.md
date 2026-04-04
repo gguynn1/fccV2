@@ -11,7 +11,7 @@ which thread to confirm in
 
 When a response arrives that matches a pending confirmation:
 resolves it as approved or rejected
-rejects replies arriving from a different thread than the originating thread (wrong-thread safety)
+prefers exact-thread matching, with an explicit requester-private fallback only when policy allows it
 
 When a timer expires:
 marks it expired
@@ -29,8 +29,8 @@ Does this action involve:
   If yes to any:
 
     The assistant states what it understood
-    and asks for approval in the same
-    thread where the request was made
+    and asks for approval in the display
+    thread chosen for that action
              |
         _____|_____
        |           |
@@ -56,7 +56,7 @@ Three categories always require explicit approval before the assistant acts:
 - **Financial actions** — logging payments, marking bills paid, adjusting savings goals, recording expenses.
 - **System changes** — adding data sources, modifying dispatch rules, changing escalation timing, adding entities.
 
-Confirmations happen in the thread where the request was made. They expire after a configured window. Expired confirmations never auto-execute. The assistant tells the user it expired and asks them to reissue.
+Confirmations default to exact-thread approval. For specific flows such as sending-on-behalf requested from a shared thread, the worker may set `approval_thread_policy: requester_private_allowed`, which lets the requester approve from their private thread. Expired confirmations never auto-execute. The assistant tells the user it expired and asks them to reissue.
 
 ## Implementation
 

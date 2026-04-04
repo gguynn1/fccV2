@@ -4,6 +4,7 @@ import { join, relative, resolve } from "node:path";
 
 import { ClaudeClassifierService } from "../../src/01-service-stack/03-classifier-service/index.js";
 import { createWorker } from "../../src/01-service-stack/05-worker/index.js";
+import { WorkerAction } from "../../src/01-service-stack/05-worker/types.js";
 import type {
   ActionRouterResult,
   StackClassificationResult,
@@ -13,8 +14,16 @@ import type {
 import { createStateService } from "../../src/02-supporting-services/03-state-service/index.js";
 import { createTopicProfileService } from "../../src/02-supporting-services/04-topic-profile-service/index.js";
 import { createRoutingService } from "../../src/02-supporting-services/05-routing-service/index.js";
-import type { ConfirmationActionType } from "../../src/02-supporting-services/08-confirmation-service/types.js";
+import {
+  ConfirmationReplyDecision,
+  ConfirmationResult,
+  ConfirmationStatus,
+  type ConfirmationActionType,
+  type PendingConfirmation,
+} from "../../src/02-supporting-services/08-confirmation-service/types.js";
+import { createTestSystemConfig } from "../../src/02-supporting-services/test-fixtures.js";
 import { createMinimalSystemState } from "../../src/config/minimal-system-config.js";
+import { applyRuntimeSystemConfig } from "../../src/config/runtime-system-config.js";
 import { loadEnv } from "../../src/env.js";
 import {
   ClassifierIntent,
@@ -60,7 +69,17 @@ async function loadEvalSystemConfig(repoRoot: string): Promise<SystemConfig> {
   const env = loadEnv(process.env as Record<string, string | undefined>);
   const stateService = createStateService(resolve(repoRoot, env.DATABASE_PATH));
   try {
-    return await stateService.getSystemConfig();
+    const config = await stateService.getSystemConfig();
+    const hasFixtureTopology =
+      config.threads.some((thread) => thread.id === "family") &&
+      config.threads.some((thread) => thread.id === "couple") &&
+      config.threads.some((thread) => thread.id === "participant_1_private") &&
+      config.entities.some((entity) => entity.id === "participant_1") &&
+      config.entities.some((entity) => entity.id === "participant_2");
+    if (config.entities.length === 0 || config.threads.length === 0 || !hasFixtureTopology) {
+      return createTestSystemConfig();
+    }
+    return config;
   } finally {
     stateService.close();
   }
@@ -230,6 +249,9 @@ function inferTopicByKeywords(message: string): TopicKey | null {
   if (
     normalized.includes("date night") ||
     normalized.includes("anniversary") ||
+    normalized.includes("relationship") ||
+    normalized.includes("connection nudge") ||
+    normalized.includes("nudge history") ||
     normalized.includes("couple reminder") ||
     normalized.includes("couple reminders") ||
     normalized.includes("couples")
@@ -581,6 +603,7 @@ function createWorkerReplayHarness(config: SystemConfig): {
     turnIndex: number,
   ) => Promise<EvalScenarioActual>;
 } {
+  applyRuntimeSystemConfig(config);
   const state: SystemState = createMinimalSystemState(new Date());
   const transportCalls: TransportOutboundEnvelope[] = [];
   const threadHistory = new Map<string, Awaited<SystemState["threads"][string]>>();
@@ -605,6 +628,59 @@ function createWorkerReplayHarness(config: SystemConfig): {
   };
 
   let activeInterpreterFixture: EvalScenarioSimulation["interpreter_fixture"] | null = null;
+  const baseNow = new Date("2026-04-04T09:00:00.000Z");
+
+  function resetRuntimeState(referenceTime: Date = baseNow): void {
+    const nextState = createMinimalSystemState(referenceTime);
+    state.queue = nextState.queue;
+    state.outbound_budget_tracker = nextState.outbound_budget_tracker;
+    state.escalation_status = nextState.escalation_status;
+    state.calendar = nextState.calendar;
+    state.chores = nextState.chores;
+    state.finances = nextState.finances;
+    state.grocery = nextState.grocery;
+    state.health = nextState.health;
+    state.pets = nextState.pets;
+    state.school = nextState.school;
+    state.travel = nextState.travel;
+    state.vendors = nextState.vendors;
+    state.business = nextState.business;
+    state.relationship = nextState.relationship;
+    state.family_status = nextState.family_status;
+    state.meals = nextState.meals;
+    state.maintenance = nextState.maintenance;
+    state.confirmations = nextState.confirmations;
+    state.threads = nextState.threads;
+    state.data_ingest_state = nextState.data_ingest_state;
+    state.digests = nextState.digests;
+    transportCalls.length = 0;
+    threadHistory.clear();
+    activeInterpreterFixture = null;
+  }
+
+  function toEvalPriority(
+    trace: Awaited<ReturnType<typeof worker.process>>,
+    outbound?: TransportOutboundEnvelope,
+  ): DispatchPriority {
+    if (outbound?.priority) {
+      return outbound.priority;
+    }
+    if (trace.outcome === "held") {
+      return DispatchPriority.Batched;
+    }
+    if (trace.outcome === "stored" || trace.outcome === "dropped_stale") {
+      return DispatchPriority.Silent;
+    }
+    return DispatchPriority.Immediate;
+  }
+
+  function traceRequiresConfirmation(trace: Awaited<ReturnType<typeof worker.process>>): boolean {
+    return trace.steps.some(
+      (step) =>
+        step.action === WorkerAction.CheckConfirmation &&
+        step.output_summary === "confirmation_prompted",
+    );
+  }
 
   function defaultActionTypeForTopic(topic: TopicKey): string {
     switch (topic) {
@@ -869,8 +945,39 @@ function createWorkerReplayHarness(config: SystemConfig): {
         if (!gates) return false;
         return gates.always_require_approval?.includes(type) ?? false;
       },
-      openConfirmation: () =>
-        Promise.reject(new Error("runtime replay confirmation open is not supported")),
+      openConfirmation: (request) => {
+        const confirmation: PendingConfirmation = {
+          id: `eval_confirmation_${Date.now()}`,
+          type: request.type,
+          action: request.action,
+          requested_action_payload: request.requested_action_payload,
+          requested_by: request.requested_by,
+          requested_in_thread: request.requested_in_thread,
+          origin_thread: request.origin_thread ?? request.requested_in_thread,
+          approval_thread_policy: request.approval_thread_policy ?? "exact_thread",
+          requested_at: request.requested_at ?? baseNow,
+          expires_at: request.expires_at,
+          status: ConfirmationStatus.Pending,
+          result: ConfirmationResult.NotYetApproved,
+          reply_options: request.reply_options ?? [
+            {
+              key: "yes",
+              label: "Yes",
+              aliases: ["yes"],
+              decision: ConfirmationReplyDecision.Approve,
+            },
+            {
+              key: "no",
+              label: "No",
+              aliases: ["no"],
+              decision: ConfirmationReplyDecision.Reject,
+            },
+          ],
+          expiry_message: request.expiry_message,
+        };
+        state.confirmations.pending = [...state.confirmations.pending, confirmation];
+        return Promise.resolve(confirmation);
+      },
       resolveFromQueueItem: () => Promise.resolve(null),
       expirePending: () => Promise.resolve([]),
       reconcileOnStartup: () => Promise.resolve({ expired: [], notifications: [] }),
@@ -895,17 +1002,17 @@ function createWorkerReplayHarness(config: SystemConfig): {
       scenario: EvalScenarioDefinition,
       options?: { interpreter_fixture?: EvalScenarioSimulation["interpreter_fixture"] },
     ): Promise<EvalScenarioActual> => {
-      transportCalls.length = 0;
+      resetRuntimeState(baseNow);
       activeInterpreterFixture = options?.interpreter_fixture ?? null;
       const inferredTopic = inferTopic(scenario.prompt_input.message);
       const inferredIntent = inferIntent(scenario.prompt_input.message);
       const queueItem: StackQueueItem = {
         id: `eval_worker_${scenario.id}`,
-        source: QueueItemSource.ScheduledTrigger,
+        source: QueueItemSource.HumanMessage,
         content: scenario.prompt_input.message,
         concerning: scenario.prompt_input.concerning,
         target_thread: scenario.prompt_input.origin_thread,
-        created_at: new Date("2026-04-04T09:00:00.000Z"),
+        created_at: baseNow,
         topic: inferredTopic,
         intent: inferredIntent,
       };
@@ -915,9 +1022,9 @@ function createWorkerReplayHarness(config: SystemConfig): {
         topic: inferredTopic,
         intent: inferredIntent,
         target_thread: outbound?.target_thread ?? scenario.prompt_input.origin_thread,
-        priority: outbound?.priority ?? DispatchPriority.Silent,
+        priority: toEvalPriority(trace, outbound),
         confirmation_required:
-          trace.outcome === "held" ||
+          traceRequiresConfirmation(trace) ||
           (typeof outbound?.content === "string" &&
             outbound.content.toLowerCase().includes("please confirm")),
         composed_message: outbound?.content ?? "No outbound generated.",
@@ -932,17 +1039,21 @@ function createWorkerReplayHarness(config: SystemConfig): {
       scenarioId: string,
       turnIndex: number,
     ): Promise<EvalScenarioActual> => {
-      transportCalls.length = 0;
-      activeInterpreterFixture = null;
+      if (turnIndex === 0) {
+        resetRuntimeState(baseNow);
+      } else {
+        transportCalls.length = 0;
+        activeInterpreterFixture = null;
+      }
       const inferredTopic = inferTopic(message);
       const inferredIntent = inferIntent(message);
       const queueItem: StackQueueItem = {
         id: `eval_worker_${scenarioId}_turn_${turnIndex}`,
-        source: QueueItemSource.ScheduledTrigger,
+        source: QueueItemSource.HumanMessage,
         content: message,
         concerning,
         target_thread: originThread,
-        created_at: new Date("2026-04-04T09:00:00.000Z"),
+        created_at: baseNow,
         topic: inferredTopic,
         intent: inferredIntent,
       };
@@ -952,9 +1063,9 @@ function createWorkerReplayHarness(config: SystemConfig): {
         topic: inferredTopic,
         intent: inferredIntent,
         target_thread: outbound?.target_thread ?? originThread,
-        priority: outbound?.priority ?? DispatchPriority.Silent,
+        priority: toEvalPriority(trace, outbound),
         confirmation_required:
-          trace.outcome === "held" ||
+          traceRequiresConfirmation(trace) ||
           (typeof outbound?.content === "string" &&
             outbound.content.toLowerCase().includes("please confirm")),
         composed_message: outbound?.content ?? "No outbound generated.",

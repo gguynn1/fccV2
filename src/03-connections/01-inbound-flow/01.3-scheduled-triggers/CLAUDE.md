@@ -32,7 +32,10 @@ Exact job names and times live in Scheduler service configuration — this page 
 ## Missed-window recovery
 
 - On **startup**, the Scheduler reconciles repeatable / delayed work that should have fired during downtime.
-- Fired jobs **check relevance** (digest still meaningful, window not expired) before emitting a queue item — stale or irrelevant windows are dropped or adapted per implementation, **not** dispatched “late as if on time”.
+- Fired jobs re-check concrete relevance before emitting a queue item:
+  - digest eligibility excludes stale or already-surfaced items
+  - relationship nudges are suppressed when the quiet window is marked busy or stressful
+  - startup recovery counts and skips stale windows instead of dispatching them late “as if on time”
 
 ## Queue tagging
 

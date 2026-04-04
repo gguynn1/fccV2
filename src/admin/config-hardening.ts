@@ -60,21 +60,23 @@ function buildPrivateThread(entityId: string, entityName: string): Thread {
   };
 }
 
-function buildFamilyThread(peopleIds: string[]): Thread {
+function buildFamilyThread(peopleIds: string[], conversationSid?: string): Thread {
   return {
     id: "family",
     type: ThreadType.Shared,
     participants: peopleIds,
     description: FAMILY_THREAD_DESCRIPTION,
+    ...(conversationSid ? { conversation_sid: conversationSid } : {}),
   };
 }
 
-function buildCoupleThread(participants: string[]): Thread {
+function buildCoupleThread(participants: string[], conversationSid?: string): Thread {
   return {
     id: "couple",
     type: ThreadType.Shared,
     participants,
     description: COUPLE_THREAD_DESCRIPTION,
+    ...(conversationSid ? { conversation_sid: conversationSid } : {}),
   };
 }
 
@@ -112,7 +114,7 @@ function normalizeEntities(config: SystemConfig, currentConfig: SystemConfig): v
   });
 }
 
-function normalizeThreads(config: SystemConfig): boolean {
+function normalizeThreads(config: SystemConfig, currentConfig: SystemConfig): boolean {
   const previousThreadsJson = JSON.stringify(config.threads);
   const people = config.entities.filter((entity) => entity.type !== EntityType.Pet);
   const peopleIds = people.map((entity) => entity.id);
@@ -121,16 +123,27 @@ function normalizeThreads(config: SystemConfig): boolean {
       .filter((entity) => entity.type === EntityType.Adult && entity.messaging_identity !== null)
       .map((entity) => entity.id),
   );
+  const requestedFamily = config.threads.find((thread) => thread.id === "family");
   const requestedCouple = config.threads.find((thread) => thread.id === "couple");
+  const currentFamily = currentConfig.threads.find((thread) => thread.id === "family");
+  const currentCouple = currentConfig.threads.find((thread) => thread.id === "couple");
   const normalizedCoupleParticipants = (requestedCouple?.participants ?? []).filter((participant) =>
     adultIds.has(participant),
   );
 
   config.threads = [
     ...people.map((entity) => buildPrivateThread(entity.id, entity.name)),
-    buildFamilyThread(peopleIds),
+    buildFamilyThread(
+      peopleIds,
+      requestedFamily?.conversation_sid ?? currentFamily?.conversation_sid,
+    ),
     ...(normalizedCoupleParticipants.length >= 2
-      ? [buildCoupleThread([...new Set(normalizedCoupleParticipants)])]
+      ? [
+          buildCoupleThread(
+            [...new Set(normalizedCoupleParticipants)],
+            requestedCouple?.conversation_sid ?? currentCouple?.conversation_sid,
+          ),
+        ]
       : []),
   ];
 
@@ -488,7 +501,7 @@ export function hardenConfigEdit(options: HardenConfigEditOptions): HardenedConf
   };
 
   normalizeEntities(nextConfig, options.current_config);
-  report.normalized_threads = normalizeThreads(nextConfig);
+  report.normalized_threads = normalizeThreads(nextConfig, options.current_config);
 
   if (options.source === "scheduler") {
     report.normalized_scheduler_times = syncEntityDigestsFromDailyRhythm(nextConfig);

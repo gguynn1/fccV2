@@ -27,3 +27,5 @@ Each topic has a behavior profile:
 ## Composition
 
 When the Worker calls the Anthropic Claude API to compose an outbound message, the returned topic profile fields drive the composition prompt. The API does not invent tone or format independently — it receives the profile as explicit instruction.
+
+Topic Profile shapes message behavior, not delivery safety. Privacy scope, allowed threads, shared-awareness rules, quiet-hour hints, and confirmation-thread policy live in the separate topic-delivery policy layer.

@@ -14,27 +14,31 @@ MMS media URLs are downloaded to a local media store and normalized before class
 
 Reaction handling is conservative — not all clients encode reactions the same way. When mapping is uncertain, the system falls back to requesting a text clarification rather than assuming intent.
 
-## Dual transport model (Twilio)
+## Canonical transport model (Twilio)
 
-The layer combines **Twilio Programmable Messaging** and, when enabled, **Twilio Conversations**:
+The layer combines **Twilio Programmable Messaging** and **Twilio Conversations**, but they do not carry equal meaning:
 
-| Path | Role |
-| --- | --- |
-| **Programmable Messaging** | Private threads: inbound webhook and outbound SMS/MMS to each participant’s messaging identity. |
-| **Conversations API** | Shared threads when `TWILIO_CONVERSATIONS_ENABLED=true`: real group MMS–style threads via Conversations, with the assistant represented by a **projected address** (the same shared long code as Programmable Messaging). |
+| Path                       | Role                                                                                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Programmable Messaging** | Canonical path for private threads: inbound webhook and outbound SMS/MMS to each participant’s messaging identity.                                                                                              |
+| **Conversations API**      | Canonical path for shared threads when `TWILIO_CONVERSATIONS_ENABLED=true`: real group MMS–style threads via Conversations, with the assistant represented by a projected address on the same shared long code. |
 
 **When `TWILIO_CONVERSATIONS_ENABLED=true`**
 
-- Shared threads are backed by a Twilio Conversation. The assistant joins with `messagingBinding.projectedAddress` set to the shared messaging identity; human participants bind by address. Inbound shared traffic uses the Conversations webhook; outbound sends through `conversations.messages.create` for that conversation when initialization succeeded.
+- Shared threads are backed by a Twilio Conversation. The assistant joins with `messagingBinding.projectedAddress` set to the shared messaging identity; human participants bind by address.
+- Inbound shared traffic uses the Conversations webhook.
+- Outbound shared traffic sends through `conversations.messages.create`.
+- A missing `ConversationSid -> thread.id` mapping is treated as a configuration/runtime error. The transport layer does **not** degrade a shared-thread message into a private thread.
 
-**When Conversations is disabled (or initialization falls back)**
+**When Conversations is disabled**
 
-- Shared threads do **not** use a single carrier group thread. Outbound **fans out** one Programmable Messaging send per participant in the shared thread — logical grouping in configuration and routing only, not one native group MMS session.
+- Only private-thread messaging is available.
+- Canonical shared-thread dispatch is unavailable until Conversations is enabled and initialized.
 
 **Webhooks**
 
 - **`POST /webhook/twilio`** — Programmable Messaging: private thread messages (and the usual delivery status callback on `/webhook/twilio/status`).
-- **`POST /webhook/twilio/conversations`** — Conversations: handles `onMessageAdded` for shared threads (assistant-authored messages are ignored; unknown senders are dropped like the participant gate).
+- **`POST /webhook/twilio/conversations`** — Conversations: handles `onMessageAdded` for shared threads (assistant-authored messages are ignored; unknown senders are dropped like the participant gate; unmapped shared conversations are rejected instead of rerouted privately).
 
 **Operational constraints (carrier / Twilio)**
 

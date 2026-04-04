@@ -30,4 +30,6 @@
 
 Exact mapping is implemented in Action Router + Budget collision rules; this table is the conceptual contract.
 
+After the Action Router returns, the Worker still enforces final topic-delivery policy before transport. The Worker can also emit small secondary notices, such as shared-awareness or paired-thread follow-up notices, when policy allows them.
+
 See sub-pages: `03.1-dispatch-to-transport`, `03.2-hold-to-scheduler`, `03.3-store-to-state`.

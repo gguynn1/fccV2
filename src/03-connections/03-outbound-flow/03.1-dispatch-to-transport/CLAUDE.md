@@ -27,7 +27,15 @@ ACTION ROUTER (decision: dispatch)
 ## Routing
 
 - **Response-in-place:** Replies target the thread where the inbound item originated.
-- **Proactive:** Routing Service chooses the **narrowest** thread that fits the audience (plus escalation overrides when Escalation widens visibility).
+- **Proactive:** Routing Service chooses the **narrowest allowed** thread that fits the audience (plus escalation overrides when Escalation widens visibility).
+- **Final guard:** Before transport send, the Worker re-checks topic delivery policy. A dispatch can still be rerouted to a safer private thread or converted to store if the selected thread is not allowed for the topic.
+
+## Secondary outbound
+
+The primary dispatch is not always the only outbound side effect. The Worker can also emit:
+
+- shared-awareness notices to a narrow shared thread when topic policy allows summary visibility
+- paired-thread follow-up notices to explain where later follow-up will stay
 
 ## Network outage
 

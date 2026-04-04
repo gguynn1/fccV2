@@ -30,4 +30,6 @@ Intent is determined alongside topic. The same message in different contexts can
 
 ## Implementation
 
-Uses Anthropic Claude API with capped thread history context. Claude returns structured output; the stack validates and maps it to a typed `ClassificationResult` using Zod before the Worker consumes it. On API failure, the classifier supplies a bounded fallback path rather than propagating the error downstream.
+Uses Anthropic Claude API with capped thread history context. Claude returns structured output; the stack validates and maps it to a typed `ClassificationResult` using Zod before the Worker consumes it. On API failure, the classifier supplies a deterministic bounded fallback path rather than propagating the error downstream.
+
+Classification decides topic, intent, and concerning entities. It does **not** decide the final thread safety outcome by itself. After classification, routing and the Worker's topic-delivery guard still enforce privacy scope, allowed threads, awareness rules, and confirmation-thread policy.

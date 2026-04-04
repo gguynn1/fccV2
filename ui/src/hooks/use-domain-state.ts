@@ -48,7 +48,6 @@ export interface DomainStateResponse {
     last_nudge: {
       date: string;
       thread: string;
-      content?: string;
       content_recorded: boolean;
       response_received: boolean;
     };

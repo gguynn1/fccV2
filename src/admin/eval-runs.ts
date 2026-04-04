@@ -18,6 +18,7 @@ export interface EvalRunRecord {
   id: string;
   scenario_set: string;
   status: string;
+  fidelity?: string;
   started_at: string;
   completed_at: string | null;
   summary: Record<string, number>;
@@ -26,6 +27,21 @@ export interface EvalRunRecord {
     title: string;
     status: string;
     category: string;
+    raw_outcome?: string;
+    started_at?: string | null;
+    completed_at?: string | null;
+    expected?: Record<string, unknown>;
+    actual?: Record<string, unknown>;
+    failures?: Array<{ field: string; message: string }>;
+    tuner?: {
+      status: string;
+      summary: string;
+      candidate?: {
+        title: string;
+        summary: string;
+        body: string;
+      };
+    } | null;
   }>;
   logs: Array<{
     seq: number;

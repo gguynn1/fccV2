@@ -85,6 +85,7 @@ export function EvalRoute() {
         label: "Investigation Needed",
         value: selectedRun.summary.investigation_needed ?? 0,
       },
+      { label: "Regressed", value: selectedRun.summary.regressed ?? 0 },
       { label: "Failed", value: selectedRun.summary.failed ?? 0 },
     ];
   }, [selectedRun]);
@@ -313,9 +314,9 @@ export function EvalRoute() {
                       </TableCell>
                       <TableCell>{scenario.category}</TableCell>
                       <TableCell className="text-xs">
-                        {scenario.failures.length === 0
+                        {(scenario.failures ?? []).length === 0
                           ? "—"
-                          : scenario.failures.map((failure) => failure.field).join(", ")}
+                          : (scenario.failures ?? []).map((failure) => failure.field).join(", ")}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {scenario.tuner?.candidate ? "embedded" : "—"}
@@ -375,6 +376,12 @@ export function EvalRoute() {
                   <div className="max-h-[28rem] overflow-y-auto rounded-md border border-border p-3 font-mono text-xs whitespace-pre-wrap">
                     {markdownQuery.data.content}
                   </div>
+                ) : markdownQuery.error instanceof Error ? (
+                  <p className="text-sm text-destructive">{markdownQuery.error.message}</p>
+                ) : selectedRun.status === "completed" && !selectedRun.artifacts.markdown_path ? (
+                  <p className="text-sm text-muted-foreground">
+                    No markdown artifact was written for this run.
+                  </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     {selectedRun.status === "completed"

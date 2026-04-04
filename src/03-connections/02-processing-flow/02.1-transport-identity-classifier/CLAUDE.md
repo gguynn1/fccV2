@@ -5,7 +5,7 @@
 1. **Transport** — Validates inbound webhook, normalizes payload (text, structured choice, reaction, media, forwarded envelope) into stack inbound types.
 2. **Identity (lightweight, pre-enqueue)** — Resolves sender **messaging identity** to **entity id** and **target_thread** for phone-originated items. Full identity resolution (`EntityType`, permissions, thread memberships) happens in Worker step 2.
 3. **Enqueue** — Produces a `PendingQueueItem`. For typical phone traffic, **`topic` and `ClassifierIntent` are omitted**; `QueueItemSource` distinguishes human message / reaction / image / forwarded / etc. (`src/types.ts`, `04-queue/types.ts`).
-4. **Worker step 1** — Calls **Classifier** with capped thread history. Claude returns structured fields; the stack validates and maps them to **`ClassificationResult`** (`TopicKey`, `ClassifierIntent`, `concerning`). On API failure, classifier service supplies a bounded fallback path per implementation.
+4. **Worker step 1** — Calls **Classifier** with capped thread history. Claude returns structured fields; the stack validates and maps them to **`ClassificationResult`** (`TopicKey`, `ClassifierIntent`, `concerning`). On API failure, classifier service supplies a deterministic bounded fallback path rather than propagating the error.
 
 **Preclassified path:** Data Ingest or Scheduler may enqueue items with `topic` / `intent` already set; Worker step 1 trusts that policy and records `classification_source` as `preclassified_email` or `preclassified_scheduled` in the processing trace.
 

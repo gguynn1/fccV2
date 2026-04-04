@@ -41,7 +41,7 @@ TRANSPORT / INGEST / SCHEDULER
 | 5    | `check_escalation`       | **Escalation**                                                                                  |
 | 6    | `check_confirmation`     | **Confirmation**                                                                                |
 | 7    | `apply_behavior_profile` | **Topic Profile** (composition)                                                                 |
-| 8    | `route_and_dispatch`     | **Routing** + **Action Router** outcome                                                         |
+| 8    | `route_and_dispatch`     | **Routing** + **Action Router** outcome + final topic-delivery safety guard                     |
 
 Supporting services **do not import each other** at runtime; only the Worker orchestrates them (`architecture.mdc`).
 

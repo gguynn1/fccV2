@@ -21,7 +21,7 @@ The admin UI is a **local operator surface** for system configuration, state, an
 
 - **Top navigation bar** with horizontal links to all pages. Full-width content area below.
 - No sidebar. No collapsible rail. No nested navigation.
-- Pages: Dashboard, Entities, Threads, Topics, Budget, Scheduler, Queue, Activity, Eval.
+- Pages: Dashboard, Entities, Threads, Topics, Budget, Scheduler, Queue, Activity, State, Eval, Emulation.
 
 ### Responsiveness
 
@@ -43,7 +43,7 @@ The admin UI is a **local operator surface** for system configuration, state, an
 
 ### Topic Profile Editability
 
-Topics are broadly editable through the UI: enabled/disabled toggle, tone, format, escalation profile, and confirmation gate settings. Cross-topic connections and framework grounding remain code-managed — they are structural decisions, not operational knobs.
+Topics are partially editable through the UI today: tone, format, escalation level, and topic-level confirmation toggle. Cross-topic connections, framework grounding, routing/privacy policy, and other structural delivery rules remain code-managed — they are structural decisions, not operational knobs.
 
 ### Dashboard
 

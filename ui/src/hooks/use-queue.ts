@@ -26,6 +26,7 @@ export interface DispatchMetadata {
   id: string;
   topic: string;
   target_thread: string;
+  concerning: string[];
   dispatched_at: string;
   priority: string;
   included_in: string | null;

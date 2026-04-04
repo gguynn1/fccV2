@@ -83,6 +83,16 @@ export type CalendarAction =
       location?: string;
       concerning: string[];
     }
+  | {
+      type: "notify_calendar_change";
+      change_type: "created" | "updated" | "removed";
+      event_id: string;
+      title: string;
+      concerning: string[];
+      starts_at?: Date;
+      ends_at?: Date;
+      location?: string;
+    }
   | { type: "reschedule_event"; event_id: string; new_start: Date; new_end?: Date }
   | { type: "cancel_event"; event_id: string; reason?: string }
   | { type: "query_events"; filters?: CalendarQueryFilters };

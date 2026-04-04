@@ -2,7 +2,7 @@
 
 Watches external sources independently:
 monitored inboxes (IMAP via imapflow — reconnects automatically after network outage)
-calendar change signals (local CalDAV polling — see below)
+calendar change signals (event-level diffs from local persisted calendar state — see below)
 
 When something relevant arrives:
 extracts content
@@ -42,10 +42,11 @@ FORWARDED SMS (see above)
     same dispatch rules
 
 CALENDAR SYNC (local CalDAV)
-  Polls the local CalDAV URL on a timer (configurable interval)
-  PROPFIND against the served calendar collection; when the
-  response fingerprint changes, enqueues a calendar update item
-  so the worker can react to edits made from external calendar apps
+  Polls local persisted calendar state on a timer
+  builds an event manifest with per-event fingerprints
+  detects created / updated / removed events
+  enqueues one calendar change item per delta
+  so the worker can react with concrete context
          |
          v
     Same queue, same worker,
@@ -68,4 +69,6 @@ Adding a new data source never requires rethinking the dispatch logic. It just f
 
 Email content and image attachments are parsed using Anthropic Claude API before items are queued. Ingest items may arrive pre-classified — `topic` and `intent` already set on the queue item — in which case the Worker skips a fresh classification call and records the source as `preclassified_email`.
 
-Calendar sync does **not** call an external calendar SaaS API; it observes **this** deployment’s CalDAV surface (`localhost`, configurable port) so changes originating in subscribed calendar apps can produce queue work.
+Calendar sync does **not** call an external calendar SaaS API. It compares the locally persisted calendar event set and emits event-level `created` / `updated` / `removed` queue items.
+
+Ambiguous inbox attribution is handled conservatively. When ownership is unclear, the item is quarantined into the safest private operator thread and marked silent rather than broadcast to a shared family audience.

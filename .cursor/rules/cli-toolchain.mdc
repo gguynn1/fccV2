@@ -48,21 +48,25 @@ All project tasks run through `npm run`. Never invoke tooling directly when a sc
 | `npm start`                 | Run the compiled application (`node dist/server.js`)                              |
 | `npm run dev`               | Run in development with file watching and auto-restart                            |
 | `npm run build`             | Compile TypeScript (`tsc`)                                                        |
+| `npm run bootstrap`         | First boot: create minimal persisted config/state                                 |
 | `npm run typecheck`         | Type-check backend and admin UI (`tsc --noEmit && npm run --prefix ui typecheck`) |
 | `npm run lint`              | Lint backend + admin UI and run Prettier check                                    |
 | `npm run lint:fix`          | Auto-fix backend + admin UI lint issues, then format                              |
 | `npm run format`            | Format all files with Prettier                                                    |
 | `npm run format:check`      | Check formatting without writing                                                  |
 | `npm test`                  | Run tests (`vitest run --passWithNoTests`)                                        |
+| `npm run dev:all`           | Start Redis (if needed), backend watcher, and admin UI dev server together        |
 | `npm run ui:dev`            | Start admin UI dev server (Vite, port 5173, proxies API to :3000)                 |
 | `npm run ui:build`          | Build admin UI production bundle to `ui/dist/`                                    |
 | `npm run ui:preview`        | Preview admin UI production build                                                 |
 | `npm run ngrok:auth`        | Configure ngrok auth token from `.env`                                            |
-| `npm run eval`              | Invoke the eval CLI with the `watch` command alias                                |
+| `npm run eval`              | Invoke the eval CLI with the default `run` command                                |
 | `npm run eval:run`          | Run one sequential eval pass and write JSON/markdown artifacts                    |
 | `npm run eval:list`         | List all available eval scenarios                                                 |
-| `npm run eval:coverage`     | Invoke the eval CLI with the `coverage` command alias                             |
+| `npm run eval:coverage`     | Currently aliases `run` (coverage mode is not implemented in the CLI)             |
 | `npm run eval:generate-set` | Generate a new scenario set into `eval/scenarios/generated/`                      |
+| `npm run state:export`      | Export persisted config/state snapshot via the state CLI                          |
+| `npm run state:import`      | Import a persisted config/state snapshot via the state CLI                        |
 | `npm run backup:local`      | Run the SQLite backup script (captures snapshot + Redis AOF files)                |
 
 ### Script lifecycle for a typical workflow
@@ -93,4 +97,4 @@ npm start             →  subsequent boots: run with existing database
 
 7. **Version awareness.** When installing new packages or writing scripts, account for the installed versions. Node 22 supports ESM natively, top-level await, and the latest V8 features. TypeScript 6 has `verbatimModuleSyntax` enabled.
 
-8. **Use the eval scripts for eval runs.** The current eval implementation is a TypeScript CLI under `eval/cli.ts`. Prefer `npm run eval:run` for one-shot runs. The backend starts eval from the UI by spawning that script rather than importing `eval/` into `src/`.
+8. **Use the eval scripts for eval runs.** The current eval implementation is a TypeScript CLI under `eval/cli.ts`. Prefer `npm run eval:run` for one-shot runs. `npm run eval` is just the default run alias right now, and `npm run eval:coverage` does not provide a distinct coverage mode yet. The backend starts eval from the UI by spawning the CLI rather than importing `eval/` into `src/`.

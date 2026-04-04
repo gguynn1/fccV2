@@ -459,7 +459,7 @@ export function EntitiesRoute() {
           </CardHeader>
           <CardContent className="space-y-6">
             {pets.map((pet) => {
-              const idx = data.entities.indexOf(pet);
+              const idx = data.entities.findIndex((entity) => entity.id === pet.id);
               return (
                 <div key={pet.id} className="space-y-3 rounded-md border border-border p-4">
                   <p className="text-sm font-medium">{pet.name}</p>

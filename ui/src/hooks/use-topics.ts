@@ -58,6 +58,10 @@ export function useUpdateTopics() {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "topics"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "queue"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "domain-state"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "eval"] });
     },
   });
 }

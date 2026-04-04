@@ -14,6 +14,8 @@ Initiative is the softest of any topic: occasional nudges during genuinely quiet
 
 - **`next_nudge_eligible`** — After each **`dispatch_nudge`** application, this timestamp is advanced from “now” using an effective cooldown in days (see below). The scheduler only emits proactive relationship items when `next_nudge_eligible` is in the past.
 
+- **Quiet-window gate** — The scheduler only emits a relationship nudge when `quiet_window` is not marked busy or stressful. A busy or stressful state suppresses the scheduled nudge entirely rather than sending and hoping the recipient ignores it.
+
 - **Backoff after ignores** — Consecutive **ignored** nudges (no response recorded) increase the cooldown with a **1.5× multiplier per consecutive ignore**, capped at **30 days**. A **response** resets toward the **base** cooldown from configuration (`cooldown_days`).
 
 - **Rotation** — `selectNextRelationshipNudgeType` walks a fixed `NudgeType` rotation so successive nudges vary (appreciation, conversation starter, connection prompt, etc.).
@@ -21,5 +23,7 @@ Initiative is the softest of any topic: occasional nudges during genuinely quiet
 - **Scheduled nudges vs queries** — Policy-driven scheduled relationship items use **`ClassifierIntent.Nudge`**, not **`ClassifierIntent.Query`**, so they resolve to the **`dispatch_nudge`** typed action instead of collapsing into **`query_nudge_history`**.
 
 - **`dispatch_nudge`** — Applies the rotation, appends to `nudge_history`, updates **`next_nudge_eligible`** with the backoff-aware cooldown, and composes outbound copy from **real prompt variants** per nudge type (short, concrete strings in the worker — not open-ended model improvisation for the default path).
+
+- **`set_quiet_window` / `record_nudge_ignored`** — Relationship replies can explicitly quiet future nudges. Busy/stress signals and ignored nudges update relationship state so the next scheduled nudge backs off instead of continuing to press.
 
 Anthropic Claude API personalizes prompts, but always grounded in the local prompt library and tone rules — it does not freeform-generate relationship advice.

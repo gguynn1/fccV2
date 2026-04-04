@@ -1,6 +1,7 @@
 import { pino, type Logger } from "pino";
 
 import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
+import { isThreadAllowedForTopicDelivery } from "../../config/topic-delivery-policy.js";
 import { EntityType } from "../../types.js";
 import type { RoutingRequest, RoutingService } from "../types.js";
 import {
@@ -62,7 +63,7 @@ export class StaticRoutingService implements RoutingService {
   public resolveRoutingDecision(input: RoutingDecisionInput): RoutingDecision {
     if (input.is_response) {
       return {
-        target: this.buildResponseTarget(input.origin_thread),
+        target: this.buildResponseTarget(input.topic, input.concerning, input.origin_thread),
         reply_policy: {
           action: "reply_here",
           reason: "Participant-initiated response remains in origin thread.",
@@ -107,15 +108,50 @@ export class StaticRoutingService implements RoutingService {
     return this.contextPolicy.explicit_switch_signals.some((signal) => normalized.includes(signal));
   }
 
-  private buildResponseTarget(originThread: string): ThreadTarget {
+  private buildResponseTarget(
+    topic: RoutingDecisionInput["topic"],
+    concerning: string[],
+    originThread: string,
+  ): ThreadTarget {
     const threads = this.getThreads();
     const threadById = new Map(threads.map((thread) => [thread.id, thread]));
-    const fallbackThread = threads[0]?.id ?? originThread;
-    const targetThread = threadById.has(originThread) ? originThread : fallbackThread;
+    const normalizedConcerning = this.normalizeConcerning(concerning);
+    if (
+      threadById.has(originThread) &&
+      this.isThreadAllowedByTopic(topic, originThread, normalizedConcerning, "response")
+    ) {
+      return {
+        thread_id: originThread,
+        rule_applied: RoutingRule.ResponseInPlace,
+        reason: "Rule 1: response stays in the origin thread.",
+      };
+    }
+
+    const privateFallback = this.tryResolveSingleEntityThread(normalizedConcerning);
+    if (
+      privateFallback &&
+      this.isThreadAllowedByTopic(
+        topic,
+        privateFallback.thread_id,
+        normalizedConcerning,
+        "response",
+      )
+    ) {
+      return {
+        thread_id: privateFallback.thread_id,
+        rule_applied: RoutingRule.ResponseInPlace,
+        reason: "Rule 1: response moved to the safest allowed private thread.",
+      };
+    }
+
+    const fallbackThread =
+      threads.find((thread) =>
+        this.isThreadAllowedByTopic(topic, thread.id, normalizedConcerning, "response"),
+      )?.id ?? originThread;
     return {
-      thread_id: targetThread,
+      thread_id: fallbackThread,
       rule_applied: RoutingRule.ResponseInPlace,
-      reason: "Rule 1: response stays in the origin thread.",
+      reason: "Rule 1: response rerouted to the closest allowed thread for the topic.",
     };
   }
 
@@ -126,7 +162,15 @@ export class StaticRoutingService implements RoutingService {
   ): ThreadTarget {
     const normalizedConcerning = this.normalizeConcerning(concerning);
     const privateIfSingle = this.tryResolveSingleEntityThread(normalizedConcerning);
-    if (privateIfSingle && this.isThreadAllowedByTopic(topic, privateIfSingle.thread_id)) {
+    if (
+      privateIfSingle &&
+      this.isThreadAllowedByTopic(
+        topic,
+        privateIfSingle.thread_id,
+        normalizedConcerning,
+        "proactive",
+      )
+    ) {
       return privateIfSingle;
     }
 
@@ -139,7 +183,7 @@ export class StaticRoutingService implements RoutingService {
       : undefined;
     if (
       hintedThread &&
-      this.isThreadAllowedByTopic(topic, hintedThread.id) &&
+      this.isThreadAllowedByTopic(topic, hintedThread.id, normalizedConcerning, "proactive") &&
       normalizedConcerning.every((entity) => hintedThread.participants.includes(entity))
     ) {
       return {
@@ -154,15 +198,21 @@ export class StaticRoutingService implements RoutingService {
       .filter((thread) =>
         normalizedConcerning.every((entity) => thread.participants.includes(entity)),
       )
-      .filter((thread) => this.isThreadAllowedByTopic(topic, thread.id))
+      .filter((thread) =>
+        this.isThreadAllowedByTopic(topic, thread.id, normalizedConcerning, "proactive"),
+      )
       .sort((a, b) => a.participants.length - b.participants.length);
     const selected =
       candidates[0] ??
       threads.find(
-        (thread) => thread.id === "family" && this.isThreadAllowedByTopic(topic, thread.id),
+        (thread) =>
+          thread.id === "family" &&
+          this.isThreadAllowedByTopic(topic, thread.id, normalizedConcerning, "proactive"),
       ) ??
       threads.find(
-        (thread) => thread.id === originThread && this.isThreadAllowedByTopic(topic, thread.id),
+        (thread) =>
+          thread.id === originThread &&
+          this.isThreadAllowedByTopic(topic, thread.id, normalizedConcerning, "proactive"),
       );
     if (!selected) {
       throw new Error("No routing thread available for proactive message.");
@@ -175,15 +225,18 @@ export class StaticRoutingService implements RoutingService {
     };
   }
 
-  private isThreadAllowedByTopic(topic: RoutingDecisionInput["topic"], threadId: string): boolean {
-    const routing = runtimeSystemConfig.topics[topic]?.routing;
-    if (!routing) {
-      return true;
-    }
-    const neverThreads = Array.isArray(routing.never)
-      ? routing.never.filter((value): value is string => typeof value === "string")
-      : [];
-    return !neverThreads.includes(threadId);
+  private isThreadAllowedByTopic(
+    topic: RoutingDecisionInput["topic"],
+    threadId: string,
+    concerning: string[],
+    deliveryKind: "response" | "proactive",
+  ): boolean {
+    return isThreadAllowedForTopicDelivery({
+      topic,
+      thread_id: threadId,
+      concerning,
+      delivery_kind: deliveryKind,
+    });
   }
 
   private normalizeConcerning(concerning: string[]): string[] {

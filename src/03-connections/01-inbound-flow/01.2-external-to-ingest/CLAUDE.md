@@ -22,7 +22,12 @@ Forwarded phone-native content --------> normalize ----------------> THE QUEUE
 
 ## Pre-classification
 
-- Ingest may set `topic` and `ClassifierIntent` on the queue item. The Worker treats trusted ingest sources as **preclassified** for step 1 (skips a fresh Claude classification call when policy matches).
+- Ingest may set `topic` and `ClassifierIntent` on the queue item. The Worker treats trusted ingest sources as **preclassified** for step 1 when those fields are present on `QueueItemSource.EmailMonitor`, `QueueItemSource.DataIngest`, or scheduled items, and records the corresponding `classification_source`.
+
+## Safety
+
+- Ambiguous inbox attribution is quarantined into the safest private operator context and marked silent rather than surfaced to a shared family audience.
+- Calendar sync now produces event-level `created` / `updated` / `removed` queue items instead of a generic “calendar changed” signal.
 
 ## Future integrations
 

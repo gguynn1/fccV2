@@ -9,15 +9,15 @@ The system is a closed communication surface. Only messages from messaging ident
 
 ## Invariants
 
-- **Non-participants are invisible.** If a messaging identity does not match a configured entity, the inbound message is logged at `warn` level and answered with empty TwiML (`<Response></Response>`). The system never enqueues, classifies, or dispatches anything for an unknown sender.
-- **No error responses to strangers.** Returning an HTTP error (4xx/5xx) to the messaging provider causes retries and confirms the number is active. Unknown senders always receive a 200 with empty TwiML — indistinguishable from a legitimate no-reply.
+- **Non-participants are invisible.** If a messaging identity does not match a configured entity, the inbound message is logged at `warn` level and answered with a provider-appropriate no-op response. For Twilio Programmable Messaging that is empty TwiML (`<Response></Response>`). The system never enqueues, classifies, or dispatches anything for an unknown sender.
+- **No error responses to strangers.** Returning an HTTP error (4xx/5xx) to the messaging provider causes retries and confirms the number is active. Unknown senders always receive a 200-style no-op acknowledgment appropriate to that transport — for example empty TwiML on Twilio Programmable Messaging — and never an explanatory message.
 - **No data leakage.** A non-participant must never receive any content — not an error message, not a "wrong number" reply, not a system status. The system behaves as if it does not exist.
 - **Transport-level enforcement.** The participant gate runs in the webhook route handler, after signature validation but before any normalization, classification, or enqueue. It is the first logical check after authentication.
 - **Applies to all messaging integrations.** This boundary is not Twilio-specific. Any future transport integration (email inbound, alternative messaging provider) must enforce the same closed-participant check before processing.
 
 ## Implementation
 
-The transport layer maintains a map of `messaging_identity → entity_id` built from `runtimeSystemConfig.entities` at startup. The `isKnownParticipant` check is a simple map lookup — O(1), no database call, no external service.
+The transport layer maintains a map of `messaging_identity → entity_id` built from `runtimeSystemConfig.entities` at startup. The `isKnownParticipant` check is a simple map lookup — O(1), no database call, no external service. The same identity map is used for direct messaging webhooks and shared-thread Conversations webhooks.
 
 ## Logging
 

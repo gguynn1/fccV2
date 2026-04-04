@@ -67,4 +67,28 @@ describe("RoutingService decision table", () => {
 
     expect(target).toBe("participant_1_private");
   });
+
+  it("keeps finance proactive routing in the couple thread even for one adult", async () => {
+    const target = await service.resolveTargetThread({
+      topic: TopicKey.Finances,
+      intent: ClassifierIntent.Update,
+      concerning: ["participant_1"],
+      origin_thread: "participant_1_private",
+      is_response: false,
+    });
+
+    expect(target).toBe("couple");
+  });
+
+  it("reroutes health responses away from shared threads into a safe private thread", async () => {
+    const target = await service.resolveTargetThread({
+      topic: TopicKey.Health,
+      intent: ClassifierIntent.Response,
+      concerning: ["participant_1"],
+      origin_thread: "family",
+      is_response: true,
+    });
+
+    expect(target).toBe("participant_1_private");
+  });
 });

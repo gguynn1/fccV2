@@ -54,6 +54,8 @@ Shared vocabulary for enums and queue fields lives in `src/types.ts` and `src/01
 
 The Action Router chooses **Dispatch**, **Hold**, or **Store**, driven in part by `DispatchPriority` (`immediate`, `batched`, `silent`). See `03-outbound-flow/CLAUDE.md`.
 
+Routing and Action Router are not the whole outbound story. The Worker also enforces executable topic delivery policy before transport and may emit small secondary notices such as shared-awareness or paired-thread follow-up notices when policy allows them.
+
 ## Principle
 
 Every source feeds **the same queue**, **the same Worker**, and **the same Action Router** outcomes. Adding a new data source means enqueueing queue items (and optional pre-classification); it does not require new dispatch logic.

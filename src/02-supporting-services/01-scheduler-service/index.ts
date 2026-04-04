@@ -55,6 +55,13 @@ function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
 }
 
+function isRelationshipQuietWindowState(quietWindow?: {
+  is_busy_period?: boolean;
+  is_stressful_period?: boolean;
+}): boolean {
+  return !quietWindow?.is_busy_period && !quietWindow?.is_stressful_period;
+}
+
 interface SchedulerTickWindow {
   type: ScheduledEventType.MorningDigest | ScheduledEventType.EveningCheckin;
   due_at: Date;
@@ -499,6 +506,7 @@ export class BullSchedulerService {
     if (
       relationshipTopic &&
       state.relationship.next_nudge_eligible <= referenceTime &&
+      isRelationshipQuietWindowState(state.relationship.quiet_window) &&
       runtimeSystemConfig.threads.some((thread) => thread.id === "couple")
     ) {
       const key = `policy:relationship_nudge:${dayKey}`;

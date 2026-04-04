@@ -17,7 +17,7 @@ In the current implementation, each scenario runs sequentially, records structur
 
 - **No feature without scenarios.** Adding a topic, a disambiguation rule, a cross-topic connection, or an escalation profile means adding eval scenarios that exercise it. If you can't write the scenario, the feature isn't specified well enough.
 - **Failures are refinements, not bugs.** A wrong classification or wrong tone is a model refinement signal, not a code defect. The tuner adjusts prompts and few-shot examples — it does not modify runtime logic.
-- **Coverage remains the target.** The default scenario set covers five topics. Generated scenario sets use 18 templates covering all 14 topics plus cross-domain variants and are immediately runnable. Future expansion should push toward edge-case and negative coverage beyond the templates.
+- **Coverage remains the target.** The curated default scenario set currently covers seven trust-sensitive scenarios. Generated scenario sets use 18 templates covering all 14 topics plus cross-domain variants and are immediately runnable. Future expansion should push toward edge-case and negative coverage beyond the templates.
 - **Negative scenarios are as important as positive ones.** The system must prove what it does NOT do: no financial data in a child's thread, no auto-execution of expired confirmations, no late dispatch of stale items, no escalation of low-accountability topics.
 - **Sequential execution is the current default.** One scenario runs at a time, and the UI polls the persisted JSON run state for progress and logs.
 
@@ -30,11 +30,11 @@ The Eval page can generate scenario scaffolds into `eval/scenarios/generated/`. 
 The eval CLI supports four **modes** (see `eval/cli.ts`); each run also records a **fidelity** level on persisted state and in markdown artifacts (`simulation`, `worker-replay`, or `high-fidelity`).
 
 - **`simulator`**: Deterministic keyword matching via `inferTopic()` in `eval/runners/sequential-runner.ts` (keywords like "bill", "electrician", "homework", "dentist" map to `TopicKey`). Scenario messages should contain recognizable keywords for their topic when exercising this path.
-- **`worker`** (default): Worker replay with real service implementations for the worker path; in-memory budget, escalation, and confirmation services enforce the same config limits and gates as production—they are not pass-through stubs.
+- **`worker`** (default): Worker replay with the real Worker orchestration, real routing service, and real topic-profile service, but in-memory doubles for budget, escalation, confirmation, state, and transport. It is a high-value replay path, not a full production-equivalent stack.
 - **`fixture-interpreter`**: Deterministic interpreter fixtures for structured action expectations (`simulation.interpreter_fixture`).
 - **`live-classifier`**: Live Anthropic API for classification (non-deterministic; high-fidelity).
 
-When eval failures involve configured behavior like topic routing, confirmation requirements, tone, format, priority, or disambiguation, inspect `src/config/minimal-system-config.ts` first. That file assembles the fresh-bootstrap defaults that flow into persisted runtime config.
+When eval failures involve configured behavior like topic routing, confirmation requirements, tone, format, priority, disambiguation, or thread safety, inspect `src/config/minimal-system-config.ts` and `src/config/topic-delivery-policy.ts` first. Bootstrap defaults and executable delivery policy together define the runtime behavior the eval harness is exercising.
 
 ## Pasteable Prompt Workflow
 

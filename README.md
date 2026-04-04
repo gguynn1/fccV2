@@ -1,6 +1,6 @@
 # Family Command Center
 
-A locally-hosted Family Command Center that runs on a Mac Mini. It communicates via phone-native messaging (Twilio SMS/MMS), processes inbound data from email and conversation, and serves a CalDAV calendar endpoint that standard calendar apps subscribe to.
+A locally-hosted Family Command Center that runs on a Mac Mini. It communicates via phone-native messaging (Twilio SMS/MMS), uses Twilio Conversations as the canonical substrate for real shared threads, processes inbound data from email and conversation, and serves a read-only CalDAV calendar endpoint that standard calendar apps subscribe to.
 
 ## Architecture
 

@@ -38,7 +38,7 @@ export interface EvalScenarioRecord {
     priority: string;
     confirmation_required: boolean;
   };
-  failures: Array<{
+  failures?: Array<{
     field: string;
     message: string;
   }>;
@@ -59,7 +59,7 @@ export interface EvalRunRecord {
   status: string;
   started_at: string;
   completed_at: string | null;
-  summary: Record<string, number>;
+  summary: Record<string, number | undefined>;
   scenarios: EvalScenarioRecord[];
   logs: EvalScenarioLogEvent[];
   artifacts: {

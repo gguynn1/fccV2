@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import type { CalendarEvent } from "../../../02-supporting-services/04-topic-profile-service/04.01-calendar/types.js";
@@ -90,9 +92,10 @@ export class CalDavService {
 
   private async getCalendarSnapshot(): Promise<{ events: CalDAVEvent[]; ctag: string }> {
     const state = await this.stateService.getSystemState();
+    const events = state.calendar.events.map((event) => this.toCalDavEvent(event));
     return {
-      events: state.calendar.events.map((event) => this.toCalDavEvent(event)),
-      ctag: String(Date.now()),
+      events,
+      ctag: this.buildSnapshotCtag(events),
     };
   }
 
@@ -116,7 +119,7 @@ export class CalDavService {
     <d:href>/caldav/events/${event.source_event_id}.ics</d:href>
     <d:propstat>
       <d:prop>
-        <d:getetag>"${event.uid}"</d:getetag>
+        <d:getetag>"${this.calendarFingerprint(event)}"</d:getetag>
         <d:getcontenttype>text/calendar; charset=utf-8</d:getcontenttype>
       </d:prop>
       <d:status>HTTP/1.1 200 OK</d:status>
@@ -189,6 +192,35 @@ export class CalDavService {
     ].filter((line): line is string => Boolean(line));
 
     return lines.join("\r\n");
+  }
+
+  private buildSnapshotCtag(events: CalDAVEvent[]): string {
+    return createHash("sha1")
+      .update(
+        JSON.stringify(
+          events.map((event) => ({
+            id: event.source_event_id,
+            fingerprint: this.calendarFingerprint(event),
+          })),
+        ),
+      )
+      .digest("hex");
+  }
+
+  private calendarFingerprint(event: CalDAVEvent): string {
+    return createHash("sha1")
+      .update(
+        JSON.stringify({
+          uid: event.uid,
+          summary: event.summary,
+          dtstart: event.dtstart.toISOString(),
+          dtend: event.dtend?.toISOString() ?? null,
+          location: event.location ?? null,
+          description: event.description ?? null,
+          source_event_id: event.source_event_id,
+        }),
+      )
+      .digest("hex");
   }
 
   private toIcalDate(value: Date): string {

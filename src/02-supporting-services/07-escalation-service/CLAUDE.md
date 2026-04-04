@@ -2,7 +2,7 @@
 
 Tracks escalation state per item
 
-Called by the Worker and by the Scheduler
+Called by the Worker. Startup recovery wiring in `server.ts` also asks it to reconcile overdue escalation work after downtime.
 
 Knows:
 which step we're on

@@ -27,14 +27,15 @@ Image or attachment ---------->|  THE QUEUE
 Email arriving in a ---------->|
 monitored inbox                |
                                |
-Calendar event added or ------>|
-changed                        |
+Calendar event added, -------->|
+updated, or removed            |
                                |
 Scheduled trigger firing ----->|
 (cron, timer, reminder due)    |
                                |
-Future integrations ---------->|
-(bank, school, vet, weather)   |
+Future local producers ------->|
+(mail parsing, conversation,   |
+state-driven adapters)         |
 ```
 
 Everything flows through a single queue. There is no separate path for human input versus system-generated events. One funnel, one worker, one set of rules.

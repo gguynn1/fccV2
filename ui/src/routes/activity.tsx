@@ -27,6 +27,13 @@ function formatDate(d: string): string {
   return new Date(d).toLocaleString();
 }
 
+function escalationTimestamp(escalation: {
+  next_action_at: string;
+  history: Array<{ at: string }>;
+}): string {
+  return escalation.next_action_at || escalation.history.at(-1)?.at || "";
+}
+
 function isInRange(dateStr: string, range: DateRange, customStart: string): boolean {
   const date = new Date(dateStr);
   if (range === "24h") return date >= hoursAgo(24);
@@ -56,19 +63,21 @@ export function ActivityRoute() {
       if (!isInRange(d.dispatched_at, dateRange, customStart)) return false;
       if (topicFilter && d.topic !== topicFilter) return false;
       if (threadFilter && d.target_thread !== threadFilter) return false;
+      if (entityFilter && !d.concerning.includes(entityFilter)) return false;
       return true;
     });
-  }, [dispatchesData, dateRange, customStart, topicFilter, threadFilter]);
+  }, [dispatchesData, dateRange, customStart, topicFilter, threadFilter, entityFilter]);
 
   const filteredEscalations = useMemo(() => {
     if (!escalationsData?.active) return [];
     return escalationsData.active.filter((e) => {
+      if (!isInRange(escalationTimestamp(e), dateRange, customStart)) return false;
       if (topicFilter && e.topic !== topicFilter) return false;
       if (threadFilter && e.target_thread_for_escalation !== threadFilter) return false;
       if (entityFilter && e.responsible_entity !== entityFilter) return false;
       return true;
     });
-  }, [escalationsData, topicFilter, threadFilter, entityFilter]);
+  }, [escalationsData, dateRange, customStart, topicFilter, threadFilter, entityFilter]);
 
   const allConfirmations = useMemo(() => {
     if (!confirmationsData) return [];
@@ -178,7 +187,9 @@ export function ActivityRoute() {
                 value={entityFilter}
                 onChange={(e) => {
                   setEntityFilter(e.target.value);
+                  setDispatchPage(1);
                   setEscalationPage(1);
+                  setConfirmationPage(1);
                 }}
                 className="h-9 w-36"
               />

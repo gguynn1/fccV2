@@ -514,6 +514,33 @@ describe("Worker", () => {
     expect(runtime.transportCalls[0]?.target_thread).toBe("family");
   });
 
+  it("does not emit shared awareness notices for private health updates", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Health,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_1"],
+        }),
+    });
+
+    await runtime.worker.process({
+      id: "health_private_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1"],
+      target_thread: "participant_1_private",
+      created_at: new Date("2026-04-03T19:10:00.000Z"),
+      content: "Schedule the dentist for next Tuesday",
+    });
+
+    expect(runtime.transportCalls[0]?.target_thread).toBe("participant_1_private");
+    expect(
+      runtime.transportCalls.some(
+        (call) => call.target_thread === "family" || call.target_thread === "couple",
+      ),
+    ).toBe(false);
+  });
+
   it("produces distinct profile-shaped outputs across topics", async () => {
     const service = createTopicProfileService();
     const outputs = await Promise.all(

@@ -20,6 +20,7 @@ import {
 } from "../../02-supporting-services/04-topic-profile-service/04.10-business/types.js";
 import {
   computeRelationshipBackoff,
+  isRelationshipQuietWindow,
   nextRelationshipNudgeEligibleAt,
   selectNextRelationshipNudgeType,
 } from "../../02-supporting-services/04-topic-profile-service/04.11-relationship/profile.js";
@@ -39,6 +40,7 @@ import {
 } from "../../02-supporting-services/04-topic-profile-service/types.js";
 import {
   RoutingRule,
+  ThreadType,
   type RoutingDecision,
   type ThreadHistory,
 } from "../../02-supporting-services/05-routing-service/types.js";
@@ -56,6 +58,12 @@ import {
   type TopicProfileService,
 } from "../../02-supporting-services/types.js";
 import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
+import {
+  getTopicDeliveryPolicy,
+  isThreadAllowedForTopicDelivery,
+  resolveRequesterPrivateThread,
+  type ConfirmationApprovalThreadPolicy,
+} from "../../config/topic-delivery-policy.js";
 import {
   ClarificationReason,
   ClassifierIntent,
@@ -98,6 +106,9 @@ const DEFAULT_MAX_THREAD_HISTORY_MESSAGES = 15;
 const DEFAULT_STALE_AFTER_HOURS = 24;
 const DEFAULT_URGENT_RELEVANCE_MINUTES = 120;
 const HISTORY_LIMIT = 40;
+const NEGATIVE_SIGNAL_PATTERN =
+  /\b(?:not now|quiet|pause|leave me alone|too much|enough|mute|maybe later)\b|^(?:later|stop|stop please|please stop)$/iu;
+const STRESS_SIGNAL_PATTERN = /\b(?:busy|stressed|stressful|overwhelmed|not a good time)\b/iu;
 const CLARIFICATION_PROMPTS = [
   "Which event should I cancel?",
   "What should I move it to?",
@@ -111,6 +122,95 @@ const CLARIFICATION_PROMPTS = [
   "What dates should I use for the trip?",
   "Who should this be for?",
 ];
+
+function parseSamePrecedenceStrategy(raw: string | undefined): SamePrecedenceStrategy {
+  const normalized = raw?.trim().toLowerCase().replace(/\s+/gu, "_");
+  switch (normalized) {
+    case SamePrecedenceStrategy.SpaceOut:
+      return SamePrecedenceStrategy.SpaceOut;
+    case SamePrecedenceStrategy.LatestWins:
+      return SamePrecedenceStrategy.LatestWins;
+    case SamePrecedenceStrategy.Batch:
+    default:
+      return SamePrecedenceStrategy.Batch;
+  }
+}
+
+function isNegativeHumanSignal(content: string): boolean {
+  return NEGATIVE_SIGNAL_PATTERN.test(content.trim().toLowerCase());
+}
+
+function isRelationshipStressSignal(content: string): boolean {
+  return STRESS_SIGNAL_PATTERN.test(content.trim().toLowerCase());
+}
+
+function detectAssistantIntrospectionToken(content: string, threadId: string): string | null {
+  const normalized = content.trim().toLowerCase();
+  if (normalized.includes("what did you see today")) {
+    return "__ingest__";
+  }
+  if (normalized.includes("why did you message me")) {
+    return `__dispatch_reason__:${threadId}`;
+  }
+  if (normalized.includes("what are you holding for later")) {
+    return `__held__:${threadId}`;
+  }
+  return null;
+}
+
+function extractCalendarChangeNotification(content: StackQueueItem["content"]): {
+  change_type: "created" | "updated" | "removed";
+  event_id: string;
+  title: string;
+  concerning: string[];
+  starts_at?: Date;
+  ends_at?: Date;
+  location?: string;
+} | null {
+  if (typeof content !== "object" || content === null) {
+    return null;
+  }
+  if (
+    !("change_type" in content) ||
+    !("event_id" in content) ||
+    !("summary" in content) ||
+    !("concerning" in content)
+  ) {
+    return null;
+  }
+  const changeType = content.change_type;
+  const eventId = content.event_id;
+  const summary = content.summary;
+  const concerning = content.concerning;
+  if (
+    (changeType !== "created" && changeType !== "updated" && changeType !== "removed") ||
+    typeof eventId !== "string" ||
+    typeof summary !== "string" ||
+    !Array.isArray(concerning)
+  ) {
+    return null;
+  }
+  const startsAt =
+    typeof content.starts_at === "string" && content.starts_at.length > 0
+      ? new Date(content.starts_at)
+      : undefined;
+  const endsAt =
+    typeof content.ends_at === "string" && content.ends_at.length > 0
+      ? new Date(content.ends_at)
+      : undefined;
+  return {
+    change_type: changeType,
+    event_id: eventId,
+    title: summary,
+    concerning: concerning.filter((entry): entry is string => typeof entry === "string"),
+    starts_at: startsAt && !Number.isNaN(startsAt.getTime()) ? startsAt : undefined,
+    ends_at: endsAt && !Number.isNaN(endsAt.getTime()) ? endsAt : undefined,
+    location:
+      typeof content.location === "string" && content.location.length > 0
+        ? content.location
+        : undefined,
+  };
+}
 
 const INTERPRETER_RESPONSE_ACTIONS_BY_TOPIC: Record<TopicKey, Set<string>> = {
   [TopicKey.Calendar]: new Set([
@@ -128,7 +228,13 @@ const INTERPRETER_RESPONSE_ACTIONS_BY_TOPIC: Record<TopicKey, Set<string>> = {
   [TopicKey.Travel]: new Set(["query_trips", "create_trip"]),
   [TopicKey.Vendors]: new Set(["query_vendors"]),
   [TopicKey.Business]: new Set(["query_leads"]),
-  [TopicKey.Relationship]: new Set(["query_nudge_history", "dispatch_nudge"]),
+  [TopicKey.Relationship]: new Set([
+    "query_nudge_history",
+    "dispatch_nudge",
+    "respond_to_nudge",
+    "record_nudge_ignored",
+    "set_quiet_window",
+  ]),
   [TopicKey.FamilyStatus]: new Set(["query_status", "update_status"]),
   [TopicKey.Meals]: new Set(["query_plans"]),
   [TopicKey.Maintenance]: new Set(["query_maintenance"]),
@@ -150,7 +256,13 @@ const INTERPRETER_SUPPORTED_ACTIONS_BY_TOPIC: Record<TopicKey, Set<string>> = {
   [TopicKey.Travel]: new Set(["query_trips", "create_trip"]),
   [TopicKey.Vendors]: new Set(["query_vendors", "add_vendor"]),
   [TopicKey.Business]: new Set(["query_leads", "add_lead"]),
-  [TopicKey.Relationship]: new Set(["query_nudge_history", "dispatch_nudge", "respond_to_nudge"]),
+  [TopicKey.Relationship]: new Set([
+    "query_nudge_history",
+    "dispatch_nudge",
+    "respond_to_nudge",
+    "record_nudge_ignored",
+    "set_quiet_window",
+  ]),
   [TopicKey.FamilyStatus]: new Set(["query_status", "update_status"]),
   [TopicKey.Meals]: new Set(["query_plans", "plan_meal"]),
   [TopicKey.Maintenance]: new Set(["query_maintenance", "add_asset"]),
@@ -167,6 +279,16 @@ const INTERPRETER_ACTION_SCHEMA_BY_TYPE: Record<string, z.ZodTypeAny> = {
     title: nonEmptyStringSchema,
     date_start: dateSchema,
     concerning: z.array(nonEmptyStringSchema).min(1),
+  }),
+  notify_calendar_change: z.object({
+    type: z.literal("notify_calendar_change"),
+    change_type: z.enum(["created", "updated", "removed"]),
+    event_id: nonEmptyStringSchema,
+    title: nonEmptyStringSchema,
+    concerning: z.array(nonEmptyStringSchema).min(1),
+    starts_at: dateSchema.optional(),
+    ends_at: dateSchema.optional(),
+    location: nonEmptyStringSchema.optional(),
   }),
   reschedule_event: z.object({
     type: z.literal("reschedule_event"),
@@ -283,6 +405,17 @@ const INTERPRETER_ACTION_SCHEMA_BY_TYPE: Record<string, z.ZodTypeAny> = {
     type: z.literal("respond_to_nudge"),
     acknowledged: z.boolean(),
   }),
+  record_nudge_ignored: z.object({
+    type: z.literal("record_nudge_ignored"),
+    ignored_at: dateSchema,
+  }),
+  set_quiet_window: z.object({
+    type: z.literal("set_quiet_window"),
+    quiet_window: z.object({
+      is_busy_period: z.boolean(),
+      is_stressful_period: z.boolean(),
+    }),
+  }),
   query_status: z.object({
     type: z.literal("query_status"),
     entity: nonEmptyStringSchema.optional(),
@@ -371,7 +504,9 @@ function summarizeContent(content: StackQueueItem["content"]): string {
 function toCollisionPolicy(): CollisionPolicy {
   return {
     precedence_order: runtimeSystemConfig.dispatch.collision_avoidance.precedence_order,
-    same_precedence_strategy: SamePrecedenceStrategy.Batch,
+    same_precedence_strategy: parseSamePrecedenceStrategy(
+      runtimeSystemConfig.dispatch.collision_avoidance.same_precedence_strategy,
+    ),
   };
 }
 
@@ -950,6 +1085,10 @@ export class Worker {
       concerning: effectiveClassification.concerning,
     };
 
+    if (typeof this.budgetService.recordHumanSignal === "function") {
+      await this.budgetService.recordHumanSignal(effectiveQueueItem, effectiveClassification);
+    }
+
     const provisionalTargetThread = await this.routingService.resolveTargetThread({
       topic: effectiveClassification.topic,
       intent: effectiveClassification.intent,
@@ -1488,6 +1627,37 @@ export class Worker {
     const dateHint =
       explicitDateHint ?? this.inferDateFromHistory(threadHistory, content, queueItem.created_at);
     const amountHint = this.resolveAmountHint(content, threadHistory);
+    const introspectionToken =
+      classification.intent === ClassifierIntent.Query
+        ? detectAssistantIntrospectionToken(content, queueItem.target_thread)
+        : null;
+
+    if (introspectionToken) {
+      return {
+        is_response: true,
+        typed_action: { type: "query_status", entity: introspectionToken },
+      };
+    }
+
+    const calendarChange =
+      queueItem.source === QueueItemSource.DataIngest && classification.topic === TopicKey.Calendar
+        ? extractCalendarChangeNotification(queueItem.content)
+        : null;
+    if (calendarChange) {
+      return {
+        is_response: false,
+        typed_action: {
+          type: "notify_calendar_change",
+          change_type: calendarChange.change_type,
+          event_id: calendarChange.event_id,
+          title: calendarChange.title,
+          concerning: calendarChange.concerning,
+          starts_at: calendarChange.starts_at,
+          ends_at: calendarChange.ends_at,
+          location: calendarChange.location,
+        },
+      };
+    }
 
     switch (classification.topic) {
       case TopicKey.Calendar: {
@@ -1830,9 +2000,21 @@ export class Worker {
             typed_action: { type: "dispatch_nudge", nudge_type: NudgeType.ConnectionPrompt },
           };
         }
+        if (isRelationshipStressSignal(content) || isNegativeHumanSignal(content)) {
+          return {
+            is_response: true,
+            typed_action: {
+              type: "set_quiet_window",
+              quiet_window: {
+                is_busy_period: true,
+                is_stressful_period: isRelationshipStressSignal(content),
+              },
+            },
+          };
+        }
         return {
-          is_response: false,
-          typed_action: { type: "respond_to_nudge", acknowledged: true },
+          is_response: true,
+          typed_action: { type: "respond_to_nudge", acknowledged: !isNegativeHumanSignal(content) },
         };
       }
       case TopicKey.FamilyStatus: {
@@ -2562,6 +2744,12 @@ export class Worker {
           thread: queueItem.target_thread,
           content: summarizeContent(queueItem.content),
           response_received: false,
+          quiet_window_valid: isRelationshipQuietWindow(
+            state.relationship.quiet_window ?? {
+              is_busy_period: false,
+              is_stressful_period: false,
+            },
+          ),
         };
         state.relationship.nudge_history.unshift({
           date: now,
@@ -2573,12 +2761,19 @@ export class Worker {
           state.relationship.nudge_history,
           baseCooldownDays,
         );
-        state.relationship.next_nudge_eligible = nextRelationshipNudgeEligibleAt(now, effectiveCooldown);
+        state.relationship.next_nudge_eligible = nextRelationshipNudgeEligibleAt(
+          now,
+          effectiveCooldown,
+        );
         mutated = true;
         break;
       }
       case "respond_to_nudge": {
         state.relationship.last_nudge.response_received = action.acknowledged;
+        state.relationship.quiet_window = {
+          is_busy_period: false,
+          is_stressful_period: false,
+        };
         const unreplied = state.relationship.nudge_history.find((entry) => !entry.responded);
         if (unreplied) {
           unreplied.responded = action.acknowledged;
@@ -2590,7 +2785,45 @@ export class Worker {
           });
         }
         const baseResetCooldown = state.relationship.cooldown_days ?? 5;
-        state.relationship.next_nudge_eligible = nextRelationshipNudgeEligibleAt(now, baseResetCooldown);
+        state.relationship.next_nudge_eligible = nextRelationshipNudgeEligibleAt(
+          now,
+          baseResetCooldown,
+        );
+        mutated = true;
+        break;
+      }
+      case "record_nudge_ignored": {
+        const latest = state.relationship.nudge_history.find((entry) => !entry.responded);
+        if (latest) {
+          latest.ignored = true;
+        } else {
+          state.relationship.nudge_history.unshift({
+            date: action.ignored_at,
+            type: NudgeType.ConnectionPrompt,
+            responded: false,
+            ignored: true,
+          });
+        }
+        state.relationship.last_nudge.response_received = false;
+        const baseCooldownDays = state.relationship.cooldown_days ?? 5;
+        const effectiveCooldown = computeRelationshipBackoff(
+          state.relationship.nudge_history,
+          baseCooldownDays,
+        );
+        state.relationship.next_nudge_eligible = nextRelationshipNudgeEligibleAt(
+          now,
+          effectiveCooldown,
+        );
+        mutated = true;
+        break;
+      }
+      case "set_quiet_window": {
+        state.relationship.quiet_window = action.quiet_window;
+        const baseCooldownDays = state.relationship.cooldown_days ?? 5;
+        state.relationship.next_nudge_eligible = nextRelationshipNudgeEligibleAt(
+          now,
+          baseCooldownDays,
+        );
         mutated = true;
         break;
       }
@@ -2771,6 +3004,15 @@ export class Worker {
           })
           .join("\n")}`;
       }
+      case "notify_calendar_change": {
+        const when = action.starts_at ? ` on ${action.starts_at.toLocaleString()}` : "";
+        const location = action.location ? ` at ${action.location}` : "";
+        const audience =
+          action.concerning.length > 0
+            ? ` for ${action.concerning.map((entityId) => entityLabel(entityId)).join(", ")}`
+            : "";
+        return `Calendar ${action.change_type}: ${action.title}${when}${location}${audience}.`;
+      }
       case "query_chores": {
         if (state.chores.active.length === 0) return "No active chores right now.";
         return `Active chores:\n${state.chores.active
@@ -2922,7 +3164,8 @@ export class Worker {
           ],
         };
         const prompts = nudgePrompts[action.nudge_type] ?? nudgePrompts[NudgeType.ConnectionPrompt];
-        const prompt = prompts[state.relationship.nudge_history.length % prompts.length] ?? prompts[0];
+        const prompt =
+          prompts[state.relationship.nudge_history.length % prompts.length] ?? prompts[0];
         return prompt;
       }
       case "query_nudge_history": {
@@ -2930,9 +3173,63 @@ export class Worker {
           return "No relationship nudges in history.";
         return `Nudge history: ${state.relationship.nudge_history.length} item(s).`;
       }
+      case "record_nudge_ignored":
+      case "set_quiet_window": {
+        return "Understood. I will keep relationship nudges quiet for now.";
+      }
       case "query_status": {
         if (action.entity === "__digest__") {
           return this.composeDigestMessage(state);
+        }
+        if (action.entity === "__ingest__") {
+          const processed = [
+            ...state.data_ingest_state.email_monitor.processed.slice(-3),
+            ...state.data_ingest_state.forwarded_messages.processed.slice(-3),
+            ...state.data_ingest_state.calendar_sync.processed.slice(-3),
+          ]
+            .sort((left, right) => left.received_at.getTime() - right.received_at.getTime())
+            .slice(-6);
+          if (processed.length === 0) {
+            return "I have not ingested anything recently.";
+          }
+          return `Recently ingested:\n${processed
+            .map((entry) => {
+              const origin = entry.origin ?? "unknown";
+              const topic = entry.topic_classified ?? "unclassified";
+              const status = entry.status ?? "processed";
+              return `- ${origin}: ${topic} (${status})`;
+            })
+            .join("\n")}`;
+        }
+        if (action.entity?.startsWith("__dispatch_reason__:")) {
+          const threadId = action.entity.slice("__dispatch_reason__:".length);
+          const recentForThread = state.queue.recently_dispatched.filter(
+            (entry) => entry.target_thread === threadId,
+          );
+          const latest = recentForThread[0];
+          if (!latest) {
+            return "I have not sent anything to this thread recently.";
+          }
+          const pendingCount = state.queue.pending.filter(
+            (entry) => entry.target_thread === threadId,
+          ).length;
+          return `I recently messaged this thread about ${latest.topic}. Latest content: ${latest.content}${pendingCount > 0 ? ` I am also holding ${pendingCount} item(s) for later in this thread.` : ""}`;
+        }
+        if (action.entity?.startsWith("__held__:")) {
+          const threadId = action.entity.slice("__held__:".length);
+          const heldItems = state.queue.pending.filter((entry) => entry.target_thread === threadId);
+          if (heldItems.length === 0) {
+            return "I am not holding anything for later in this thread.";
+          }
+          return `Held for later:\n${heldItems
+            .slice(0, 6)
+            .map((entry) => {
+              const holdUntil =
+                entry.hold_until instanceof Date ? entry.hold_until.toLocaleString() : "later";
+              const topic = entry.topic ?? TopicKey.FamilyStatus;
+              return `- ${topic} until ${holdUntil}`;
+            })
+            .join("\n")}`;
         }
         if (state.family_status.current.length === 0) return "No current family status entries.";
         return `Family status:\n${state.family_status.current
@@ -3009,17 +3306,32 @@ export class Worker {
       return { kind: "none", metadata: {} };
     }
 
+    const approvalThreadPolicy = this.confirmationApprovalPolicyForAction(
+      confirmationType,
+      queueItem,
+      targetThread,
+    );
     const confirmation = await this.confirmationService.openConfirmation({
       type: confirmationType,
       action: action.type,
       requested_action_payload: action,
       requested_by: queueItem.concerning[0] ?? getDefaultHumanEntityId(),
       requested_in_thread: targetThread,
+      origin_thread: queueItem.target_thread,
+      approval_thread_policy: approvalThreadPolicy,
       expires_at: new Date(
         queueItem.created_at.getTime() + this.config.clarification_timeout_minutes * 60_000,
       ),
     });
-    const prompt = `Please confirm: ${action.type.replaceAll("_", " ")}. Reply yes or no.`;
+    const requesterPrivateThread = resolveRequesterPrivateThread(
+      queueItem.concerning[0] ?? getDefaultHumanEntityId(),
+    );
+    const prompt =
+      approvalThreadPolicy === "requester_private_allowed" &&
+      requesterPrivateThread &&
+      requesterPrivateThread !== targetThread
+        ? `Please confirm: ${action.type.replaceAll("_", " ")}. Reply yes or no here or in your private thread.`
+        : `Please confirm: ${action.type.replaceAll("_", " ")}. Reply yes or no.`;
     await this.persistSystemDispatch({
       queue_item: queueItem,
       classification,
@@ -3030,8 +3342,27 @@ export class Worker {
     });
     return {
       kind: "confirmation_prompted",
-      metadata: { confirmation_id: confirmation.id, target_thread: targetThread },
+      metadata: {
+        confirmation_id: confirmation.id,
+        target_thread: targetThread,
+        approval_thread_policy: approvalThreadPolicy,
+      },
     };
+  }
+
+  private confirmationApprovalPolicyForAction(
+    confirmationType: ConfirmationActionType,
+    queueItem: StackQueueItem,
+    targetThread: string,
+  ): ConfirmationApprovalThreadPolicy {
+    if (
+      confirmationType === ConfirmationActionType.SendingOnBehalf &&
+      !targetThread.endsWith("_private") &&
+      resolveRequesterPrivateThread(queueItem.concerning[0] ?? getDefaultHumanEntityId()) !== null
+    ) {
+      return "requester_private_allowed";
+    }
+    return "exact_thread";
   }
 
   private confirmationTypeForAction(action: TopicAction): ConfirmationActionType | null {
@@ -3295,7 +3626,8 @@ export class Worker {
         identity,
         action: candidateAction,
       };
-      return this.actionRouter.route(workerDecision, toCollisionPolicy());
+      const routedAction = await this.actionRouter.route(workerDecision, toCollisionPolicy());
+      return this.enforceDispatchPolicy(queueItem, classification, routedAction, routingDecision);
     }
 
     if (budget.priority === DispatchPriority.Silent) {
@@ -3311,15 +3643,101 @@ export class Worker {
         budget.reason,
       );
     }
-    return {
-      decision: "dispatch",
-      outbound: {
-        target_thread: routingDecision.target.thread_id,
-        content: composedMessage,
-        priority: budget.priority,
-        concerning: queueItem.concerning,
+    return this.enforceDispatchPolicy(
+      queueItem,
+      classification,
+      {
+        decision: "dispatch",
+        outbound: {
+          target_thread: routingDecision.target.thread_id,
+          content: composedMessage,
+          priority: budget.priority,
+          concerning: queueItem.concerning,
+        },
       },
-    };
+      routingDecision,
+    );
+  }
+
+  private enforceDispatchPolicy(
+    queueItem: StackQueueItem,
+    classification: StackClassificationResult,
+    action: ActionRouterResult,
+    routingDecision: RoutingDecision,
+  ): ActionRouterResult {
+    if (action.decision !== "dispatch") {
+      return action;
+    }
+
+    const deliveryKind =
+      routingDecision.target.rule_applied === RoutingRule.ResponseInPlace
+        ? "response"
+        : "proactive";
+    const targetThread = action.outbound.target_thread;
+    if (
+      isThreadAllowedForTopicDelivery({
+        topic: classification.topic,
+        thread_id: targetThread,
+        concerning: queueItem.concerning,
+        delivery_kind: deliveryKind,
+      })
+    ) {
+      return action;
+    }
+
+    const safePrivateThread = this.resolveSafePrivateThread(queueItem.concerning);
+    if (
+      safePrivateThread &&
+      safePrivateThread !== targetThread &&
+      isThreadAllowedForTopicDelivery({
+        topic: classification.topic,
+        thread_id: safePrivateThread,
+        concerning: queueItem.concerning,
+        delivery_kind: deliveryKind,
+      })
+    ) {
+      this.logger.warn(
+        {
+          queue_item_id: extractQueueItemId(queueItem),
+          topic: classification.topic,
+          blocked_thread: targetThread,
+          rerouted_thread: safePrivateThread,
+        },
+        "Outbound rerouted to a safer private thread by topic delivery policy.",
+      );
+      return {
+        decision: "dispatch",
+        outbound: {
+          ...action.outbound,
+          target_thread: safePrivateThread,
+        },
+      };
+    }
+
+    this.logger.warn(
+      {
+        queue_item_id: extractQueueItemId(queueItem),
+        topic: classification.topic,
+        blocked_thread: targetThread,
+      },
+      "Outbound blocked by topic delivery policy.",
+    );
+    return this.toStoreAction(
+      { ...queueItem, target_thread: targetThread },
+      `Outbound blocked by topic delivery policy for ${classification.topic}.`,
+    );
+  }
+
+  private resolveSafePrivateThread(concerning: string[]): string | null {
+    if (concerning.length !== 1) {
+      return null;
+    }
+    const only = concerning[0];
+    if (!only) {
+      return null;
+    }
+    const candidate = `${only}_private`;
+    return runtimeSystemConfig.threads.some((thread) => thread.id === candidate) ? candidate : null;
   }
 
   private async persistSystemDispatch(input: {
@@ -3479,7 +3897,6 @@ export class Worker {
     TopicKey.Meals,
     TopicKey.Travel,
     TopicKey.Maintenance,
-    TopicKey.Health,
   ]);
 
   private static readonly SHARED_AWARENESS_INTENTS = new Set<ClassifierIntent>([
@@ -3567,6 +3984,10 @@ export class Worker {
     if (!Worker.SHARED_AWARENESS_TOPICS.has(classification.topic)) {
       return;
     }
+    const policy = getTopicDeliveryPolicy(classification.topic);
+    if (policy.awareness_policy === "none") {
+      return;
+    }
     if (!Worker.SHARED_AWARENESS_INTENTS.has(classification.intent)) {
       return;
     }
@@ -3589,13 +4010,25 @@ export class Worker {
     if (hasRecentAwareness) {
       return;
     }
+    if (
+      !isThreadAllowedForTopicDelivery({
+        topic: classification.topic,
+        thread_id: narrowestShared,
+        concerning: queueItem.concerning,
+        delivery_kind: "awareness",
+      })
+    ) {
+      return;
+    }
 
-    const topicLabel = runtimeSystemConfig.topics[classification.topic]?.label ?? classification.topic;
-    const intentLabel = classification.intent === ClassifierIntent.Cancellation
-      ? "cancelled"
-      : classification.intent === ClassifierIntent.Completion
-        ? "completed"
-        : "updated";
+    const topicLabel =
+      runtimeSystemConfig.topics[classification.topic]?.label ?? classification.topic;
+    const intentLabel =
+      classification.intent === ClassifierIntent.Cancellation
+        ? "cancelled"
+        : classification.intent === ClassifierIntent.Completion
+          ? "completed"
+          : "updated";
     const notice = `${topicLabel} update: an item was ${intentLabel}.`;
 
     const outbound: DispatchAction = {
@@ -3626,7 +4059,7 @@ export class Worker {
 
   private resolveNarrowestSharedThread(concerning: string[]): string | null {
     const sharedThreads = runtimeSystemConfig.threads
-      .filter((thread) => thread.type === "shared")
+      .filter((thread) => thread.type === ThreadType.Shared)
       .filter((thread) => concerning.every((entity) => thread.participants.includes(entity)))
       .sort((a, b) => a.participants.length - b.participants.length);
     return sharedThreads[0]?.id ?? null;

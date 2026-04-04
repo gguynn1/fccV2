@@ -14,6 +14,7 @@ During the processing sequence, the Worker reads state to inform its decisions:
 - **Outbound budget tracker** — messages sent per person and per thread. Used by the budget check (step 4) to decide whether to send, batch, or hold.
 - **Per-topic records** — calendar events, chore assignments, bills, grocery list, health profiles, school assignments, travel plans, vendor records, business leads, relationship nudge history, family status snapshots, meal plans, dietary notes, maintenance assets and schedules. Used by the behavior profile step (step 7) to compose contextually accurate messages.
 - **Digest history** — what was included in the last digest for each person. Used to avoid repeating information and to build the next digest.
+- **Ingest provenance/state** — monitored inbox history, forwarded-message processing, and calendar-sync records. Used for explanation-style responses and conservative ingest handling.
 
 ## What the Worker Writes
 
@@ -25,6 +26,7 @@ After the processing sequence completes, the Worker writes back:
 - **Confirmation state** — creates pending confirmations or resolves existing ones based on incoming responses.
 - **Thread history** — appends the assistant's outbound message to the thread's recent_messages.
 - **Budget tracker** — increments the outbound counters for the target person and thread.
+- **Ingest state and explanation surfaces** — records what was seen and how it was handled so later queries like “what did you see today?” and “what are you holding for later?” can be answered from state.
 
 ## State Is the System's Memory
 

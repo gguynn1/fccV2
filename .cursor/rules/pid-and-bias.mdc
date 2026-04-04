@@ -22,7 +22,7 @@ If you encounter a new real name, flag it — do not guess the substitution.
 
 ## Platform-Neutral Language
 
-The system describes capabilities, not specific products or brands.
+Prefer capability-first language in product descriptions, user-facing explanations, and architecture narratives. When documenting actual implementation dependencies, provider APIs, environment variables, or webhook behavior, use the real product name where precision matters.
 
 | Avoid                   | Use instead                           |
 | ----------------------- | ------------------------------------- |

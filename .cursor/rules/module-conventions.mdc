@@ -18,12 +18,17 @@ This project uses ECMAScript Modules (`"type": "module"`). `verbatimModuleSyntax
 import { TopicKey } from "../../types";
 // ✅ Correct
 import { TopicKey } from "../../types.js";
-// ❌ Non-type import used only as a type
-
+// ❌ Value import used only as a type
+import { SystemConfig } from "./index.js";
 // ✅ Correct
-import { SystemConfig, type SystemConfig } from "./index.js";
+import type { SystemConfig } from "./index.js";
 ```
 
 ## Enums Over String Literals
 
 All classified values use their enum. Never use raw strings where an enum exists.
+
+## Type-Only vs Value Imports
+
+- Import shared enums from `src/types.ts` as **value imports** when they are used at runtime, such as `z.nativeEnum(...)`, switch cases, comparisons, or default maps.
+- Use `import type` only when a symbol is referenced purely in a type position.

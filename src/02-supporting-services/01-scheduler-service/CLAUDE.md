@@ -9,6 +9,7 @@ morning digests (BullMQ repeatable cron job)
 evening check-ins (BullMQ repeatable cron job)
 policy-driven proactive queue items from topic configuration (follow-ups, nudges, reminders)
 stale/relevance filtering before enqueue
+relationship quiet-window suppression before nudge emission
 
 Owned by other services:
 escalation deadlines and step timers — escalation service
@@ -44,3 +45,12 @@ DEFAULT STATE
   It earns the right to speak
   by being useful when it does
 ```
+
+## Policy-driven items
+
+The scheduler currently produces more than digests:
+
+- held-item release back into the main queue when `hold_until` matures
+- calendar follow-up windows
+- health post-visit follow-ups
+- relationship nudges when `next_nudge_eligible` is reached **and** the relationship quiet window is not marked busy or stressful

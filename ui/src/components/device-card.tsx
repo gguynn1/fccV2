@@ -39,6 +39,9 @@ function MessageBubble({
   message: EmulationMessage;
   isOwnMessage: boolean;
 }) {
+  const visibleContent =
+    message.content.trim().length > 0 ? message.content : message.preview_label;
+
   return (
     <div className={cn("flex w-full", isOwnMessage ? "justify-end" : "justify-start")}>
       <div
@@ -47,7 +50,7 @@ function MessageBubble({
           isOwnMessage ? "bg-blue-600 text-white" : "bg-muted text-foreground",
         )}
       >
-        <p className="whitespace-pre-wrap break-words">{message.preview_label}</p>
+        <p className="whitespace-pre-wrap break-words">{visibleContent}</p>
         <p
           className={cn(
             "mt-1 text-[10px]",

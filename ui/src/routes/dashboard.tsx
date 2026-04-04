@@ -62,7 +62,7 @@ export function DashboardRoute() {
     return <p className="text-sm text-muted-foreground">Loading dashboard…</p>;
   }
 
-  const { queue, escalations, confirmations, dispatches, budget, system } = data;
+  const { queue, escalations, confirmations, dispatches, budget_usage, budget, system } = data;
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
@@ -75,6 +75,14 @@ export function DashboardRoute() {
   ).length;
 
   const budgetCap = budget.dispatch.outbound_budget.max_unprompted_per_person_per_day;
+  const perPersonUsage = Object.entries(budget_usage.outbound_budget_tracker.by_person)
+    .map(([entityId, usage]) => ({
+      entityId,
+      sent: usage.unprompted_sent,
+      max: usage.max,
+      ratio: usage.max > 0 ? usage.unprompted_sent / usage.max : 0,
+    }))
+    .sort((left, right) => right.ratio - left.ratio)[0];
 
   const queueVariant: "success" | "warning" | "destructive" =
     queueDepth === 0 ? "success" : queueDepth < 10 ? "warning" : "destructive";
@@ -91,7 +99,7 @@ export function DashboardRoute() {
         : "active"
       : undefined;
 
-  const budgetUsageRatio = budgetCap > 0 ? dispatchedToday / budgetCap : 0;
+  const budgetUsageRatio = perPersonUsage?.ratio ?? 0;
   const budgetVariant: "success" | "warning" | "destructive" =
     budgetUsageRatio >= 1 ? "destructive" : budgetUsageRatio >= 0.75 ? "warning" : "success";
 
@@ -143,7 +151,9 @@ export function DashboardRoute() {
           to="/activity"
           variant={budgetVariant}
           badge={
-            budgetUsageRatio >= 0.75 ? `${Math.round(budgetUsageRatio * 100)}% of cap` : undefined
+            budgetUsageRatio >= 0.75 && perPersonUsage
+              ? `${perPersonUsage.entityId}: ${perPersonUsage.sent}/${perPersonUsage.max}`
+              : undefined
           }
         />
 

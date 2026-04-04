@@ -6,7 +6,7 @@ This folder contains the current eval implementation. It is a local sequential r
 
 - `cli.ts` is the entrypoint. Valid commands are `run`, `list`, and `generate-set`. Used by `npm run eval`, `npm run eval:run`, `npm run eval:run:worker`, `npm run eval:run:fixture`, `npm run eval:list`, and `npm run eval:generate-set`. The `watch` and `coverage` commands are not yet implemented and throw with a clear message.
 - `runners/sequential-runner.ts` runs one scenario at a time, persists JSON run state, appends structured logs, and writes the final markdown artifact.
-- `scenarios/` contains the current scenario schema and the default scenario set.
+- `scenarios/` contains the current scenario schema and the default scenario set, including trust-focused cases for private health routing, scoped relationship behavior, and other thread-sensitive flows.
 - `scenarios/SCENARIO_SETS.md` explains how to author realistic scenario sets and where generated scaffolds should live.
 - `scenarios/generate-set.ts` creates UI-generated scaffolds in `eval/scenarios/generated/` with 18 templates per file covering all 14 topics plus 4 cross-domain variants. Each generation varies messages via a hash-based variant selector.
 - `tuner/diagnose.ts` decides whether a failure is prompt-fixable or needs investigation.
@@ -17,22 +17,22 @@ This folder contains the current eval implementation. It is a local sequential r
 
 Each run records a **fidelity** value on `EvalRunState` and surfaces it in JSON and markdown artifacts (for example a `Fidelity:` line in the prompt markdown). There are three levels:
 
-| Fidelity        | Typical modes                         | What it approximates |
-| --------------- | ------------------------------------- | --------------------- |
-| `simulation`    | `simulator`, `fixture-interpreter`    | Fast, deterministic paths without live model classification. |
-| `worker-replay` | `worker` (default)                    | Worker pipeline with in-memory services and real persisted config behavior. |
-| `high-fidelity` | `live-classifier`                     | Live Anthropic classification (and downstream behavior for that path). |
+| Fidelity        | Typical modes                      | What it approximates                                                        |
+| --------------- | ---------------------------------- | --------------------------------------------------------------------------- |
+| `simulation`    | `simulator`, `fixture-interpreter` | Fast, deterministic paths without live model classification.                |
+| `worker-replay` | `worker` (default)                 | Worker pipeline with in-memory services and real persisted config behavior. |
+| `high-fidelity` | `live-classifier`                  | Live Anthropic classification (and downstream behavior for that path).      |
 
 Mode-to-fidelity mapping is defined in `runners/sequential-runner.ts` when constructing run state.
 
 ## Execution modes
 
 - **`simulator`**: Deterministic keyword matching via `inferTopic()` for classification-style behavior; reads configuration from the persisted SQLite-backed state service.
-- **`worker`** (CLI default): Worker replay harness with **real service implementations** for the worker path: in-memory budget, escalation, and confirmation services enforce the same limits and gates as production config—they are not pass-through stubs.
+- **`worker`** (CLI default): Worker replay harness over the real Worker orchestration, real routing service, real topic-profile service, and the active runtime config. Supporting services such as budget, escalation, confirmation, state, and transport are **in-memory replay doubles**, not the full production Redis/BullMQ/SQLite stack.
 - **`fixture-interpreter`**: Deterministic interpreter fixtures for structured action expectations (`simulation.interpreter_fixture`).
 - **`live-classifier`**: Live Anthropic API for classification (high-fidelity; non-deterministic).
 
-Multi-turn scenarios follow the simulator path regardless of `--mode`.
+Multi-turn scenarios use worker replay when `worker` or `fixture-interpreter` mode is active; otherwise they use the simulator path.
 
 ## Current Behavior
 
@@ -47,7 +47,7 @@ Multi-turn scenarios follow the simulator path regardless of `--mode`.
 
 - Worker replay is the default path but is still not equivalent to full production integration replay (e.g. full Redis/BullMQ stack).
 - Fixture interpreter mode is deterministic by design and does not exercise live model variance.
-- Multi-turn scenarios always use the simulator path regardless of the `--mode` flag.
+- Worker replay uses in-memory doubles for budget, escalation, confirmation, and transport, so service-level timing and persistence behavior can still diverge from the live stack.
 
 ## UI Integration
 

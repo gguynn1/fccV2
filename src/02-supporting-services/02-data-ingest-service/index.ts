@@ -15,6 +15,7 @@ import {
   QueueItemSource,
   TopicKey,
 } from "../../types.js";
+import type { CalendarEvent } from "../04-topic-profile-service/04.01-calendar/types.js";
 import type { DataIngestService as DataIngestServiceContract, StateService } from "../types.js";
 import {
   DataIngestSourceType,
@@ -79,6 +80,18 @@ interface IngestEnvelope {
 interface AttributedEntity {
   concerning: string[];
   target_thread: string;
+  uncertain?: boolean;
+}
+
+interface CalendarSyncSnapshot {
+  id: string;
+  summary: string;
+  concerning: string[];
+  location?: string;
+  starts_at?: string;
+  ends_at?: string;
+  status?: string;
+  fingerprint: string;
 }
 
 interface NormalizedImapConfig {
@@ -538,7 +551,10 @@ export class DataIngestService implements DataIngestServiceContract {
       processed_at: new Date(),
       queue_item_created: (baseEmailItem as { id?: string }).id,
       topic_classified: classification.topic,
-      status: this.isStale(extracted, message.received_at, new Date()) ? "stored_silent" : "queued",
+      status:
+        attribution.uncertain || this.isStale(extracted, message.received_at, new Date())
+          ? "stored_silent"
+          : "queued",
     });
 
     return items;
@@ -646,6 +662,7 @@ export class DataIngestService implements DataIngestServiceContract {
 
   private calendarSyncTimer: ReturnType<typeof setInterval> | null = null;
   private calendarSyncWatermark: string | null = null;
+  private calendarSyncSnapshots = new Map<string, CalendarSyncSnapshot>();
 
   public startCalendarSync(caldavPort: number = 3001): void {
     const calendarSource = this.config.sources.find(
@@ -656,15 +673,19 @@ export class DataIngestService implements DataIngestServiceContract {
       return;
     }
 
-    const intervalMinutes = (calendarSource.config as { sync_interval_minutes?: number })?.sync_interval_minutes ?? 10;
+    const intervalMinutes =
+      (calendarSource.config as { sync_interval_minutes?: number })?.sync_interval_minutes ?? 10;
     this.logger.info(
       { interval_minutes: intervalMinutes, port: caldavPort },
-      "Starting calendar sync polling against local CalDAV endpoint.",
+      "Starting calendar sync polling against local calendar state.",
     );
 
-    this.calendarSyncTimer = setInterval(() => {
-      void this.pollCalendarChanges(caldavPort);
-    }, intervalMinutes * 60 * 1000);
+    this.calendarSyncTimer = setInterval(
+      () => {
+        void this.pollCalendarChanges(caldavPort);
+      },
+      intervalMinutes * 60 * 1000,
+    );
 
     void this.pollCalendarChanges(caldavPort);
   }
@@ -676,64 +697,167 @@ export class DataIngestService implements DataIngestServiceContract {
     }
   }
 
-  private async pollCalendarChanges(caldavPort: number): Promise<void> {
+  private async pollCalendarChanges(_caldavPort: number): Promise<void> {
     try {
-      const response = await fetch(`http://localhost:${caldavPort}/calendars/`, {
-        method: "PROPFIND",
-        headers: { "Content-Type": "application/xml", Depth: "1" },
-        body: `<?xml version="1.0" encoding="utf-8"?>
-<d:propfind xmlns:d="DAV:">
-  <d:prop><d:getlastmodified/><d:displayname/></d:prop>
-</d:propfind>`,
-      });
+      const state = await this.stateService.getSystemState();
+      const currentSnapshots = this.buildCalendarSnapshots(state.calendar.events);
+      const currentWatermark = this.computeCalendarSyncWatermark(currentSnapshots);
+      if (this.calendarSyncWatermark === null) {
+        this.calendarSyncSnapshots = currentSnapshots;
+        this.calendarSyncWatermark = currentWatermark;
+        this.logger.info("Calendar sync: initial event manifest captured.");
+        return;
+      }
+      if (this.calendarSyncWatermark === currentWatermark) {
+        return;
+      }
 
-      if (!response.ok) {
+      const changes: Array<{
+        change_type: "created" | "updated" | "removed";
+        snapshot: CalendarSyncSnapshot;
+      }> = [];
+      for (const [eventId, snapshot] of currentSnapshots.entries()) {
+        const previous = this.calendarSyncSnapshots.get(eventId);
+        if (!previous) {
+          changes.push({ change_type: "created", snapshot });
+          continue;
+        }
+        if (previous.fingerprint !== snapshot.fingerprint) {
+          changes.push({ change_type: "updated", snapshot });
+        }
+      }
+      for (const [eventId, snapshot] of this.calendarSyncSnapshots.entries()) {
+        if (!currentSnapshots.has(eventId)) {
+          changes.push({ change_type: "removed", snapshot });
+        }
+      }
+
+      this.calendarSyncSnapshots = currentSnapshots;
+      this.calendarSyncWatermark = currentWatermark;
+      if (changes.length === 0) {
+        return;
+      }
+      if (!this.queueService) {
         this.logger.warn(
-          { status: response.status },
-          "CalDAV PROPFIND request failed during calendar sync.",
+          "Calendar sync: no queue service available to enqueue event-level changes.",
         );
         return;
       }
 
-      const body = await response.text();
-      const currentHash = Buffer.from(body).toString("base64").slice(0, 32);
-
-      if (this.calendarSyncWatermark === currentHash) {
-        return;
+      for (const change of changes) {
+        const queueItem = this.buildCalendarSyncQueueItem(change.change_type, change.snapshot);
+        await this.queueService.enqueue(queueItem);
+        await this.recordProcessed("calendar_sync", {
+          source_id: change.snapshot.id,
+          received_at: new Date(),
+          processed_at: new Date(),
+          queue_item_created: (queueItem as { id?: string }).id,
+          topic_classified: TopicKey.Calendar,
+          status: "queued",
+        });
       }
-
-      const previousWatermark = this.calendarSyncWatermark;
-      this.calendarSyncWatermark = currentHash;
-
-      if (previousWatermark === null) {
-        this.logger.info("Calendar sync: initial watermark captured.");
-        return;
-      }
-
-      if (!this.queueService) {
-        this.logger.warn("Calendar sync: no queue service available to enqueue changes.");
-        return;
-      }
-
-      const queueItem: StackQueueItem = {
-        source: QueueItemSource.DataIngest,
-        content: "Calendar data changed (detected via CalDAV sync).",
-        concerning: [],
-        target_thread: "family",
-        created_at: new Date(),
-        topic: TopicKey.Calendar,
-        intent: ClassifierIntent.Update,
-        idempotency_key: `calendar_sync:${currentHash}`,
-      };
-
-      await this.queueService.enqueue(queueItem);
-      this.logger.info("Calendar sync: change detected, queued calendar update item.");
+      this.logger.info(
+        {
+          created: changes.filter((change) => change.change_type === "created").length,
+          updated: changes.filter((change) => change.change_type === "updated").length,
+          removed: changes.filter((change) => change.change_type === "removed").length,
+        },
+        "Calendar sync: event-level changes detected and queued.",
+      );
     } catch (error: unknown) {
       this.logger.warn(
         { err: error instanceof Error ? error.message : String(error) },
         "Calendar sync poll failed.",
       );
     }
+  }
+
+  private buildCalendarSnapshots(events: CalendarEvent[]): Map<string, CalendarSyncSnapshot> {
+    return new Map(events.map((event) => [event.id, this.toCalendarSyncSnapshot(event)]));
+  }
+
+  private computeCalendarSyncWatermark(snapshots: Map<string, CalendarSyncSnapshot>): string {
+    return [...snapshots.values()]
+      .map((snapshot) => `${snapshot.id}:${snapshot.fingerprint}`)
+      .sort((left, right) => left.localeCompare(right))
+      .join("|");
+  }
+
+  private toCalendarSyncSnapshot(event: CalendarEvent): CalendarSyncSnapshot {
+    const startsAt =
+      event.date_start instanceof Date
+        ? event.date_start.toISOString()
+        : event.date instanceof Date
+          ? event.date.toISOString()
+          : undefined;
+    const endsAt = event.date_end instanceof Date ? event.date_end.toISOString() : undefined;
+    const fingerprint = JSON.stringify({
+      id: event.id,
+      title: event.title,
+      concerning: event.concerning,
+      status: event.status,
+      starts_at: startsAt ?? null,
+      ends_at: endsAt ?? null,
+      location: event.location ?? null,
+    });
+    return {
+      id: event.id,
+      summary: event.title,
+      concerning: [...event.concerning],
+      location: event.location ?? undefined,
+      starts_at: startsAt,
+      ends_at: endsAt,
+      status: event.status,
+      fingerprint,
+    };
+  }
+
+  private buildCalendarSyncQueueItem(
+    changeType: "created" | "updated" | "removed",
+    snapshot: CalendarSyncSnapshot,
+  ): StackQueueItem {
+    const targetThread = this.resolveCalendarTargetThread(snapshot.concerning);
+    const concerning =
+      snapshot.concerning.length > 0
+        ? snapshot.concerning
+        : this.resolveThreadParticipants(targetThread);
+    return {
+      id: queueItemId(`calendar_sync_${changeType}`, snapshot.id),
+      source: QueueItemSource.DataIngest,
+      content: {
+        summary: snapshot.summary,
+        change_type: changeType,
+        event_id: snapshot.id,
+        starts_at: snapshot.starts_at ?? "",
+        ends_at: snapshot.ends_at ?? "",
+        location: snapshot.location ?? "",
+        concerning,
+      },
+      concerning,
+      target_thread: targetThread,
+      created_at: new Date(),
+      topic: TopicKey.Calendar,
+      intent: changeType === "removed" ? ClassifierIntent.Cancellation : ClassifierIntent.Update,
+      priority: DispatchPriority.Batched,
+      idempotency_key: `calendar_sync:${changeType}:${snapshot.id}:${snapshot.fingerprint}`,
+    };
+  }
+
+  private resolveCalendarTargetThread(concerning: string[]): string {
+    if (concerning.length === 0) {
+      return "family";
+    }
+    if (concerning.length === 1) {
+      const privateThread = `${concerning[0]}_private`;
+      if (runtimeSystemConfig.threads.some((thread) => thread.id === privateThread)) {
+        return privateThread;
+      }
+    }
+    const narrowestShared = runtimeSystemConfig.threads
+      .filter((thread) => thread.participants.length > 1)
+      .filter((thread) => concerning.every((entityId) => thread.participants.includes(entityId)))
+      .sort((left, right) => left.participants.length - right.participants.length)[0];
+    return narrowestShared?.id ?? "family";
   }
 
   private isImapConfigured(): boolean {
@@ -880,9 +1004,10 @@ export class DataIngestService implements DataIngestServiceContract {
       topic: classification.topic,
       intent: classification.intent,
       idempotency_key: `email:${message.inbox_address}:${message.message_id}`,
-      priority: this.isStale(extracted, message.received_at, new Date())
-        ? DispatchPriority.Silent
-        : DispatchPriority.Batched,
+      priority:
+        attribution.uncertain || this.isStale(extracted, message.received_at, new Date())
+          ? DispatchPriority.Silent
+          : DispatchPriority.Batched,
     } satisfies StackQueueItem & { priority: DispatchPriority };
 
     return item;
@@ -972,12 +1097,20 @@ export class DataIngestService implements DataIngestServiceContract {
     }
 
     // Shared inbox fallback keeps the item visible without pretending we know the owner.
-    const adults = runtimeSystemConfig.entities
-      .filter((entity) => entity.type !== EntityType.Pet && entity.messaging_identity !== null)
-      .map((entity) => entity.id);
+    const operator = runtimeSystemConfig.entities.find(
+      (entity) => entity.type === EntityType.Adult && entity.messaging_identity !== null,
+    );
+    if (operator) {
+      return {
+        concerning: [operator.id],
+        target_thread: `${operator.id}_private`,
+        uncertain: true,
+      };
+    }
     return {
-      concerning: adults.slice(0, 2),
+      concerning: [],
       target_thread: "family",
+      uncertain: true,
     };
   }
 

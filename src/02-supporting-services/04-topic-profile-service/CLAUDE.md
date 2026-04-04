@@ -26,3 +26,9 @@ The topics are: Calendar, Chores, Finances, Grocery, Health, Pets, School, Trave
 - **Escalation level** — high (chores, finances), medium (school, health, calendar, travel), low (relationship, pets, family status, maintenance), or none (grocery, vendors, business, meals).
 - **Framework grounding** — certain topics draw on established frameworks. Relationship draws on Internal Family Systems Therapy, emotionally focused therapy, and attachment-based connection practices. The assistant uses these to inform the quality of its nudges, not to act as a therapist.
 - **Response format** — lists for grocery, snapshots with numbers for finances, open-ended prompts for relationship, structured confirmations for calendar, clear task statements for chores, meal plans with grocery links for meals, schedules and history logs for maintenance.
+
+## What This Service Does Not Own
+
+Topic profile is not the executable delivery-policy layer.
+
+Privacy scope, allowed and denied threads, shared-awareness rules, confirmation approval-thread defaults, per-topic notification quotas, and quiet-hour hints are enforced by `src/config/topic-delivery-policy.ts` and consumed by routing, worker dispatch safety, budget, transport, and confirmation behavior.

@@ -21,7 +21,8 @@ ACTION ROUTER (decision: store)
 - Silent rows **do not notify** by default. They appear when:
   - a participant asks a query the Worker resolves against state,
   - an admin or tooling reads SQLite-backed tables,
-  - a downstream digest job explicitly includes stored summaries per policy.
+  - a downstream digest job explicitly includes stored summaries per policy,
+  - an explanation-style request asks what was ingested, why something was sent, or what is being held for later.
 
 ## Distinction from Hold
 

@@ -89,6 +89,11 @@ export function BudgetRoute() {
               />
             </div>
           </div>
+          {budget.quiet_hours && (
+            <div className="mt-3 text-xs text-muted-foreground">
+              Quiet hours: {budget.quiet_hours.start} to {budget.quiet_hours.end}
+            </div>
+          )}
           <p className="mt-3 text-xs text-muted-foreground">{budget.description}</p>
         </CardContent>
       </Card>

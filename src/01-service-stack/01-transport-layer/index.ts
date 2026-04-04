@@ -11,6 +11,7 @@ import {
   runtimeSystemConfig,
   runtimeSystemConfigVersion,
 } from "../../config/runtime-system-config.js";
+import { isSharedThreadId } from "../../config/topic-delivery-policy.js";
 import { toRedisConnection } from "../../lib/redis.js";
 import { QueueItemSource } from "../../types.js";
 import type { QueueConsumerOptions } from "../04-queue/types.js";
@@ -209,24 +210,12 @@ export class TwilioTransportLayer {
 
         const threadId = this.threadByConversationSid.get(conversationSid);
         if (!threadId) {
-          this.logger.warn(
+          this.logger.error(
             { conversation_sid: conversationSid },
-            "No thread mapping for conversation. Falling back to private thread.",
+            "No thread mapping for shared conversation. Rejecting inbound instead of degrading to private thread.",
           );
-          const normalized = await this.normalizeInboundPayload({
-            ...payload,
-            MessageSid: messageSid,
-            From: author,
-            To: this.messagingIdentity,
-            Body: body,
-            NumMedia: payload.NumMedia ?? "0",
-          });
-          await queue.enqueue(this.toQueueItem(normalized), {
-            attempts: DEFAULT_RETRY.attempts,
-            backoff: { type: "exponential", delay: DEFAULT_RETRY.backoff_ms },
-          });
-          reply.code(200);
-          return { ok: true };
+          reply.code(503);
+          return { error: "Conversation mapping missing for shared thread." };
         }
 
         const participantId = this.entityIdByIdentity.get(author);
@@ -235,16 +224,22 @@ export class TwilioTransportLayer {
           return { ok: true };
         }
 
-        const queueItem: StackQueueItem = {
-          source: QueueItemSource.HumanMessage,
-          content: body,
-          concerning: [participantId],
-          target_thread: threadId,
-          created_at: new Date(),
-          idempotency_key: `twilio_conv:${messageSid}`,
-        };
-
-        await queue.enqueue(queueItem, {
+        const normalized = await this.normalizeInboundPayload(
+          {
+            ...payload,
+            MessageSid: messageSid,
+            From: author,
+            To: this.messagingIdentity,
+            Body: body,
+            NumMedia: payload.NumMedia ?? "0",
+          },
+          {
+            participant_id: participantId,
+            thread_id: threadId,
+            source_identity: author,
+          },
+        );
+        await queue.enqueue(this.toQueueItem(normalized), {
           attempts: DEFAULT_RETRY.attempts,
           backoff: { type: "exponential", delay: DEFAULT_RETRY.backoff_ms },
         });
@@ -264,6 +259,7 @@ export class TwilioTransportLayer {
     const sharedThreads = runtimeSystemConfig.threads.filter(
       (thread) => thread.type === ThreadType.Shared,
     );
+    const failures: string[] = [];
 
     for (const thread of sharedThreads) {
       try {
@@ -310,10 +306,15 @@ export class TwilioTransportLayer {
         );
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        if (message.includes("uniqueName") || message.includes("already exists") || message.includes("50433")) {
+        if (
+          message.includes("uniqueName") ||
+          message.includes("already exists") ||
+          message.includes("50433")
+        ) {
           try {
-            const existing = await this.twilioClient.conversations.v1.conversations
-              .list({ limit: 100 });
+            const existing = await this.twilioClient.conversations.v1.conversations.list({
+              limit: 100,
+            });
             const match = existing.find((c) => c.uniqueName === `fcc-thread-${thread.id}`);
             if (match) {
               this.conversationSidByThread.set(thread.id, match.sid);
@@ -328,18 +329,31 @@ export class TwilioTransportLayer {
             // Fall through to warning
           }
         }
-        this.logger.warn(
+        failures.push(thread.id);
+        this.logger.error(
           { thread_id: thread.id, err: message },
-          "Failed to initialize Conversations for shared thread. Falling back to fan-out.",
+          "Failed to initialize Conversations for canonical shared thread.",
         );
       }
     }
 
-    this.conversationsInitialized = this.conversationSidByThread.size > 0;
+    this.conversationsInitialized =
+      sharedThreads.length === 0 ||
+      (failures.length === 0 &&
+        sharedThreads.every((thread) => this.conversationSidByThread.has(thread.id)));
     this.logger.info(
-      { conversations_count: this.conversationSidByThread.size, enabled: this.conversationsInitialized },
+      {
+        conversations_count: this.conversationSidByThread.size,
+        enabled: this.conversationsInitialized,
+        failures,
+      },
       "Conversations initialization complete.",
     );
+    if (failures.length > 0) {
+      throw new Error(
+        `Canonical shared-thread Conversations initialization failed for: ${failures.join(", ")}`,
+      );
+    }
   }
 
   public async queueOutbound(message: TransportOutboundMessage): Promise<void> {
@@ -402,23 +416,30 @@ export class TwilioTransportLayer {
     return request.protocol;
   }
 
-  private async normalizeInboundPayload(payload: FormPayload): Promise<TransportInboundInput> {
+  private async normalizeInboundPayload(
+    payload: FormPayload,
+    overrides: {
+      participant_id?: string;
+      thread_id?: string;
+      source_identity?: string;
+    } = {},
+  ): Promise<TransportInboundInput> {
     this.refreshMapsIfStale();
     const parsed = twilioInboundPayloadSchema.parse(payload);
     const body = (payload.Body ?? "").trim();
-    const participantId = this.entityIdByIdentity.get(parsed.From);
+    const participantId = overrides.participant_id ?? this.entityIdByIdentity.get(parsed.From);
     if (!participantId) {
       throw new Error(`Unknown inbound messaging identity: ${parsed.From}`);
     }
 
-    const threadId = this.privateThreadByParticipantId.get(participantId);
+    const threadId = overrides.thread_id ?? this.privateThreadByParticipantId.get(participantId);
     if (!threadId) {
       throw new Error(`No private thread configured for participant: ${participantId}`);
     }
 
     const common = {
       provider_message_id: parsed.MessageSid,
-      source_identity: parsed.From,
+      source_identity: overrides.source_identity ?? parsed.From,
       thread_id: threadId,
       concerning: [participantId],
       received_at: new Date(),
@@ -613,13 +634,17 @@ export class TwilioTransportLayer {
 
     const conversationSid = this.conversationSidByThread.get(message.target_thread);
     if (this.conversationsEnabled && this.conversationsInitialized && conversationSid) {
-      await this.twilioClient.conversations.v1
-        .conversations(conversationSid)
-        .messages.create({
-          author: this.messagingIdentity,
-          body: message.content,
-        });
+      await this.twilioClient.conversations.v1.conversations(conversationSid).messages.create({
+        author: this.messagingIdentity,
+        body: message.content,
+      });
       return;
+    }
+
+    if (isSharedThreadId(message.target_thread)) {
+      throw new Error(
+        `Shared thread ${message.target_thread} requires an initialized Twilio Conversation mapping.`,
+      );
     }
 
     const participantIds = this.resolveParticipantsForThread(message.target_thread);
@@ -677,6 +702,28 @@ export class TwilioTransportLayer {
         continue;
       }
       this.privateThreadByParticipantId.set(participantId, thread.id);
+    }
+
+    const sharedThreadIds = new Set(
+      runtimeSystemConfig.threads
+        .filter((thread) => thread.type === ThreadType.Shared)
+        .map((thread) => thread.id),
+    );
+    const preservedMappings = [...this.conversationSidByThread.entries()].filter(([threadId]) =>
+      sharedThreadIds.has(threadId),
+    );
+    this.conversationSidByThread.clear();
+    this.threadByConversationSid.clear();
+    for (const [threadId, sid] of preservedMappings) {
+      this.conversationSidByThread.set(threadId, sid);
+      this.threadByConversationSid.set(sid, threadId);
+    }
+    for (const thread of runtimeSystemConfig.threads) {
+      if (thread.type !== ThreadType.Shared || !thread.conversation_sid) {
+        continue;
+      }
+      this.conversationSidByThread.set(thread.id, thread.conversation_sid);
+      this.threadByConversationSid.set(thread.conversation_sid, thread.id);
     }
   }
 }

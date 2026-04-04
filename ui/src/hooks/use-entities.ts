@@ -25,6 +25,7 @@ export interface ThreadPayload {
   type: string;
   participants: string[];
   description: string;
+  conversation_sid?: string;
 }
 
 export interface EntitiesResponse {
@@ -33,6 +34,14 @@ export interface EntitiesResponse {
   daily_rhythm: {
     morning_digest: { times: Record<string, string | null> };
     evening_checkin: { times: Record<string, string | null> };
+    default_state?: string;
+    digest_eligibility?: {
+      exclude_already_dispatched: boolean;
+      exclude_stale: boolean;
+      staleness_threshold_hours: number;
+      suppress_repeats_from_previous_digest: boolean;
+      include_unresolved_from_yesterday: boolean;
+    };
   };
 }
 

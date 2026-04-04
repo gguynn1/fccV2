@@ -25,6 +25,8 @@ export enum ConfirmationReplyDecision {
   Reject = "reject",
 }
 
+export type ConfirmationApprovalPolicy = "exact_thread" | "requester_private_allowed";
+
 export interface ConfirmationReplyOption {
   key: string;
   label: string;
@@ -45,6 +47,8 @@ export interface ConfirmationRecordBase {
   requested_action_payload?: TopicAction;
   requested_by: string;
   requested_in_thread: string;
+  origin_thread?: string;
+  approval_thread_policy?: ConfirmationApprovalPolicy;
   requested_at: Date;
   expires_at?: Date;
   resolved_in_thread?: string;
