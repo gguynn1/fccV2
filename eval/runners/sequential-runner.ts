@@ -19,9 +19,12 @@ import type {
   EvalRunSummary,
   EvalScenarioActual,
   EvalScenarioDefinition,
+  EvalScenarioExpectation,
   EvalScenarioFailure,
   EvalScenarioLogEvent,
   EvalScenarioResult,
+  EvalTurn,
+  EvalTurnResult,
 } from "../types.js";
 
 export interface RunSequentialEvalOptions {
@@ -60,9 +63,42 @@ function buildSummary(scenarios: EvalScenarioResult[]): EvalRunSummary {
   };
 }
 
-function inferTopic(message: string): TopicKey {
+interface SimulatedThreadContext {
+  recent_messages: Array<{
+    role: "participant" | "assistant";
+    message: string;
+    topic: TopicKey | null;
+  }>;
+  active_topic_context: TopicKey | null;
+  pending_clarification: boolean;
+}
+
+const DEICTIC_PATTERNS =
+  /^(that|it|this|those|these|the one|cancel that|move that|change that|actually|no|yes|yeah|yep|nah|nope|ok|okay|sure|right|correct|the \w+)\b/i;
+const SHORT_MESSAGE_WORD_LIMIT = 12;
+
+function isDeicticOrShort(message: string): boolean {
+  const trimmed = message.trim();
+  if (DEICTIC_PATTERNS.test(trimmed)) {
+    return true;
+  }
+  return trimmed.split(/\s+/).length <= SHORT_MESSAGE_WORD_LIMIT;
+}
+
+function isSimulatedDigestRequest(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    /\b(digest|summary|recap|highlights|overview|snapshot)\b/u.test(normalized) &&
+    /\b(today|tonight|this\s+day|this\s+week|right\s+now|now)\b/u.test(normalized)
+  );
+}
+
+function inferTopicByKeywords(message: string): TopicKey | null {
   const normalized = message.toLowerCase();
 
+  if (isSimulatedDigestRequest(message)) {
+    return TopicKey.FamilyStatus;
+  }
   if (
     normalized.includes("running late") ||
     normalized.includes("on my way") ||
@@ -70,7 +106,6 @@ function inferTopic(message: string): TopicKey {
   ) {
     return TopicKey.FamilyStatus;
   }
-
   if (
     normalized.includes("bill") ||
     normalized.includes("expense") ||
@@ -179,11 +214,35 @@ function inferTopic(message: string): TopicKey {
     return TopicKey.Calendar;
   }
 
+  return null;
+}
+
+function inferTopic(message: string, context?: SimulatedThreadContext): TopicKey {
+  const keywordMatch = inferTopicByKeywords(message);
+  if (keywordMatch !== null) {
+    return keywordMatch;
+  }
+
+  if (context?.active_topic_context && isDeicticOrShort(message)) {
+    return context.active_topic_context;
+  }
+
   return TopicKey.FamilyStatus;
 }
 
-function inferIntent(message: string): ClassifierIntent {
-  const normalized = message.toLowerCase();
+function inferIntent(message: string, context?: SimulatedThreadContext): ClassifierIntent {
+  const normalized = message.toLowerCase().trim();
+
+  if (context?.pending_clarification) {
+    const affirmatives = /^(yes|yeah|yep|sure|ok|okay|correct|right|do it|go ahead|confirmed?)\b/i;
+    if (affirmatives.test(normalized)) {
+      return ClassifierIntent.Confirmation;
+    }
+    if (normalized.includes("cancel")) {
+      return ClassifierIntent.Cancellation;
+    }
+    return ClassifierIntent.Response;
+  }
 
   if (
     normalized.startsWith("what") ||
@@ -194,6 +253,9 @@ function inferIntent(message: string): ClassifierIntent {
   ) {
     return ClassifierIntent.Query;
   }
+  if (normalized.includes("cancel") || normalized.startsWith("never mind")) {
+    return ClassifierIntent.Cancellation;
+  }
   if (
     normalized.includes("can come") ||
     normalized.includes("moved to") ||
@@ -201,7 +263,10 @@ function inferIntent(message: string): ClassifierIntent {
     normalized.includes(" is due ") ||
     normalized.includes(" is confirmed ") ||
     normalized.includes(" is ready ") ||
-    normalized.startsWith("replace ")
+    normalized.startsWith("replace ") ||
+    normalized.startsWith("actually") ||
+    normalized.startsWith("change ") ||
+    normalized.startsWith("move ")
   ) {
     return ClassifierIntent.Update;
   }
@@ -291,6 +356,17 @@ function extractTimingPhrase(message: string): string {
 function composeMessage(topic: TopicKey, input: EvalScenarioDefinition["prompt_input"]): string {
   const timing = extractTimingPhrase(input.message);
 
+  if (topic === TopicKey.FamilyStatus && isSimulatedDigestRequest(input.message)) {
+    return [
+      "Today",
+      "- Morning meeting at 9am",
+      "- Chore: take out the trash",
+      "",
+      "Pending",
+      "- 3 grocery item(s) on the list",
+    ].join("\n");
+  }
+
   switch (topic) {
     case TopicKey.Calendar:
       return `Schedule summary: ${timing} activity from "${input.message}" is ready to review.`;
@@ -343,6 +419,184 @@ function evaluateScenario(
     ...baseActual,
     ...scenario.simulation?.actual_overrides,
   };
+}
+
+function collectTurnFailures(
+  expected: Partial<EvalScenarioExpectation>,
+  actual: EvalScenarioActual,
+  turnIndex: number,
+): EvalScenarioFailure[] {
+  const failures: EvalScenarioFailure[] = [];
+
+  if (expected.topic !== undefined && actual.topic !== expected.topic) {
+    failures.push({
+      field: "topic",
+      expected: expected.topic,
+      actual: actual.topic,
+      prompt_fixable: false,
+      message: `Turn ${turnIndex}: classified into a different topic.`,
+      turn_index: turnIndex,
+    });
+  }
+  if (expected.intent !== undefined && actual.intent !== expected.intent) {
+    failures.push({
+      field: "intent",
+      expected: expected.intent,
+      actual: actual.intent,
+      prompt_fixable: false,
+      message: `Turn ${turnIndex}: action intent did not match.`,
+      turn_index: turnIndex,
+    });
+  }
+  if (expected.target_thread !== undefined && actual.target_thread !== expected.target_thread) {
+    failures.push({
+      field: "target_thread",
+      expected: expected.target_thread,
+      actual: actual.target_thread,
+      prompt_fixable: false,
+      message: `Turn ${turnIndex}: response targeted a different thread.`,
+      turn_index: turnIndex,
+    });
+  }
+  if (expected.priority !== undefined && actual.priority !== expected.priority) {
+    failures.push({
+      field: "priority",
+      expected: expected.priority,
+      actual: actual.priority,
+      prompt_fixable: false,
+      message: `Turn ${turnIndex}: outbound priority did not match.`,
+      turn_index: turnIndex,
+    });
+  }
+  if (
+    expected.confirmation_required !== undefined &&
+    actual.confirmation_required !== expected.confirmation_required
+  ) {
+    failures.push({
+      field: "confirmation_required",
+      expected: expected.confirmation_required,
+      actual: actual.confirmation_required,
+      prompt_fixable: false,
+      message: `Turn ${turnIndex}: confirmation gate expectation was not met.`,
+      turn_index: turnIndex,
+    });
+  }
+  if (!matchesAllMarkers(actual.composed_message, expected.tone_markers)) {
+    failures.push({
+      field: "tone_markers",
+      expected: expected.tone_markers ?? [],
+      actual: actual.composed_message,
+      prompt_fixable: true,
+      message: `Turn ${turnIndex}: composed output missed tone markers.`,
+      turn_index: turnIndex,
+    });
+  }
+  if (!matchesAllMarkers(actual.composed_message, expected.format_markers)) {
+    failures.push({
+      field: "format_markers",
+      expected: expected.format_markers ?? [],
+      actual: actual.composed_message,
+      prompt_fixable: true,
+      message: `Turn ${turnIndex}: composed output missed format markers.`,
+      turn_index: turnIndex,
+    });
+  }
+  if (includesForbiddenMarker(actual.composed_message, expected.must_not)) {
+    failures.push({
+      field: "must_not",
+      expected: expected.must_not ?? [],
+      actual: actual.composed_message,
+      prompt_fixable: true,
+      message: `Turn ${turnIndex}: composed output included forbidden content.`,
+      turn_index: turnIndex,
+    });
+  }
+
+  return failures;
+}
+
+function evaluateMultiTurnScenario(
+  scenario: EvalScenarioDefinition,
+  turns: EvalTurn[],
+  config: SystemConfig,
+): {
+  allFailures: EvalScenarioFailure[];
+  turnResults: EvalTurnResult[];
+  lastActual: EvalScenarioActual | null;
+} {
+  const context: SimulatedThreadContext = {
+    recent_messages: [],
+    active_topic_context: null,
+    pending_clarification: false,
+  };
+
+  const allFailures: EvalScenarioFailure[] = [];
+  const turnResults: EvalTurnResult[] = [];
+  let lastActual: EvalScenarioActual | null = null;
+
+  for (let i = 0; i < turns.length; i++) {
+    const turn = turns[i];
+
+    if (turn.role === "assistant") {
+      const isQuestion = turn.message.trim().endsWith("?");
+      context.pending_clarification = isQuestion;
+      context.recent_messages.push({
+        role: "assistant",
+        message: turn.message,
+        topic: context.active_topic_context,
+      });
+      turnResults.push({
+        turn_index: i,
+        role: "assistant",
+        message: turn.message,
+        actual: null,
+        failures: [],
+      });
+      continue;
+    }
+
+    const inferredTopic = inferTopic(turn.message, context);
+    const inferredIntent = inferIntent(turn.message, context);
+    const syntheticInput: EvalScenarioDefinition["prompt_input"] = {
+      message: turn.message,
+      concerning: turn.entity_id ? [turn.entity_id] : scenario.prompt_input.concerning,
+      origin_thread: turn.thread_id,
+    };
+
+    const actual: EvalScenarioActual = {
+      topic: inferredTopic,
+      intent: inferredIntent,
+      target_thread: inferTargetThread(inferredTopic, syntheticInput),
+      priority: inferPriority(inferredTopic, inferredIntent),
+      confirmation_required: inferConfirmation(config, inferredTopic),
+      composed_message: composeMessage(inferredTopic, syntheticInput),
+    };
+
+    lastActual = actual;
+    context.active_topic_context = inferredTopic;
+    context.pending_clarification = false;
+    context.recent_messages.push({
+      role: "participant",
+      message: turn.message,
+      topic: inferredTopic,
+    });
+
+    let turnFailures: EvalScenarioFailure[] = [];
+    if (turn.expected) {
+      turnFailures = collectTurnFailures(turn.expected, actual, i);
+      allFailures.push(...turnFailures);
+    }
+
+    turnResults.push({
+      turn_index: i,
+      role: "participant",
+      message: turn.message,
+      actual,
+      failures: turnFailures,
+    });
+  }
+
+  return { allFailures, turnResults, lastActual };
 }
 
 function matchesAllMarkers(message: string, markers: string[] | undefined): boolean {
@@ -531,25 +785,53 @@ export async function runSequentialEval(options: RunSequentialEvalOptions): Prom
       scenarioResult.status = "running";
       scenarioResult.started_at = new Date().toISOString();
       await persistState();
-      await pushLog("scenario", `Starting scenario "${scenario.title}".`, scenario.id);
-      await pause(stepDelayMs);
 
-      const actual = evaluateScenario(scenario, systemConfig);
-      scenarioResult.actual = actual;
+      const isMultiTurn = scenario.turns && scenario.turns.length >= 2;
       await pushLog(
-        "evaluate",
-        "Scenario input evaluated against the current prompt/runtime simulator.",
+        "scenario",
+        `Starting ${isMultiTurn ? "multi-turn" : "single-turn"} scenario "${scenario.title}".`,
         scenario.id,
-        {
-          topic: actual.topic,
-          intent: actual.intent,
-          target_thread: actual.target_thread,
-          priority: actual.priority,
-        },
       );
       await pause(stepDelayMs);
 
-      const failures = collectFailures(scenario, actual);
+      let actual: EvalScenarioActual;
+      let failures: EvalScenarioFailure[];
+
+      if (isMultiTurn && scenario.turns) {
+        const turns = scenario.turns;
+        const result = evaluateMultiTurnScenario(scenario, turns, systemConfig);
+        actual = result.lastActual ?? evaluateScenario(scenario, systemConfig);
+        failures = result.allFailures;
+        scenarioResult.turn_results = result.turnResults;
+        scenarioResult.actual = actual;
+        await pushLog(
+          "evaluate",
+          `Multi-turn scenario evaluated across ${turns.length} turns; ${result.turnResults.filter((tr) => tr.role === "participant").length} participant turns checked.`,
+          scenario.id,
+          {
+            turns: turns.length,
+            participant_turns: result.turnResults.filter((tr) => tr.role === "participant").length,
+            failures: failures.length,
+          },
+        );
+      } else {
+        actual = evaluateScenario(scenario, systemConfig);
+        scenarioResult.actual = actual;
+        failures = collectFailures(scenario, actual);
+        await pushLog(
+          "evaluate",
+          "Scenario input evaluated against the current prompt/runtime simulator.",
+          scenario.id,
+          {
+            topic: actual.topic,
+            intent: actual.intent,
+            target_thread: actual.target_thread,
+            priority: actual.priority,
+          },
+        );
+      }
+      await pause(stepDelayMs);
+
       scenarioResult.failures = failures;
       scenarioResult.raw_outcome = failures.length === 0 ? "pass" : "fail";
 

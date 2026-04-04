@@ -66,7 +66,9 @@ function buildInsights(state: EvalRunState): {
   return {
     topicCoverageLine: `${expectedTopics.size}/${allTopics.size} topics represented in scenario expectations.`,
     missingTopicsLine:
-      missingTopics.length > 0 ? missingTopics.join(", ") : "None. Full topic coverage in this run.",
+      missingTopics.length > 0
+        ? missingTopics.join(", ")
+        : "None. Full topic coverage in this run.",
     categoryCoverageLine: [...categoryCounts.entries()]
       .map(([category, count]) => `${category}: ${count}`)
       .join(" | "),

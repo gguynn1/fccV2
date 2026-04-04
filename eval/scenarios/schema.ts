@@ -25,6 +25,14 @@ export const evalScenarioExpectationSchema = z.object({
   must_not: z.array(z.string().min(1)).optional(),
 });
 
+export const evalTurnSchema = z.object({
+  role: z.enum(["participant", "assistant"]),
+  thread_id: z.string().min(1),
+  message: z.string().min(1),
+  entity_id: z.string().min(1).optional(),
+  expected: evalScenarioExpectationSchema.partial().optional(),
+});
+
 export const evalScenarioSimulationSchema = z.object({
   actual_overrides: z.record(z.string(), z.unknown()).optional(),
   tuning_scope: z.enum(["prompt", "structural"]).optional(),
@@ -36,6 +44,7 @@ export const evalScenarioDefinitionSchema = z.object({
   category: evalScenarioCategorySchema,
   prompt_input: evalScenarioPromptInputSchema,
   expected: evalScenarioExpectationSchema,
+  turns: z.array(evalTurnSchema).min(2).optional(),
   notes: z.string().min(1).optional(),
   simulation: evalScenarioSimulationSchema.optional(),
 });

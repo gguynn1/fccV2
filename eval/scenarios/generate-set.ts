@@ -87,7 +87,10 @@ const scenarioTemplates: ScenarioTemplate[] = [
     variants: [
       { message: "Add eggs and yogurt to the list", tone_markers: ["added", "grocery"] },
       { message: "We need ground beef and bread", tone_markers: ["added", "grocery"] },
-      { message: "Actually, add cereal and bananas to the grocery list on 6/3", tone_markers: ["added", "grocery"] },
+      {
+        message: "Actually, add cereal and bananas to the grocery list on 6/3",
+        tone_markers: ["added", "grocery"],
+      },
     ],
   },
   {

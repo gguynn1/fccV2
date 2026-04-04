@@ -73,6 +73,7 @@ describe("Supporting-service contracts", () => {
       getThreadDefinitions: () => Promise.resolve([]),
       resolveTargetThread: () => Promise.resolve("family"),
       resolveRoutingDecision: () => ({}) as never,
+      shouldResetActiveTopicContext: () => false,
     };
     const budgetService: BudgetService = {
       getBudgetTracker: () => Promise.resolve({} as never),

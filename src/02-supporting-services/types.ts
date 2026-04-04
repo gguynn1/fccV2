@@ -19,7 +19,6 @@ import type {
   ConfirmationActionType,
   ConfirmationRecoveryResult,
   ConfirmationReplyOption,
-  ConfirmationResult,
   ConfirmationsState,
   ResolvedConfirmation,
 } from "./08-confirmation-service/types.js";
@@ -87,6 +86,12 @@ export interface RoutingService {
   getThreadDefinitions(): Promise<Thread[]>;
   resolveTargetThread(request: RoutingRequest): Promise<string>;
   resolveRoutingDecision(request: RoutingRequest): RoutingDecision;
+  shouldResetActiveTopicContext(
+    history: ThreadHistory | null,
+    next_topic: string,
+    now?: Date,
+    message?: string,
+  ): boolean;
 }
 
 export interface BudgetDecision {

@@ -26,6 +26,14 @@ export interface EvalScenarioPromptInput {
   origin_thread: string;
 }
 
+export interface EvalTurn {
+  role: "participant" | "assistant";
+  thread_id: string;
+  message: string;
+  entity_id?: string;
+  expected?: Partial<EvalScenarioExpectation>;
+}
+
 export interface EvalScenarioExpectation {
   topic: TopicKey;
   intent: ClassifierIntent;
@@ -48,6 +56,7 @@ export interface EvalScenarioDefinition {
   category: EvalScenarioCategory;
   prompt_input: EvalScenarioPromptInput;
   expected: EvalScenarioExpectation;
+  turns?: EvalTurn[];
   notes?: string;
   simulation?: EvalScenarioSimulation;
 }
@@ -71,6 +80,15 @@ export interface EvalScenarioFailure {
   actual: string | boolean | string[] | null;
   prompt_fixable: boolean;
   message: string;
+  turn_index?: number;
+}
+
+export interface EvalTurnResult {
+  turn_index: number;
+  role: "participant" | "assistant";
+  message: string;
+  actual: Partial<EvalScenarioActual> | null;
+  failures: EvalScenarioFailure[];
 }
 
 export interface EvalScenarioLogEvent {
@@ -107,6 +125,7 @@ export interface EvalScenarioResult {
   expected: EvalScenarioExpectation;
   actual: EvalScenarioActual | null;
   failures: EvalScenarioFailure[];
+  turn_results?: EvalTurnResult[];
   tuner: EvalTunerOutcome | null;
 }
 

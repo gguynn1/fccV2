@@ -31,7 +31,10 @@ import {
   type TopicAction,
   type TopicProfile,
 } from "../../02-supporting-services/04-topic-profile-service/types.js";
-import type { RoutingDecision, ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
+import type {
+  RoutingDecision,
+  ThreadHistory,
+} from "../../02-supporting-services/05-routing-service/types.js";
 import {
   ConfirmationActionType,
   ConfirmationResult,
@@ -289,10 +292,7 @@ function splitListItems(content: string): string[] {
         .replace(/^(?:and|also)\s+/iu, "")
         .replace(/^(?:actually|just|okay|ok)\s*,?\s*/iu, "")
         .replace(/^(?:not|no)\s+/iu, containsRemovalCue ? "" : "$&")
-        .replace(
-          /\b(?:note|remind(?: me)?|track|log)\s+\$?\d[\d,.]*(?:\.\d{1,2})?.*$/iu,
-          "",
-        )
+        .replace(/\b(?:note|remind(?: me)?|track|log)\s+\$?\d[\d,.]*(?:\.\d{1,2})?.*$/iu, "")
         .replace(/\b(?:bill|invoice|payment|pay|due)\b.*$/iu, "")
         .replace(
           /\s+\b(?:on|for)\s+(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\w*\s+\d{1,2}(?:,\s*\d{4})?)\b.*$/iu,
@@ -357,10 +357,7 @@ function groceryItemsMatch(candidate: string, target: string): boolean {
 
 function normalizeLegacyGroceryItemForStorage(value: string): string | null {
   const normalized = canonicalizeGroceryItem(value)
-    .replace(
-      /^(?:please\s+)?(?:add|get|buy|grab|pick up|put)\s+(?:me\s+)?(?:some\s+)?/iu,
-      "",
-    )
+    .replace(/^(?:please\s+)?(?:add|get|buy|grab|pick up|put)\s+(?:me\s+)?(?:some\s+)?/iu, "")
     .replace(
       /\s+\b(?:on|for)\s+(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\w*\s+\d{1,2}(?:,\s*\d{4})?)\b.*$/iu,
       "",
@@ -381,9 +378,8 @@ function isLikelyMixedIntent(content: string): boolean {
 
   const groceryCue = /\b(grocery|shopping|list|cart|buy|get|pick up|grab)\b/u.test(text);
   const financeCue = /\b(\$|bill|invoice|payment|pay|expense|due|budget)\b/u.test(text);
-  const calendarCue = /\b(calendar|appointment|schedule|meeting|at\s+\d{1,2}(?::\d{2})?\s*(am|pm))\b/u.test(
-    text,
-  );
+  const calendarCue =
+    /\b(calendar|appointment|schedule|meeting|at\s+\d{1,2}(?::\d{2})?\s*(am|pm))\b/u.test(text);
   const choresCue = /\b(chore|trash|laundry|dishes|vacuum|clean|yard)\b/u.test(text);
 
   const domains = [groceryCue, financeCue, calendarCue, choresCue].filter(Boolean).length;
@@ -566,9 +562,20 @@ export class Worker {
     const threadHistory = await this.stateService.getThreadHistory(
       normalizedQueueItem.target_thread,
     );
+    const contentText =
+      typeof normalizedQueueItem.content === "string"
+        ? normalizedQueueItem.content
+        : JSON.stringify(normalizedQueueItem.content);
     const cappedHistory = threadHistory
       ? {
-          active_topic_context: threadHistory.active_topic_context,
+          active_topic_context: this.shouldResetTopicContext(
+            threadHistory,
+            normalizedQueueItem.topic ?? "",
+            startedAt,
+            contentText,
+          )
+            ? ""
+            : threadHistory.active_topic_context,
           last_activity: threadHistory.last_activity,
           recent_messages: threadHistory.recent_messages.slice(
             -this.config.max_thread_history_messages,
@@ -847,12 +854,10 @@ export class Worker {
         if (stateBackedMessage) {
           composed = stateBackedMessage;
         }
-        await this.enqueueCrossTopicEvents(
-          classifiedQueueItem,
-          classification,
-          profile,
-          { ...determined, typed_action: actionToExecute },
-        );
+        await this.enqueueCrossTopicEvents(classifiedQueueItem, classification, profile, {
+          ...determined,
+          typed_action: actionToExecute,
+        });
         return { profile, composed };
       },
       (output) => ({
@@ -1000,7 +1005,11 @@ export class Worker {
     content: string,
     classifiedConcerning: string[],
     fallbackEntityId: string,
-    options: { includePets?: boolean; onlyTypes?: EntityType[] } = {},
+    options: {
+      includePets?: boolean;
+      onlyTypes?: EntityType[];
+      threadHistory?: ThreadHistory | null;
+    } = {},
   ): string[] {
     const mentioned = this.extractMentionedEntities(content, options);
     if (mentioned.length > 0) {
@@ -1009,7 +1018,45 @@ export class Worker {
     if (classifiedConcerning.length > 0) {
       return classifiedConcerning;
     }
+
+    const historyEntities = this.inferEntitiesFromHistory(options.threadHistory);
+    if (historyEntities.length > 0) {
+      return historyEntities;
+    }
+
     return [fallbackEntityId];
+  }
+
+  private shouldResetTopicContext(
+    history: ThreadHistory | null,
+    nextTopic: string,
+    now: Date,
+    message: string,
+  ): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return -- method exists on RoutingService; IDE resolver lags behind tsc
+    return this.routingService.shouldResetActiveTopicContext(history, nextTopic, now, message);
+  }
+
+  private inferEntitiesFromHistory(
+    threadHistory: ThreadHistory | null | undefined,
+    lookbackCount: number = 3,
+  ): string[] {
+    if (!threadHistory || threadHistory.recent_messages.length === 0) {
+      return [];
+    }
+    const recentParticipant = threadHistory.recent_messages
+      .filter((msg) => msg.from === "participant")
+      .slice(-lookbackCount);
+
+    for (let i = recentParticipant.length - 1; i >= 0; i--) {
+      const msg = recentParticipant[i];
+      if (!msg) continue;
+      const found = this.extractMentionedEntities(msg.content, { includePets: true });
+      if (found.length > 0) {
+        return found;
+      }
+    }
+    return [];
   }
 
   private async resolveActionContent(
@@ -1065,7 +1112,9 @@ export class Worker {
     threadHistory: ThreadHistory | null,
     actionContent?: string,
   ): DeterminedAction {
-    const content = stripConversationalLeadIns(actionContent ?? summarizeContent(queueItem.content));
+    const content = stripConversationalLeadIns(
+      actionContent ?? summarizeContent(queueItem.content),
+    );
     const explicitDateHint = extractDateHint(content, queueItem.created_at);
     const inferredReference = this.inferClarificationReference(queueItem, threadHistory);
     const referenceId =
@@ -1555,12 +1604,27 @@ export class Worker {
     }
 
     const assistantMessage = recent[lastAssistantIndex];
-    const assistantContent = assistantMessage?.content?.trim().toLowerCase() ?? "";
-    const isClarificationPrompt = CLARIFICATION_PROMPTS.some(
-      (prompt) => assistantContent === prompt.toLowerCase(),
+    const assistantContent = assistantMessage?.content?.trim() ?? "";
+
+    const isExactClarification = CLARIFICATION_PROMPTS.some(
+      (prompt) => assistantContent.toLowerCase() === prompt.toLowerCase(),
     );
-    if (!isClarificationPrompt) {
+    const isQuestionFromAssistant = assistantContent.endsWith("?");
+
+    if (!isExactClarification && !isQuestionFromAssistant) {
       return null;
+    }
+
+    if (!isExactClarification && isQuestionFromAssistant) {
+      const currentContent = typeof queueItem.content === "string" ? queueItem.content : "";
+      const wordCount = currentContent.trim().split(/\s+/u).length;
+      const isShortResponse = wordCount <= 12;
+      const startsWithDeterminer = /^(the|that|this|it|yes|yeah|no|nah|ok|okay|sure)\b/iu.test(
+        currentContent.trim(),
+      );
+      if (!isShortResponse && !startsWithDeterminer) {
+        return null;
+      }
     }
 
     for (let index = lastAssistantIndex - 1; index >= 0; index -= 1) {
@@ -2026,6 +2090,79 @@ export class Worker {
     return `${prefix}\n${lines.join("\n")}`;
   }
 
+  private composeDigestMessage(state: Awaited<ReturnType<StateService["getSystemState"]>>): string {
+    const sections: string[] = [];
+    const MAX_ITEMS_PER_SECTION = 3;
+
+    const overdueChores = state.chores.active.filter(
+      (chore) => chore.status === ChoreStatus.Overdue,
+    );
+    const pendingConfirmations = state.confirmations.pending;
+    const urgentLines: string[] = [];
+    for (const chore of overdueChores.slice(0, MAX_ITEMS_PER_SECTION)) {
+      urgentLines.push(`- Overdue chore: ${chore.task}`);
+    }
+    for (const conf of pendingConfirmations.slice(0, MAX_ITEMS_PER_SECTION)) {
+      urgentLines.push(`- Awaiting approval: ${conf.action}`);
+    }
+    if (urgentLines.length > 0) {
+      sections.push(`Urgent\n${urgentLines.join("\n")}`);
+    }
+
+    const todayLines: string[] = [];
+    for (const event of state.calendar.events.slice(0, MAX_ITEMS_PER_SECTION)) {
+      const time = event.time ?? "";
+      todayLines.push(`- ${event.title}${time ? ` at ${time}` : ""}`);
+    }
+    for (const meal of state.meals.planned.slice(0, 2)) {
+      todayLines.push(`- Meal: ${meal.description}`);
+    }
+    const dueChores = state.chores.active.filter((chore) => chore.status !== ChoreStatus.Overdue);
+    for (const chore of dueChores.slice(0, 2)) {
+      todayLines.push(`- Chore: ${chore.task}`);
+    }
+    if (todayLines.length > 0) {
+      sections.push(`Today\n${todayLines.join("\n")}`);
+    }
+
+    const pendingLines: string[] = [];
+    if (state.grocery.list.length > 0) {
+      pendingLines.push(`- ${state.grocery.list.length} grocery item(s) on the list`);
+    }
+    if (pendingConfirmations.length > MAX_ITEMS_PER_SECTION) {
+      pendingLines.push(
+        `- ${pendingConfirmations.length - MAX_ITEMS_PER_SECTION} more confirmation(s) pending`,
+      );
+    }
+    if (pendingLines.length > 0) {
+      sections.push(`Pending\n${pendingLines.join("\n")}`);
+    }
+
+    const winsLines: string[] = [];
+    for (const chore of state.chores.completed_recent.slice(0, MAX_ITEMS_PER_SECTION)) {
+      winsLines.push(`- Done: ${chore.task}`);
+    }
+    if (state.finances.expenses_recent.length > 0) {
+      winsLines.push(`- ${state.finances.expenses_recent.length} expense(s) logged`);
+    }
+    if (winsLines.length > 0) {
+      sections.push(`Wins\n${winsLines.join("\n")}`);
+    }
+
+    if (state.family_status.current.length > 0) {
+      const statusLines = state.family_status.current
+        .slice(0, MAX_ITEMS_PER_SECTION)
+        .map((entry) => `- ${entry.entity}: ${entry.status}`);
+      sections.push(`Status\n${statusLines.join("\n")}`);
+    }
+
+    if (sections.length === 0) {
+      return "All clear today. Nothing pending.";
+    }
+
+    return sections.join("\n\n");
+  }
+
   private async composeStateBackedMessage(action: TopicAction): Promise<string | null> {
     const state = await this.stateService.getSystemState();
     const entityLabel = (entityId: string): string => {
@@ -2194,32 +2331,7 @@ export class Worker {
       }
       case "query_status": {
         if (action.entity === "__digest__") {
-          const lines: string[] = [];
-          lines.push(
-            `Today snapshot: ${state.calendar.events.length} calendar item(s), ${state.grocery.list.length} grocery item(s), ${state.finances.expenses_recent.length} expense log(s), ${state.chores.active.length} active chore(s).`,
-          );
-          if (state.calendar.events.length > 0) {
-            const upcoming = state.calendar.events
-              .slice(0, 3)
-              .map((entry) => entry.title)
-              .join(", ");
-            lines.push(`Calendar: ${upcoming}.`);
-          }
-          if (state.meals.planned.length > 0) {
-            const meals = state.meals.planned
-              .slice(0, 3)
-              .map((entry) => entry.description)
-              .join(", ");
-            lines.push(`Meals: ${meals}.`);
-          }
-          if (state.family_status.current.length > 0) {
-            const statuses = state.family_status.current
-              .slice(0, 3)
-              .map((entry) => `${entry.entity}: ${entry.status}`)
-              .join("; ");
-            lines.push(`Status: ${statuses}.`);
-          }
-          return lines.join("\n");
+          return this.composeDigestMessage(state);
         }
         if (state.family_status.current.length === 0) return "No current family status entries.";
         return `Family status:\n${state.family_status.current

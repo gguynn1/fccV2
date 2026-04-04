@@ -14,10 +14,10 @@ import {
 } from "./prompts.js";
 import {
   classificationResultSchema,
+  topicScopedContentSchema,
   type ClassifierContextMessage,
   type ClassifierInput,
   type ClassifierServiceOptions,
-  topicScopedContentSchema,
 } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "classifier-service" });

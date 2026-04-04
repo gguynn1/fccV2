@@ -38,6 +38,56 @@ const topicProfileSchema = z.object({
 
 const topicConfigSchema = z.record(z.nativeEnum(TopicKey), topicProfileSchema);
 
+type ToneBucket = "warm" | "direct" | "factual";
+
+function classifyToneBucket(tone: string): ToneBucket {
+  const normalized = tone.toLowerCase();
+  if (
+    normalized.includes("warm") ||
+    normalized.includes("gentle") ||
+    normalized.includes("supportive")
+  ) {
+    return "warm";
+  }
+  if (
+    normalized.includes("factual") ||
+    normalized.includes("calm") ||
+    normalized.includes("precise") ||
+    normalized.includes("attentive")
+  ) {
+    return "factual";
+  }
+  return "direct";
+}
+
+const TONE_TEMPLATES: Record<string, Record<ToneBucket, string>> = {
+  query: {
+    warm: "Let me look into that for you.",
+    direct: "Checking now.",
+    factual: "Got it. I will check and share an update.",
+  },
+  cancellation: {
+    warm: "No problem, I have canceled that for you.",
+    direct: "Canceled.",
+    factual: "Okay, that has been canceled.",
+  },
+  completion: {
+    warm: "Nice work, marked that as done!",
+    direct: "Done.",
+    factual: "Great, marked complete.",
+  },
+  confirmation: {
+    warm: "Thanks for confirming.",
+    direct: "Confirmed.",
+    factual: "Understood, confirmed.",
+  },
+  request: {
+    warm: "On it! I will take care of that.",
+    direct: "Got it.",
+    factual: "Got it. I will take care of that.",
+  },
+};
+
 const TOPIC_PROFILES: TopicProfileConfig = {
   [TopicKey.Calendar]: CALENDAR_TOPIC_PROFILE,
   [TopicKey.Chores]: CHORES_TOPIC_PROFILE,
@@ -104,30 +154,32 @@ export class StaticTopicProfileService {
     const topic = decision.classification.topic;
     const intent = decision.classification.intent;
     const content = this.readContentText(decision.queue_item.content);
+    const profile = this.config[topic];
+    const toneBucket = profile ? classifyToneBucket(profile.tone) : "direct";
 
     if (topic === TopicKey.Grocery) {
       if (intent === ClassifierIntent.Query) {
         return Promise.resolve("Here is your grocery list right now.");
       }
       if (intent === ClassifierIntent.Cancellation) {
-        return Promise.resolve("Okay, I removed that from the grocery list.");
+        return Promise.resolve("Removed from the grocery list.");
       }
       return Promise.resolve(`Added to the grocery list: ${content}`);
     }
 
     if (intent === ClassifierIntent.Query) {
-      return Promise.resolve("Got it. I will check and share an update.");
+      return Promise.resolve(TONE_TEMPLATES.query[toneBucket]);
     }
     if (intent === ClassifierIntent.Cancellation) {
-      return Promise.resolve("Okay, canceled.");
+      return Promise.resolve(TONE_TEMPLATES.cancellation[toneBucket]);
     }
     if (intent === ClassifierIntent.Completion) {
-      return Promise.resolve("Great, marked complete.");
+      return Promise.resolve(TONE_TEMPLATES.completion[toneBucket]);
     }
     if (intent === ClassifierIntent.Confirmation) {
-      return Promise.resolve("Understood.");
+      return Promise.resolve(TONE_TEMPLATES.confirmation[toneBucket]);
     }
-    return Promise.resolve("Got it. I will take care of that.");
+    return Promise.resolve(TONE_TEMPLATES.request[toneBucket]);
   }
 
   private readContentText(content: StackQueueItem["content"]): string {

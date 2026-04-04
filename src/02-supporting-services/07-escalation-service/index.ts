@@ -417,9 +417,34 @@ export class XStateEscalationService implements EscalationService {
       action === EscalationStepAction.EscalateToBroaderThread
         ? escalation.target_thread_for_escalation
         : `${escalation.responsible_entity}_private`;
+
+    const pendingMs = now.getTime() - (escalation.history[0]?.at.getTime() ?? now.getTime());
+    const pendingHours = Math.round(pendingMs / 3_600_000);
+    const pendingLabel = pendingHours >= 1 ? `${pendingHours}h ago` : "just now";
+    const itemSummary = escalation.item_ref;
+
+    let content: string;
+    switch (action) {
+      case EscalationStepAction.ReminderSent:
+        content = `Reminder: "${itemSummary}" for ${escalation.responsible_entity} is still pending (opened ${pendingLabel}).`;
+        break;
+      case EscalationStepAction.FollowUpSent:
+        content = `Follow-up: "${itemSummary}" for ${escalation.responsible_entity} has not been addressed (opened ${pendingLabel}).`;
+        break;
+      case EscalationStepAction.EscalateToBroaderThread:
+        content = `Escalation: "${itemSummary}" assigned to ${escalation.responsible_entity} has not been resolved after ${pendingLabel}. Escalating to the broader thread.`;
+        break;
+      case EscalationStepAction.FlaggedInDigest:
+        content = `Flagged: "${itemSummary}" for ${escalation.responsible_entity} is unresolved (opened ${pendingLabel}).`;
+        break;
+      default:
+        content = `Escalation step: ${action} for "${itemSummary}".`;
+        break;
+    }
+
     return {
       source: QueueItemSource.ScheduledTrigger,
-      content: `Escalation step: ${action}`,
+      content,
       concerning: escalation.concerning,
       target_thread: targetThread,
       created_at: now,

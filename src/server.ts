@@ -4,7 +4,7 @@ import { parse as parseQueryString } from "node:querystring";
 
 import fastifyStaticPlugin from "@fastify/static";
 import type BetterSqlite3 from "better-sqlite3";
-import { Queue, type Worker } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import Fastify, {
   type FastifyBaseLogger,
   type FastifyInstance,
@@ -342,6 +342,25 @@ async function createRuntime(): Promise<RuntimeHandles> {
     schedulerService,
   );
 
+  const escalationTimerWorker = new Worker(
+    "fcc-escalation-timers",
+    async (job) => {
+      const { escalation_id, item_ref } = job.data as { escalation_id: string; item_ref: string };
+      logger.info({ escalation_id, item_ref }, "Escalation timer fired.");
+      const state = await stateService.getSystemState();
+      const active = state.escalation_status.active.find((e) => e.id === escalation_id);
+      if (!active) {
+        logger.warn({ escalation_id }, "Escalation not found; timer ignored.");
+        return;
+      }
+      const items = await escalationService.reconcileOnStartup(new Date());
+      if (items.length > 0) {
+        await Promise.all(items.map((item) => queueService.enqueue(item)));
+      }
+    },
+    { connection: toRedisConnection(env.REDIS_URL), concurrency: 1 },
+  );
+
   const workerService = createWorker({
     classifier_service: classifierService,
     identity_service: createWorkerIdentityService(),
@@ -377,6 +396,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
     worker,
     scheduler: {
       stop: async () => {
+        await escalationTimerWorker.close();
         await schedulerWorker.close();
         await schedulerService.stop();
         logger.info("Scheduler service stopped.");

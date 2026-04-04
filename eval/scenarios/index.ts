@@ -3,7 +3,15 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { EvalScenarioDefinition } from "../types.js";
+import {
+  continuityRegressionName,
+  continuityRegressionScenarios,
+} from "./continuity-regression.js";
 import { defaultScenarios, defaultScenarioSetName } from "./default.js";
+import { digestQualityName, digestQualityScenarios } from "./digest-quality.js";
+import { nudgeRealismName, nudgeRealismScenarios } from "./nudge-realism.js";
+import { threadDynamicsName, threadDynamicsScenarios } from "./thread-dynamics.js";
+import { toneRegressionName, toneRegressionScenarios } from "./tone-regression.js";
 
 export interface EvalScenarioSet {
   name: string;
@@ -81,6 +89,31 @@ const scenarioSets: EvalScenarioSet[] = [
     name: defaultScenarioSetName,
     label: "Default",
     scenarios: defaultScenarios,
+  },
+  {
+    name: threadDynamicsName,
+    label: "Thread Dynamics",
+    scenarios: threadDynamicsScenarios,
+  },
+  {
+    name: continuityRegressionName,
+    label: "Continuity Regression",
+    scenarios: continuityRegressionScenarios,
+  },
+  {
+    name: digestQualityName,
+    label: "Digest Quality",
+    scenarios: digestQualityScenarios,
+  },
+  {
+    name: toneRegressionName,
+    label: "Tone Regression",
+    scenarios: toneRegressionScenarios,
+  },
+  {
+    name: nudgeRealismName,
+    label: "Nudge Realism",
+    scenarios: nudgeRealismScenarios,
   },
   ...(await loadGeneratedScenarioSets()),
 ];
