@@ -252,15 +252,22 @@ async function createRuntime(): Promise<RuntimeHandles> {
     return reply.sendFile("index.html");
   });
 
+  const conversationsEnabled = env.TWILIO_CONVERSATIONS_ENABLED?.toLowerCase() === "true";
   const transportLayer = createTwilioTransportLayer({
     account_sid: env.TWILIO_ACCOUNT_SID,
     auth_token: env.TWILIO_AUTH_TOKEN,
     messaging_identity: env.TWILIO_MESSAGING_IDENTITY,
     redis_url: env.REDIS_URL,
     public_base_url: env.PUBLIC_BASE_URL,
+    conversations_enabled: conversationsEnabled,
     logger,
   });
   transportLayer.registerRoutes(fastify, queueService);
+
+  if (conversationsEnabled) {
+    await transportLayer.initializeConversations();
+    logger.info("Twilio Conversations enabled for shared threads (real group MMS).");
+  }
 
   await fastify.listen({ port: Number(env.PORT || "3000"), host: "0.0.0.0" });
   logger.info({ port: env.PORT || "3000" }, "Fastify server started (Twilio webhooks via ngrok).");
@@ -404,6 +411,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
   );
 
   const imapClient = await dataIngestService.startMonitoring();
+  dataIngestService.startCalendarSync(caldavPort);
 
   return {
     fastify,

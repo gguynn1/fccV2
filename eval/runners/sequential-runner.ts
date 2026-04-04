@@ -803,21 +803,54 @@ function createWorkerReplayHarness(config: SystemConfig): {
     routing_service: createRoutingService(),
     budget_service: {
       getBudgetTracker: () => Promise.resolve(state.outbound_budget_tracker),
-      evaluateOutbound: () =>
-        Promise.resolve({
+      evaluateOutbound: (_topic: TopicKey, _thread: string, _entity: string) => {
+        const tracker = state.outbound_budget_tracker;
+        const maxPerPerson =
+          config.dispatch?.outbound_budget?.max_unprompted_per_person_per_day ?? 5;
+        const entityCount = tracker.by_person[_entity] ?? 0;
+        if (entityCount >= maxPerPerson) {
+          return Promise.resolve({
+            priority: DispatchPriority.Batched,
+            reason: "budget: per-person daily limit reached",
+          });
+        }
+        return Promise.resolve({
           priority: DispatchPriority.Immediate,
-          reason: "runtime replay",
-        }),
-      recordDispatch: () => Promise.resolve(undefined),
+          reason: "budget: within limits",
+        });
+      },
+      recordDispatch: (_topic: TopicKey, _thread: string, _entity: string) => {
+        state.outbound_budget_tracker.by_person[_entity] =
+          (state.outbound_budget_tracker.by_person[_entity] ?? 0) + 1;
+        state.outbound_budget_tracker.by_thread[_thread] =
+          (state.outbound_budget_tracker.by_thread[_thread] ?? 0) + 1;
+        return Promise.resolve(undefined);
+      },
     },
     escalation_service: {
       getStatus: () => Promise.resolve(state.escalation_status),
-      evaluate: () => Promise.resolve({ should_escalate: false }),
+      evaluate: (_topic: TopicKey) => {
+        const topicConfig = config.topics[_topic];
+        const level = topicConfig?.escalation;
+        if (level === EscalationLevel.High || level === EscalationLevel.Medium) {
+          const activeForTopic = state.escalation_status.active.filter(
+            (e) => (e as Record<string, unknown>).topic === _topic,
+          );
+          if (activeForTopic.length > 0) {
+            return Promise.resolve({ should_escalate: true, step: activeForTopic.length });
+          }
+        }
+        return Promise.resolve({ should_escalate: false });
+      },
       reconcileOnStartup: () => Promise.resolve([]),
     },
     confirmation_service: {
       getState: () => Promise.resolve(state.confirmations),
-      requiresConfirmation: () => false,
+      requiresConfirmation: (_actionType: string) => {
+        const gates = config.confirmation_gates;
+        if (!gates) return false;
+        return gates.always_require_approval?.includes(_actionType) ?? false;
+      },
       openConfirmation: () =>
         Promise.reject(new Error("runtime replay confirmation open is not supported")),
       resolveFromQueueItem: () => Promise.resolve(null),
@@ -1306,10 +1339,18 @@ function createRunState(
 ): EvalRunState {
   const startedAt = new Date().toISOString();
 
+  const fidelityMap = {
+    simulator: "simulation" as const,
+    worker: "worker-replay" as const,
+    "fixture-interpreter": "simulation" as const,
+    "live-classifier": "high-fidelity" as const,
+  };
+
   return {
     id: options.run_id,
     scenario_set: options.scenario_set,
     status: "queued",
+    fidelity: fidelityMap[options.mode ?? "simulator"],
     started_at: startedAt,
     completed_at: null,
     summary: buildSummary(createScenarioResults(scenarios)),

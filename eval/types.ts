@@ -154,10 +154,13 @@ export interface EvalArtifactSet {
   markdown_path: string | null;
 }
 
+export type EvalFidelity = "simulation" | "worker-replay" | "high-fidelity";
+
 export interface EvalRunState {
   id: string;
   scenario_set: string;
   status: EvalRunStatus;
+  fidelity: EvalFidelity;
   started_at: string;
   completed_at: string | null;
   summary: EvalRunSummary;

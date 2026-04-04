@@ -14,6 +14,32 @@ MMS media URLs are downloaded to a local media store and normalized before class
 
 Reaction handling is conservative — not all clients encode reactions the same way. When mapping is uncertain, the system falls back to requesting a text clarification rather than assuming intent.
 
+## Dual transport model (Twilio)
+
+The layer combines **Twilio Programmable Messaging** and, when enabled, **Twilio Conversations**:
+
+| Path | Role |
+| --- | --- |
+| **Programmable Messaging** | Private threads: inbound webhook and outbound SMS/MMS to each participant’s messaging identity. |
+| **Conversations API** | Shared threads when `TWILIO_CONVERSATIONS_ENABLED=true`: real group MMS–style threads via Conversations, with the assistant represented by a **projected address** (the same shared long code as Programmable Messaging). |
+
+**When `TWILIO_CONVERSATIONS_ENABLED=true`**
+
+- Shared threads are backed by a Twilio Conversation. The assistant joins with `messagingBinding.projectedAddress` set to the shared messaging identity; human participants bind by address. Inbound shared traffic uses the Conversations webhook; outbound sends through `conversations.messages.create` for that conversation when initialization succeeded.
+
+**When Conversations is disabled (or initialization falls back)**
+
+- Shared threads do **not** use a single carrier group thread. Outbound **fans out** one Programmable Messaging send per participant in the shared thread — logical grouping in configuration and routing only, not one native group MMS session.
+
+**Webhooks**
+
+- **`POST /webhook/twilio`** — Programmable Messaging: private thread messages (and the usual delivery status callback on `/webhook/twilio/status`).
+- **`POST /webhook/twilio/conversations`** — Conversations: handles `onMessageAdded` for shared threads (assistant-authored messages are ignored; unknown senders are dropped like the participant gate).
+
+**Operational constraints (carrier / Twilio)**
+
+- Group MMS via Conversations is intended for **+1 US/Canada long codes**. Participant count limits apply (typically **max 10** in a group); very large shared groups may not map cleanly to a single group MMS conversation.
+
 ## Threads
 
 Threads are defined by participants, not topics. A private thread is one entity plus the assistant. A shared thread is multiple entities plus the assistant. The system never creates threads per topic — it routes topics into the correct participant-based thread.

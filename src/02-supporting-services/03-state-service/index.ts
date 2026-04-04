@@ -616,6 +616,71 @@ export class SqliteStateService implements StateService {
       );
     }
   }
+
+  public async exportSnapshot(): Promise<ExportedSnapshotEnvelope> {
+    const config = await this.getSystemConfig();
+    const state = await this.getSystemState();
+    const threadRows = this.db
+      .prepare("SELECT thread_id, data FROM thread_history")
+      .all() as Array<{ thread_id: string; data: string }>;
+    const threads: Record<string, unknown> = {};
+    for (const row of threadRows) {
+      threads[row.thread_id] = reviveDatesFromJson(row.data);
+    }
+    const dispatchRows = this.db
+      .prepare("SELECT * FROM dispatch_records ORDER BY dispatched_at DESC LIMIT 500")
+      .all() as Array<Record<string, unknown>>;
+    const schemaVersionRow = this.db
+      .prepare("SELECT MAX(version) AS version FROM schema_version")
+      .get() as { version: number } | undefined;
+
+    return {
+      exported_at: new Date(),
+      schema_version: schemaVersionRow?.version ?? 0,
+      config,
+      state,
+      threads,
+      dispatch_records: dispatchRows,
+    };
+  }
+
+  public async importSnapshot(envelope: ExportedSnapshotEnvelope): Promise<void> {
+    const tx = this.db.transaction(() => {
+      if (envelope.config) {
+        this.db
+          .prepare("UPDATE system_config SET data = ? WHERE id = 'current'")
+          .run(serializeForStorage(envelope.config));
+      }
+      if (envelope.state) {
+        this.db
+          .prepare("UPDATE state_snapshots SET data = ? WHERE id = 'current'")
+          .run(serializeForStorage(envelope.state));
+      }
+      if (envelope.threads) {
+        this.db.prepare("DELETE FROM thread_history").run();
+        const insertThread = this.db.prepare(
+          "INSERT INTO thread_history (thread_id, data) VALUES (?, ?)",
+        );
+        for (const [threadId, data] of Object.entries(envelope.threads)) {
+          insertThread.run(threadId, serializeForStorage(data));
+        }
+      }
+    });
+    tx();
+    this.logger.info(
+      { exported_at: envelope.exported_at, schema_version: envelope.schema_version },
+      "State snapshot imported.",
+    );
+  }
+}
+
+export interface ExportedSnapshotEnvelope {
+  exported_at: Date;
+  schema_version: number;
+  config: SystemConfig;
+  state: SystemState;
+  threads: Record<string, unknown>;
+  dispatch_records: Array<Record<string, unknown>>;
 }
 
 export function createStateService(databasePath: string, logger?: Logger): SqliteStateService {

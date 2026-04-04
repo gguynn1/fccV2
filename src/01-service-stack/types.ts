@@ -57,11 +57,18 @@ export interface IdentityResolutionResult {
   concerning: string[];
 }
 
+export interface ImageExtraction {
+  type: "receipt" | "school_flyer" | "maintenance_photo" | "unknown";
+  extracted_fields: Record<string, string>;
+  confidence: number;
+}
+
 export interface StackClassificationResult {
   topic: TopicKey;
   intent: ClassifierIntent;
   concerning: string[];
   confidence?: number;
+  image_extraction?: ImageExtraction;
 }
 
 export interface ClarificationRequest {

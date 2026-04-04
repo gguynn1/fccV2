@@ -8,7 +8,7 @@ import type {
 import type { SystemConfig } from "../index.js";
 import type { ClassifierIntent, DispatchPriority, TopicKey } from "../types.js";
 import type { DigestDay } from "./01-scheduler-service/types.js";
-import type { DataIngestState } from "./02-data-ingest-service/types.js";
+import type { DataIngestState, ExtractedIngestPayload } from "./02-data-ingest-service/types.js";
 import type { SystemState } from "./03-state-service/types.js";
 import type { TopicAction, TopicProfileConfig } from "./04-topic-profile-service/types.js";
 import type { RoutingDecision, Thread, ThreadHistory } from "./05-routing-service/types.js";
@@ -48,11 +48,7 @@ export interface SchedulerService extends SchedulerQueueProducer {
 export interface DataIngestService extends DataIngestQueueProducer {
   getIngestState(): Promise<DataIngestState>;
   updateIngestState(state: DataIngestState): Promise<void>;
-  processForwardedContent(
-    content: string,
-    target_thread: string,
-    created_at: Date,
-  ): Promise<StackQueueItem>;
+  extractForwardedPayload(content: string): Promise<ExtractedIngestPayload>;
 }
 
 export interface StateService {

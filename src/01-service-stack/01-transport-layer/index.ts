@@ -45,6 +45,7 @@ export interface TwilioTransportLayerOptions {
   redis_url: string;
   public_base_url?: string;
   media_directory?: string;
+  conversations_enabled?: boolean;
   logger?: Logger;
 }
 
@@ -69,6 +70,14 @@ export class TwilioTransportLayer {
 
   private readonly privateThreadByParticipantId: Map<string, string>;
 
+  private readonly conversationSidByThread: Map<string, string>;
+
+  private readonly threadByConversationSid: Map<string, string>;
+
+  private readonly conversationsEnabled: boolean;
+
+  private conversationsInitialized: boolean;
+
   private lastSeenConfigVersion: number;
 
   private readonly outboundQueue: Queue<TransportOutboundMessage>;
@@ -82,6 +91,8 @@ export class TwilioTransportLayer {
     this.accountSid = options.account_sid;
     this.messagingIdentity = options.messaging_identity;
     this.publicBaseUrl = options.public_base_url;
+    this.conversationsEnabled = options.conversations_enabled === true;
+    this.conversationsInitialized = false;
     this.mediaDirectory = resolve(
       process.cwd(),
       options.media_directory ?? DEFAULT_MEDIA_DIRECTORY,
@@ -89,6 +100,8 @@ export class TwilioTransportLayer {
     this.entityIdByIdentity = new Map();
     this.participantIdentityById = new Map();
     this.privateThreadByParticipantId = new Map();
+    this.conversationSidByThread = new Map();
+    this.threadByConversationSid = new Map();
     this.lastSeenConfigVersion = -1;
     this.outboundQueue = new Queue<TransportOutboundMessage>(DEFAULT_OUTBOUND_QUEUE_NAME, {
       connection: toRedisConnection(options.redis_url),
@@ -155,6 +168,178 @@ export class TwilioTransportLayer {
       reply.code(204);
       return null;
     });
+
+    if (this.conversationsEnabled) {
+      fastify.post("/webhook/twilio/conversations", async (request, reply) => {
+        const payload = this.toFormPayload(request.body);
+        if (!this.validateSignature(request, payload)) {
+          reply.code(403);
+          return { error: "Invalid signature" };
+        }
+
+        const eventType = payload.EventType;
+        if (eventType !== "onMessageAdded") {
+          reply.code(200);
+          return { ok: true };
+        }
+
+        const conversationSid = payload.ConversationSid;
+        const author = payload.Author;
+        const body = (payload.Body ?? "").trim();
+        const messageSid = payload.MessageSid ?? `conv_${Date.now()}`;
+
+        if (!conversationSid || !author) {
+          reply.code(400);
+          return { error: "Missing ConversationSid or Author" };
+        }
+
+        if (author === this.messagingIdentity) {
+          reply.code(200);
+          return { ok: true };
+        }
+
+        if (!this.isKnownParticipant(author)) {
+          this.logger.warn(
+            { from: author, conversation_sid: conversationSid },
+            "Conversations message from non-participant silently dropped.",
+          );
+          reply.code(200);
+          return { ok: true };
+        }
+
+        const threadId = this.threadByConversationSid.get(conversationSid);
+        if (!threadId) {
+          this.logger.warn(
+            { conversation_sid: conversationSid },
+            "No thread mapping for conversation. Falling back to private thread.",
+          );
+          const normalized = await this.normalizeInboundPayload({
+            ...payload,
+            MessageSid: messageSid,
+            From: author,
+            To: this.messagingIdentity,
+            Body: body,
+            NumMedia: payload.NumMedia ?? "0",
+          });
+          await queue.enqueue(this.toQueueItem(normalized), {
+            attempts: DEFAULT_RETRY.attempts,
+            backoff: { type: "exponential", delay: DEFAULT_RETRY.backoff_ms },
+          });
+          reply.code(200);
+          return { ok: true };
+        }
+
+        const participantId = this.entityIdByIdentity.get(author);
+        if (!participantId) {
+          reply.code(200);
+          return { ok: true };
+        }
+
+        const queueItem: StackQueueItem = {
+          source: QueueItemSource.HumanMessage,
+          content: body,
+          concerning: [participantId],
+          target_thread: threadId,
+          created_at: new Date(),
+          idempotency_key: `twilio_conv:${messageSid}`,
+        };
+
+        await queue.enqueue(queueItem, {
+          attempts: DEFAULT_RETRY.attempts,
+          backoff: { type: "exponential", delay: DEFAULT_RETRY.backoff_ms },
+        });
+
+        reply.code(200);
+        return { ok: true };
+      });
+    }
+  }
+
+  public async initializeConversations(): Promise<void> {
+    if (!this.conversationsEnabled) {
+      return;
+    }
+
+    this.refreshMapsIfStale();
+    const sharedThreads = runtimeSystemConfig.threads.filter(
+      (thread) => thread.type === ThreadType.Shared,
+    );
+
+    for (const thread of sharedThreads) {
+      try {
+        if (thread.conversation_sid) {
+          this.conversationSidByThread.set(thread.id, thread.conversation_sid);
+          this.threadByConversationSid.set(thread.conversation_sid, thread.id);
+          this.logger.info(
+            { thread_id: thread.id, conversation_sid: thread.conversation_sid },
+            "Mapped existing conversation SID from config.",
+          );
+          continue;
+        }
+
+        const conversation = await this.twilioClient.conversations.v1.conversations.create({
+          friendlyName: `fcc-${thread.id}`,
+          uniqueName: `fcc-thread-${thread.id}`,
+        });
+
+        this.conversationSidByThread.set(thread.id, conversation.sid);
+        this.threadByConversationSid.set(conversation.sid, thread.id);
+
+        await this.twilioClient.conversations.v1
+          .conversations(conversation.sid)
+          .participants.create({
+            identity: "fcc-assistant",
+            "messagingBinding.projectedAddress": this.messagingIdentity,
+          });
+
+        for (const participantId of thread.participants) {
+          const identity = this.participantIdentityById.get(participantId);
+          if (!identity) {
+            continue;
+          }
+          await this.twilioClient.conversations.v1
+            .conversations(conversation.sid)
+            .participants.create({
+              "messagingBinding.address": identity,
+            });
+        }
+
+        this.logger.info(
+          { thread_id: thread.id, conversation_sid: conversation.sid },
+          "Created Twilio Conversation for shared thread.",
+        );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes("uniqueName") || message.includes("already exists") || message.includes("50433")) {
+          try {
+            const existing = await this.twilioClient.conversations.v1.conversations
+              .list({ limit: 100 });
+            const match = existing.find((c) => c.uniqueName === `fcc-thread-${thread.id}`);
+            if (match) {
+              this.conversationSidByThread.set(thread.id, match.sid);
+              this.threadByConversationSid.set(match.sid, thread.id);
+              this.logger.info(
+                { thread_id: thread.id, conversation_sid: match.sid },
+                "Found existing Twilio Conversation for shared thread.",
+              );
+              continue;
+            }
+          } catch {
+            // Fall through to warning
+          }
+        }
+        this.logger.warn(
+          { thread_id: thread.id, err: message },
+          "Failed to initialize Conversations for shared thread. Falling back to fan-out.",
+        );
+      }
+    }
+
+    this.conversationsInitialized = this.conversationSidByThread.size > 0;
+    this.logger.info(
+      { conversations_count: this.conversationSidByThread.size, enabled: this.conversationsInitialized },
+      "Conversations initialization complete.",
+    );
   }
 
   public async queueOutbound(message: TransportOutboundMessage): Promise<void> {
@@ -425,6 +610,18 @@ export class TwilioTransportLayer {
 
   private async sendOutboundDirect(message: TransportOutboundMessage): Promise<void> {
     this.refreshMapsIfStale();
+
+    const conversationSid = this.conversationSidByThread.get(message.target_thread);
+    if (this.conversationsEnabled && this.conversationsInitialized && conversationSid) {
+      await this.twilioClient.conversations.v1
+        .conversations(conversationSid)
+        .messages.create({
+          author: this.messagingIdentity,
+          body: message.content,
+        });
+      return;
+    }
+
     const participantIds = this.resolveParticipantsForThread(message.target_thread);
     const callbackBase = this.publicBaseUrl ?? `http://localhost:${process.env.PORT ?? "3000"}`;
 

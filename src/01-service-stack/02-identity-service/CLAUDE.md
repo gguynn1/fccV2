@@ -1,11 +1,25 @@
 # Identity Service
 
-Resolves who sent this
-Maps messaging identity to entity
+## Role in the system
 
-Knows: type (adult/child/pet), permissions, thread memberships
+**Primary roles: startup validation and worker-time utility** — not the hot path for resolving who sent an inbound phone message.
 
-Returns: entity ID, entity type, which thread this came from
+- **Inbound messages:** The transport layer maps **messaging identity → entity id** (and thread) using configuration loaded at startup. That lookup happens **before** enqueue; it does not call `IdentityService` on every webhook. Think of it as the same mapping data the service would use, applied at the boundary for speed and clarity.
+- **Post-dequeue worker:** The worker uses **`createWorkerIdentityService()`**, a narrow adapter that **trusts the queue item**: it takes **`item.concerning[0]`** (with a default human fallback) as the source entity and **`item.target_thread`** as the thread context, and loads entity type from config via `IdentityService.getEntity`. It does not re-resolve the sender from raw transport fields for that step.
+
+So `IdentityService` remains the place that knows entity records, thread memberships, and validation rules — but **inbound identity resolution for “who texted us?” is owned by transport**, not by invoking the full service on the hot path.
+
+## Resolving by messaging identity
+
+`resolveByMessagingIdentity(messagingIdentity, incomingThreadId)` maps a messaging identity to an entity **only for entities that have one**. The internal map is built from entities with a non-null `messaging_identity`.
+
+**`EntityType.Pet` is intentionally excluded from messaging-identity resolution:** pet entities must not have a messaging identity (enforced by the entity schema when configuration is parsed, including when `IdentityService` is constructed). They never appear in the messaging-identity map and cannot be looked up as senders. `IdentityService.assertPetMessagingIdentities()` exists to assert the same invariant explicitly if needed.
+
+## What it knows
+
+Entity type (adult / child / pet), permissions, thread memberships.
+
+Returns (for `resolveByMessagingIdentity`): entity ID, entity type, permissions, incoming thread ID, full thread membership list for that entity.
 
 ## Entity Model
 

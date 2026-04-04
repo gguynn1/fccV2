@@ -508,7 +508,7 @@ export class BullSchedulerService {
           source: QueueItemSource.ScheduledTrigger,
           type: QueueItemType.Outbound,
           topic: TopicKey.Relationship,
-          intent: ClassifierIntent.Query,
+          intent: ClassifierIntent.Nudge,
           concerning:
             runtimeSystemConfig.threads.find((thread) => thread.id === "couple")?.participants ??
             [],

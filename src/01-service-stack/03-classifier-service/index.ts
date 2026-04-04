@@ -6,7 +6,12 @@ import { pino, type Logger } from "pino";
 import type { ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
 import type { StateService } from "../../02-supporting-services/types.js";
 import { ClassifierIntent, QueueItemSource, TopicKey } from "../../types.js";
-import type { ClarificationRequest, StackClassificationResult, StackQueueItem } from "../types.js";
+import type {
+  ClarificationRequest,
+  ImageExtraction,
+  StackClassificationResult,
+  StackQueueItem,
+} from "../types.js";
 import {
   actionInterpreterSystemPrompt,
   classifierSystemPrompt,
@@ -103,12 +108,16 @@ export class ClaudeClassifierService {
       const parsed = classificationResultSchema.parse(JSON.parse(raw));
       const topic = this.toTopicKey(parsed.topic);
       const intent = this.toClassifierIntent(parsed.intent);
-      return {
+      const result: StackClassificationResult = {
         topic,
         intent,
         concerning: this.deduplicateEntities(parsed.entities, item.concerning),
         confidence: parsed.confidence,
       };
+      if (item.source === QueueItemSource.ImageAttachment) {
+        result.image_extraction = this.inferImageExtraction(topic, firstBlock.text);
+      }
+      return result;
     } catch (error: unknown) {
       const fallback = this.classifyFallback(input);
       this.logger.warn(
@@ -558,6 +567,41 @@ export class ClaudeClassifierService {
         },
       ];
     });
+  }
+
+  private inferImageExtraction(topic: TopicKey, classifierResponse: string): ImageExtraction {
+    const lowered = classifierResponse.toLowerCase();
+    if (topic === TopicKey.Finances && (lowered.includes("receipt") || lowered.includes("expense"))) {
+      const amountMatch = /\$?([\d,]+\.?\d*)/u.exec(classifierResponse);
+      const vendorMatch = /(?:at|from)\s+([A-Z][a-zA-Z\s]+)/u.exec(classifierResponse);
+      return {
+        type: "receipt",
+        extracted_fields: {
+          amount: amountMatch?.[1] ?? "",
+          vendor: vendorMatch?.[1]?.trim() ?? "",
+        },
+        confidence: amountMatch ? 0.8 : 0.4,
+      };
+    }
+    if (topic === TopicKey.School && (lowered.includes("flyer") || lowered.includes("notice") || lowered.includes("event"))) {
+      return {
+        type: "school_flyer",
+        extracted_fields: {},
+        confidence: 0.6,
+      };
+    }
+    if (topic === TopicKey.Maintenance && (lowered.includes("photo") || lowered.includes("work") || lowered.includes("repair"))) {
+      return {
+        type: "maintenance_photo",
+        extracted_fields: {},
+        confidence: 0.6,
+      };
+    }
+    return {
+      type: "unknown",
+      extracted_fields: {},
+      confidence: 0.3,
+    };
   }
 }
 

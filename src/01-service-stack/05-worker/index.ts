@@ -18,6 +18,11 @@ import {
   BusinessLeadStatus,
   BusinessPipelineStage,
 } from "../../02-supporting-services/04-topic-profile-service/04.10-business/types.js";
+import {
+  computeRelationshipBackoff,
+  nextRelationshipNudgeEligibleAt,
+  selectNextRelationshipNudgeType,
+} from "../../02-supporting-services/04-topic-profile-service/04.11-relationship/profile.js";
 import { NudgeType } from "../../02-supporting-services/04-topic-profile-service/04.11-relationship/types.js";
 import { extractGroceryItemsFromMealDescription } from "../../02-supporting-services/04-topic-profile-service/04.13-meals/profile.js";
 import {
@@ -123,7 +128,7 @@ const INTERPRETER_RESPONSE_ACTIONS_BY_TOPIC: Record<TopicKey, Set<string>> = {
   [TopicKey.Travel]: new Set(["query_trips", "create_trip"]),
   [TopicKey.Vendors]: new Set(["query_vendors"]),
   [TopicKey.Business]: new Set(["query_leads"]),
-  [TopicKey.Relationship]: new Set(["query_nudge_history"]),
+  [TopicKey.Relationship]: new Set(["query_nudge_history", "dispatch_nudge"]),
   [TopicKey.FamilyStatus]: new Set(["query_status", "update_status"]),
   [TopicKey.Meals]: new Set(["query_plans"]),
   [TopicKey.Maintenance]: new Set(["query_maintenance"]),
@@ -145,7 +150,7 @@ const INTERPRETER_SUPPORTED_ACTIONS_BY_TOPIC: Record<TopicKey, Set<string>> = {
   [TopicKey.Travel]: new Set(["query_trips", "create_trip"]),
   [TopicKey.Vendors]: new Set(["query_vendors", "add_vendor"]),
   [TopicKey.Business]: new Set(["query_leads", "add_lead"]),
-  [TopicKey.Relationship]: new Set(["query_nudge_history", "respond_to_nudge"]),
+  [TopicKey.Relationship]: new Set(["query_nudge_history", "dispatch_nudge", "respond_to_nudge"]),
   [TopicKey.FamilyStatus]: new Set(["query_status", "update_status"]),
   [TopicKey.Meals]: new Set(["query_plans", "plan_meal"]),
   [TopicKey.Maintenance]: new Set(["query_maintenance", "add_asset"]),
@@ -269,6 +274,10 @@ const INTERPRETER_ACTION_SCHEMA_BY_TYPE: Record<string, z.ZodTypeAny> = {
   query_nudge_history: z.object({
     type: z.literal("query_nudge_history"),
     nudge_type: z.nativeEnum(NudgeType).optional(),
+  }),
+  dispatch_nudge: z.object({
+    type: z.literal("dispatch_nudge"),
+    nudge_type: z.nativeEnum(NudgeType),
   }),
   respond_to_nudge: z.object({
     type: z.literal("respond_to_nudge"),
@@ -1434,6 +1443,19 @@ export class Worker {
     if (interpreted) {
       return interpreted;
     }
+
+    if (
+      queueItem.source === QueueItemSource.ImageAttachment &&
+      classification.image_extraction &&
+      classification.image_extraction.type !== "unknown" &&
+      classification.image_extraction.confidence >= 0.5
+    ) {
+      const imageAction = this.resolveImageAction(classification, identity.source_entity_id);
+      if (imageAction) {
+        return imageAction;
+      }
+    }
+
     const explicitDateHint = extractDateHint(content, queueItem.created_at);
     const inferredReference = this.inferClarificationReference(queueItem, threadHistory);
     const referenceId =
@@ -1800,6 +1822,12 @@ export class Worker {
               type: "query_nudge_history",
               nudge_type: NudgeType.AppreciationPrompt,
             },
+          };
+        }
+        if (classification.intent === ClassifierIntent.Nudge) {
+          return {
+            is_response: false,
+            typed_action: { type: "dispatch_nudge", nudge_type: NudgeType.ConnectionPrompt },
           };
         }
         return {
@@ -2527,13 +2555,42 @@ export class Worker {
         mutated = true;
         break;
       }
-      case "respond_to_nudge": {
-        state.relationship.last_nudge.response_received = action.acknowledged;
+      case "dispatch_nudge": {
+        const selectedNudgeType = selectNextRelationshipNudgeType(state.relationship.nudge_history);
+        state.relationship.last_nudge = {
+          date: now,
+          thread: queueItem.target_thread,
+          content: summarizeContent(queueItem.content),
+          response_received: false,
+        };
         state.relationship.nudge_history.unshift({
           date: now,
-          type: NudgeType.ConnectionPrompt,
-          responded: action.acknowledged,
+          type: selectedNudgeType,
+          responded: false,
         });
+        const baseCooldownDays = state.relationship.cooldown_days ?? 5;
+        const effectiveCooldown = computeRelationshipBackoff(
+          state.relationship.nudge_history,
+          baseCooldownDays,
+        );
+        state.relationship.next_nudge_eligible = nextRelationshipNudgeEligibleAt(now, effectiveCooldown);
+        mutated = true;
+        break;
+      }
+      case "respond_to_nudge": {
+        state.relationship.last_nudge.response_received = action.acknowledged;
+        const unreplied = state.relationship.nudge_history.find((entry) => !entry.responded);
+        if (unreplied) {
+          unreplied.responded = action.acknowledged;
+        } else {
+          state.relationship.nudge_history.unshift({
+            date: now,
+            type: NudgeType.ConnectionPrompt,
+            responded: action.acknowledged,
+          });
+        }
+        const baseResetCooldown = state.relationship.cooldown_days ?? 5;
+        state.relationship.next_nudge_eligible = nextRelationshipNudgeEligibleAt(now, baseResetCooldown);
         mutated = true;
         break;
       }
@@ -2836,6 +2893,38 @@ export class Worker {
           .map((lead, i) => `${i + 1}. ${lead.client_name}`)
           .join("\n")}`;
       }
+      case "dispatch_nudge": {
+        const nudgePrompts: Record<NudgeType, string[]> = {
+          [NudgeType.AppreciationPrompt]: [
+            "One small thing you appreciated about each other this week?",
+            "What's something your partner did recently that made your day a little easier?",
+            "Quick appreciation moment: name one thing you're grateful for about each other today.",
+          ],
+          [NudgeType.ConversationStarter]: [
+            "What's something on your mind that you haven't had a chance to share yet this week?",
+            "If you could plan a perfect evening together, what would it look like?",
+            "What's been making you laugh lately?",
+          ],
+          [NudgeType.ConnectionPrompt]: [
+            "It's been a busy stretch. Five minutes to just check in with each other?",
+            "When was the last time you two had a real conversation that wasn't about logistics?",
+            "Take a breath together. How are you both really doing?",
+          ],
+          [NudgeType.DateNightSuggestion]: [
+            "When was the last time you had an evening just for the two of you? Even an hour counts.",
+            "Date night idea: cook something new together this weekend?",
+            "Sometimes connection is just sitting on the couch together without screens. Worth a try tonight?",
+          ],
+          [NudgeType.GratitudeExercise]: [
+            "Try this: each share three things you're grateful for right now. They don't have to be deep.",
+            "Gratitude check: what's one thing going well in your life together right now?",
+            "Quick gratitude round: one thing about your relationship that you'd never want to change.",
+          ],
+        };
+        const prompts = nudgePrompts[action.nudge_type] ?? nudgePrompts[NudgeType.ConnectionPrompt];
+        const prompt = prompts[state.relationship.nudge_history.length % prompts.length] ?? prompts[0];
+        return prompt;
+      }
       case "query_nudge_history": {
         if (state.relationship.nudge_history.length === 0)
           return "No relationship nudges in history.";
@@ -3108,6 +3197,57 @@ export class Worker {
     return ![ClassifierIntent.Query, ClassifierIntent.Confirmation].includes(intent);
   }
 
+  private resolveImageAction(
+    classification: StackClassificationResult,
+    actor: string,
+  ): DeterminedAction | null {
+    const extraction = classification.image_extraction;
+    if (!extraction) return null;
+
+    switch (extraction.type) {
+      case "receipt": {
+        const amount = parseFloat(extraction.extracted_fields.amount?.replace(/,/gu, "") ?? "0");
+        if (amount <= 0) return null;
+        return {
+          is_response: true,
+          typed_action: {
+            type: "log_expense",
+            description: extraction.extracted_fields.vendor
+              ? `Receipt from ${extraction.extracted_fields.vendor}`
+              : "Receipt photo expense",
+            amount,
+            logged_by: actor,
+            requires_confirmation: true,
+          },
+        };
+      }
+      case "school_flyer":
+        return {
+          is_response: true,
+          typed_action: {
+            type: "add_assignment",
+            entity: this.getFirstEntityIdByType(EntityType.Child) ?? actor,
+            parent_entity: actor,
+            title: "School notice (from photo)",
+            due_date: new Date(Date.now() + 7 * 24 * 60 * 60_000),
+            source: SchoolInputSource.Conversation,
+          },
+        };
+      case "maintenance_photo":
+        return {
+          is_response: true,
+          typed_action: {
+            type: "add_asset",
+            asset_type: MaintenanceAssetType.Home,
+            name: "Maintenance item (from photo)",
+            details: extraction.extracted_fields,
+          },
+        };
+      default:
+        return null;
+    }
+  }
+
   private isParticipantInitiatedSource(source: QueueItemSource): boolean {
     return (
       source === QueueItemSource.HumanMessage ||
@@ -3331,19 +3471,30 @@ export class Worker {
     });
   }
 
+  private static readonly SHARED_AWARENESS_TOPICS = new Set<TopicKey>([
+    TopicKey.Calendar,
+    TopicKey.Chores,
+    TopicKey.Finances,
+    TopicKey.Grocery,
+    TopicKey.Meals,
+    TopicKey.Travel,
+    TopicKey.Maintenance,
+    TopicKey.Health,
+  ]);
+
+  private static readonly SHARED_AWARENESS_INTENTS = new Set<ClassifierIntent>([
+    ClassifierIntent.Request,
+    ClassifierIntent.Update,
+    ClassifierIntent.Cancellation,
+    ClassifierIntent.Completion,
+  ]);
+
   private async maybeDispatchFollowUpThreadNotice(
     queueItem: StackQueueItem,
     classification: StackClassificationResult,
     primaryTargetThread: string,
     routingDecision: RoutingDecision,
   ): Promise<void> {
-    if (routingDecision.reply_policy?.action !== "notify_there") {
-      return;
-    }
-    const followUpThread = routingDecision.follow_up_target?.thread_id;
-    if (!followUpThread || followUpThread === primaryTargetThread) {
-      return;
-    }
     if (
       !this.isParticipantInitiatedSource(queueItem.source) ||
       classification.intent === ClassifierIntent.Query ||
@@ -3351,7 +3502,19 @@ export class Worker {
     ) {
       return;
     }
-    if (primaryTargetThread.endsWith("_private")) {
+
+    const isPrivateOrigin = primaryTargetThread.endsWith("_private");
+
+    if (isPrivateOrigin) {
+      await this.maybeDispatchSharedAwareness(queueItem, classification, primaryTargetThread);
+      return;
+    }
+
+    if (routingDecision.reply_policy?.action !== "notify_there") {
+      return;
+    }
+    const followUpThread = routingDecision.follow_up_target?.thread_id;
+    if (!followUpThread || followUpThread === primaryTargetThread) {
       return;
     }
 
@@ -3394,6 +3557,79 @@ export class Worker {
       },
       "Sent follow-up thread notice with reply policy dedupe metadata.",
     );
+  }
+
+  private async maybeDispatchSharedAwareness(
+    queueItem: StackQueueItem,
+    classification: StackClassificationResult,
+    privateThread: string,
+  ): Promise<void> {
+    if (!Worker.SHARED_AWARENESS_TOPICS.has(classification.topic)) {
+      return;
+    }
+    if (!Worker.SHARED_AWARENESS_INTENTS.has(classification.intent)) {
+      return;
+    }
+
+    const narrowestShared = this.resolveNarrowestSharedThread(queueItem.concerning);
+    if (!narrowestShared || narrowestShared === privateThread) {
+      return;
+    }
+
+    const state = await this.stateService.getSystemState();
+    const now = this.now();
+    const cooldownMs = 20 * 60 * 1000;
+    const dedupeKey = `awareness:${classification.topic}:${[...queueItem.concerning].sort().join(",")}`;
+    const hasRecentAwareness = state.queue.recently_dispatched.some(
+      (record) =>
+        record.target_thread === narrowestShared &&
+        now.getTime() - record.dispatched_at.getTime() <= cooldownMs &&
+        record.content.toLowerCase().includes("update:"),
+    );
+    if (hasRecentAwareness) {
+      return;
+    }
+
+    const topicLabel = runtimeSystemConfig.topics[classification.topic]?.label ?? classification.topic;
+    const intentLabel = classification.intent === ClassifierIntent.Cancellation
+      ? "cancelled"
+      : classification.intent === ClassifierIntent.Completion
+        ? "completed"
+        : "updated";
+    const notice = `${topicLabel} update: an item was ${intentLabel}.`;
+
+    const outbound: DispatchAction = {
+      decision: "dispatch",
+      outbound: {
+        target_thread: narrowestShared,
+        content: notice,
+        priority: DispatchPriority.Batched,
+        concerning: queueItem.concerning,
+      },
+    };
+    await this.transportService.sendOutbound(outbound.outbound);
+    await this.stateService.appendDispatchResult(
+      { ...queueItem, target_thread: narrowestShared, topic: classification.topic },
+      outbound,
+    );
+    await this.appendOutboundHistory(narrowestShared, notice, classification.topic);
+    this.logger.debug(
+      {
+        queue_item_id: extractQueueItemId(queueItem),
+        private_thread: privateThread,
+        awareness_thread: narrowestShared,
+        dedupe_key: dedupeKey,
+      },
+      "Dispatched shared awareness notice from private-origin action.",
+    );
+  }
+
+  private resolveNarrowestSharedThread(concerning: string[]): string | null {
+    const sharedThreads = runtimeSystemConfig.threads
+      .filter((thread) => thread.type === "shared")
+      .filter((thread) => concerning.every((entity) => thread.participants.includes(entity)))
+      .sort((a, b) => a.participants.length - b.participants.length);
+    return sharedThreads[0]?.id ?? null;
   }
 
   private async dispatchClarification(

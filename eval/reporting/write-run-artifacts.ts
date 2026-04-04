@@ -99,7 +99,6 @@ function toLikelyFiles(scenario: EvalRunState["scenarios"][number], scenarioSet:
       case "must_not":
         files.add("eval/runners/sequential-runner.ts");
         files.add("eval/tuner/correct.ts");
-        files.add("src/config/default-system-config.ts");
         files.add("src/config/minimal-system-config.ts");
         break;
       case "topic":
@@ -108,7 +107,6 @@ function toLikelyFiles(scenario: EvalRunState["scenarios"][number], scenarioSet:
       case "priority":
       case "confirmation_required":
         files.add("eval/runners/sequential-runner.ts");
-        files.add("src/config/default-system-config.ts");
         files.add("src/config/minimal-system-config.ts");
         files.add("src/config/runtime-system-config.ts");
         files.add("src/02-supporting-services/03-state-service/index.ts");
@@ -220,7 +218,7 @@ Important context:
 - this eval implementation is the current local sequential runner under \`eval/\`, not a full real-pipeline eval system
 - \`prompt_fix_suggested\` means the eval tuner considered the failure prompt-fixable and embedded a prompt suggestion in the run artifact
 - \`investigation_needed\` means the failure likely needs code-level investigation rather than a prompt-only change
-- bootstrap/default config now lives under \`src/config/\`; inspect \`src/config/default-system-config.ts\` and \`src/config/minimal-system-config.ts\` before assuming scenario expectations are wrong
+- bootstrap/default config now lives under \`src/config/\`; inspect \`src/config/minimal-system-config.ts\` before assuming scenario expectations are wrong
 - runtime behavior ultimately comes from persisted config loaded through \`src/02-supporting-services/03-state-service/index.ts\` into \`src/config/runtime-system-config.ts\`
 
 Run summary:
@@ -312,6 +310,7 @@ ${formatLogLines(state, scenario.id)}
 - Run ID: \`${state.id}\`
 - Scenario set: \`${state.scenario_set}\`
 - Status: \`${state.status}\`
+- Fidelity: \`${state.fidelity}\`
 - Started: ${state.started_at}
 - Completed: ${state.completed_at ?? "running"}
 

@@ -10,6 +10,7 @@ export interface Thread {
   type: ThreadType;
   participants: string[];
   description: string;
+  conversation_sid?: string;
 }
 
 export interface ThreadMessage {

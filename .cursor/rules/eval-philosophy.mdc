@@ -17,19 +17,24 @@ In the current implementation, each scenario runs sequentially, records structur
 
 - **No feature without scenarios.** Adding a topic, a disambiguation rule, a cross-topic connection, or an escalation profile means adding eval scenarios that exercise it. If you can't write the scenario, the feature isn't specified well enough.
 - **Failures are refinements, not bugs.** A wrong classification or wrong tone is a model refinement signal, not a code defect. The tuner adjusts prompts and few-shot examples — it does not modify runtime logic.
-- **Coverage remains the target.** The default scenario set covers five topics. Generated scenario sets cover ten of the fourteen topics (Calendar, Grocery, Finances, Business, Vendors, School, Health, Meals, Chores, Maintenance). The four remaining topics (Pets, Travel, Relationship, FamilyStatus) are not yet represented in generated sets. Future expansion should push toward full topic and edge-case coverage.
+- **Coverage remains the target.** The default scenario set covers five topics. Generated scenario sets use 18 templates covering all 14 topics plus cross-domain variants and are immediately runnable. Future expansion should push toward edge-case and negative coverage beyond the templates.
 - **Negative scenarios are as important as positive ones.** The system must prove what it does NOT do: no financial data in a child's thread, no auto-execution of expired confirmations, no late dispatch of stale items, no escalation of low-accountability topics.
 - **Sequential execution is the current default.** One scenario runs at a time, and the UI polls the persisted JSON run state for progress and logs.
 
 ## Scenario Generation
 
-The Eval page can generate scenario scaffolds into `eval/scenarios/generated/`. Each scaffold covers 10 of the 14 system topics (Calendar, Grocery, Finances, Business, Vendors, School, Health, Meals, Chores, Maintenance) and is immediately runnable. Successive generation clicks produce varied messages via a deterministic hash-based variant selector. Pets, Travel, Relationship, and FamilyStatus are not yet included in generated sets.
+The Eval page can generate scenario scaffolds into `eval/scenarios/generated/`. Each scaffold uses 18 templates covering all 14 topics plus cross-domain variants and is immediately runnable. Successive generation clicks produce varied messages via a deterministic hash-based variant selector.
 
 ## How the Runner Works
 
-The current runner uses **deterministic keyword matching** to classify messages, not model inference. The `inferTopic()` function in `eval/runners/sequential-runner.ts` matches keywords like "bill", "electrician", "homework", "dentist" to their respective `TopicKey` values. This means scenario messages must contain recognizable keywords for their topic to be classified correctly.
+The eval CLI supports four **modes** (see `eval/cli.ts`); each run also records a **fidelity** level on persisted state and in markdown artifacts (`simulation`, `worker-replay`, or `high-fidelity`).
 
-When eval failures involve configured behavior like topic routing, confirmation requirements, tone, format, priority, or disambiguation, inspect `src/config/default-system-config.ts` and `src/config/minimal-system-config.ts` first. Those files now define the fresh-bootstrap defaults that flow into persisted runtime config.
+- **`simulator`**: Deterministic keyword matching via `inferTopic()` in `eval/runners/sequential-runner.ts` (keywords like "bill", "electrician", "homework", "dentist" map to `TopicKey`). Scenario messages should contain recognizable keywords for their topic when exercising this path.
+- **`worker`** (default): Worker replay with real service implementations for the worker path; in-memory budget, escalation, and confirmation services enforce the same config limits and gates as production—they are not pass-through stubs.
+- **`fixture-interpreter`**: Deterministic interpreter fixtures for structured action expectations (`simulation.interpreter_fixture`).
+- **`live-classifier`**: Live Anthropic API for classification (non-deterministic; high-fidelity).
+
+When eval failures involve configured behavior like topic routing, confirmation requirements, tone, format, priority, or disambiguation, inspect `src/config/minimal-system-config.ts` first. That file assembles the fresh-bootstrap defaults that flow into persisted runtime config.
 
 ## Pasteable Prompt Workflow
 
@@ -73,6 +78,5 @@ When all scenarios pass, the pasteable prompt shifts to a coverage-expansion mod
 
 ## Config Source Of Truth
 
-- `src/config/default-system-config.ts` holds the non-entity bootstrap defaults used for first-run config.
-- `src/config/minimal-system-config.ts` assembles the first persisted config shape.
+- `src/config/minimal-system-config.ts` assembles the non-entity bootstrap defaults and the first persisted config shape.
 - Runtime and eval both operate against persisted config loaded through the state service, not checked-in seed snapshots.

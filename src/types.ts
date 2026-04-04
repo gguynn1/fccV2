@@ -41,6 +41,7 @@ export enum ClassifierIntent {
   Completion = "completion",
   Confirmation = "confirmation",
   ForwardedData = "forwarded_data",
+  Nudge = "nudge",
 }
 
 export enum EntityType {

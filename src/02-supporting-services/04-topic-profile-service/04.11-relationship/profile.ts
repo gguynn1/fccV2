@@ -47,3 +47,37 @@ export function selectNextRelationshipNudgeType(history: NudgeHistoryEntry[]): N
   const currentIndex = NUDGE_ROTATION.indexOf(recentType);
   return NUDGE_ROTATION[(currentIndex + 1) % NUDGE_ROTATION.length];
 }
+
+const BACKOFF_MULTIPLIER = 1.5;
+const MAX_COOLDOWN_DAYS = 30;
+
+export function computeRelationshipBackoff(
+  history: NudgeHistoryEntry[],
+  base_cooldown_days: number,
+): number {
+  let consecutiveIgnores = 0;
+  const sorted = history.slice().sort((a, b) => b.date.getTime() - a.date.getTime());
+  for (const entry of sorted) {
+    if (entry.responded) {
+      break;
+    }
+    consecutiveIgnores += 1;
+  }
+  if (consecutiveIgnores === 0) {
+    return base_cooldown_days;
+  }
+  const multiplied = base_cooldown_days * Math.pow(BACKOFF_MULTIPLIER, consecutiveIgnores);
+  return Math.min(multiplied, MAX_COOLDOWN_DAYS);
+}
+
+export function countConsecutiveIgnores(history: NudgeHistoryEntry[]): number {
+  let count = 0;
+  const sorted = history.slice().sort((a, b) => b.date.getTime() - a.date.getTime());
+  for (const entry of sorted) {
+    if (entry.responded) {
+      break;
+    }
+    count += 1;
+  }
+  return count;
+}

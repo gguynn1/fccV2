@@ -16,6 +16,7 @@ const envSchema = z.object({
   TWILIO_ACCOUNT_SID: z.string().min(1),
   TWILIO_AUTH_TOKEN: z.string().min(1),
   TWILIO_MESSAGING_IDENTITY: z.string().min(1),
+  TWILIO_CONVERSATIONS_ENABLED: z.string().optional(),
   REDIS_URL: z.string().min(1),
   DATABASE_PATH: z.string().min(1),
   PORT: z.string().optional(),

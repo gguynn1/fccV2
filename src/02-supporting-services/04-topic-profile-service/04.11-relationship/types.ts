@@ -42,6 +42,7 @@ export interface RelationshipState {
 
 export type RelationshipAction =
   | { type: "respond_to_nudge"; acknowledged: boolean }
+  | { type: "dispatch_nudge"; nudge_type: NudgeType }
   | { type: "record_nudge_ignored"; ignored_at: Date }
   | { type: "set_quiet_window"; quiet_window: RelationshipQuietWindowState }
   | { type: "query_nudge_history"; nudge_type?: NudgeType };

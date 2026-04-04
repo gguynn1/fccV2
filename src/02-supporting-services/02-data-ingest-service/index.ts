@@ -429,6 +429,15 @@ export class DataIngestService implements DataIngestServiceContract {
     return items;
   }
 
+  public async extractForwardedPayload(content: string): Promise<ExtractedIngestPayload> {
+    return this.extractPayload({
+      origin: IngestOrigin.ForwardedContent,
+      received_at: new Date(),
+      content,
+      attachments: [],
+    });
+  }
+
   public async processForwardedContent(
     content: string,
     target_thread: string,
@@ -631,6 +640,98 @@ export class DataIngestService implements DataIngestServiceContract {
       this.logger.error(
         { err: error instanceof Error ? error.message : String(error) },
         "IMAP polling cycle failed.",
+      );
+    }
+  }
+
+  private calendarSyncTimer: ReturnType<typeof setInterval> | null = null;
+  private calendarSyncWatermark: string | null = null;
+
+  public startCalendarSync(caldavPort: number = 3001): void {
+    const calendarSource = this.config.sources.find(
+      (source) => source.type === DataIngestSourceType.Calendar,
+    );
+    if (!calendarSource || !calendarSource.active) {
+      this.logger.info("Calendar sync source is not active. Skipping calendar sync.");
+      return;
+    }
+
+    const intervalMinutes = (calendarSource.config as { sync_interval_minutes?: number })?.sync_interval_minutes ?? 10;
+    this.logger.info(
+      { interval_minutes: intervalMinutes, port: caldavPort },
+      "Starting calendar sync polling against local CalDAV endpoint.",
+    );
+
+    this.calendarSyncTimer = setInterval(() => {
+      void this.pollCalendarChanges(caldavPort);
+    }, intervalMinutes * 60 * 1000);
+
+    void this.pollCalendarChanges(caldavPort);
+  }
+
+  public stopCalendarSync(): void {
+    if (this.calendarSyncTimer) {
+      clearInterval(this.calendarSyncTimer);
+      this.calendarSyncTimer = null;
+    }
+  }
+
+  private async pollCalendarChanges(caldavPort: number): Promise<void> {
+    try {
+      const response = await fetch(`http://localhost:${caldavPort}/calendars/`, {
+        method: "PROPFIND",
+        headers: { "Content-Type": "application/xml", Depth: "1" },
+        body: `<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop><d:getlastmodified/><d:displayname/></d:prop>
+</d:propfind>`,
+      });
+
+      if (!response.ok) {
+        this.logger.warn(
+          { status: response.status },
+          "CalDAV PROPFIND request failed during calendar sync.",
+        );
+        return;
+      }
+
+      const body = await response.text();
+      const currentHash = Buffer.from(body).toString("base64").slice(0, 32);
+
+      if (this.calendarSyncWatermark === currentHash) {
+        return;
+      }
+
+      const previousWatermark = this.calendarSyncWatermark;
+      this.calendarSyncWatermark = currentHash;
+
+      if (previousWatermark === null) {
+        this.logger.info("Calendar sync: initial watermark captured.");
+        return;
+      }
+
+      if (!this.queueService) {
+        this.logger.warn("Calendar sync: no queue service available to enqueue changes.");
+        return;
+      }
+
+      const queueItem: StackQueueItem = {
+        source: QueueItemSource.DataIngest,
+        content: "Calendar data changed (detected via CalDAV sync).",
+        concerning: [],
+        target_thread: "family",
+        created_at: new Date(),
+        topic: TopicKey.Calendar,
+        intent: ClassifierIntent.Update,
+        idempotency_key: `calendar_sync:${currentHash}`,
+      };
+
+      await this.queueService.enqueue(queueItem);
+      this.logger.info("Calendar sync: change detected, queued calendar update item.");
+    } catch (error: unknown) {
+      this.logger.warn(
+        { err: error instanceof Error ? error.message : String(error) },
+        "Calendar sync poll failed.",
       );
     }
   }
