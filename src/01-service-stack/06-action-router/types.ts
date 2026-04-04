@@ -61,9 +61,14 @@ export interface CollisionPolicy {
   same_precedence_strategy: string;
 }
 
+export interface RoutingRules {
+  rule_1: string;
+  rule_2: string;
+}
+
 export interface DispatchConfig {
   priority_levels: Record<DispatchPriority, PriorityLevel>;
   outbound_budget: OutboundBudget;
-  routing_rules: Record<string, string>;
+  routing_rules: RoutingRules;
   collision_avoidance: CollisionPolicy;
 }

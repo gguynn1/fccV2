@@ -291,7 +291,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
   fastify.put("/topics", async (request) => {
     const payload = topicsPayloadSchema.parse(request.body);
     const nextConfig = structuredClone(await options.state_service.getSystemConfig());
-    nextConfig.topics = payload.topics as typeof nextConfig.topics;
+    nextConfig.topics = payload.topics as unknown as typeof nextConfig.topics;
     nextConfig.escalation_profiles =
       payload.escalation_profiles as typeof nextConfig.escalation_profiles;
     nextConfig.confirmation_gates = payload.confirmation_gates;

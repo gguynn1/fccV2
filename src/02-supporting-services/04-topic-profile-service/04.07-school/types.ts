@@ -55,7 +55,7 @@ export interface SchoolCommunication {
 
 export interface SchoolState {
   students: StudentRecord[];
-  communications?: SchoolCommunication[];
+  communications: SchoolCommunication[];
 }
 
 export type SchoolAction =

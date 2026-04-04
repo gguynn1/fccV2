@@ -16,23 +16,53 @@ export interface MonitoredInboxBinding {
   default_thread_id?: string;
 }
 
-export interface DataIngestSourceConfig {
-  inboxes?: string[];
+export interface EmailMonitorSourceConfig {
+  inboxes: string[];
   monitored_inboxes?: MonitoredInboxBinding[];
-  calendars?: string[];
-  poll_interval_minutes?: number;
-  sync_interval_minutes?: number;
+  poll_interval_minutes: number;
   mailbox?: string;
   relevance_window_minutes?: number;
 }
 
-export interface DataIngestSource {
+export interface CalendarSyncSourceConfig {
+  calendars: string[];
+  sync_interval_minutes: number;
+  mailbox?: string;
+  relevance_window_minutes?: number;
+}
+
+export interface ForwardedMessagesSourceConfig {
+  relevance_window_minutes?: number;
+}
+
+export interface EmailMonitorDataIngestSource {
   id: string;
-  type: DataIngestSourceType;
+  type: DataIngestSourceType.Email;
   description: string;
   active: boolean;
-  config?: DataIngestSourceConfig;
+  config: EmailMonitorSourceConfig;
 }
+
+export interface CalendarSyncDataIngestSource {
+  id: string;
+  type: DataIngestSourceType.Calendar;
+  description: string;
+  active: boolean;
+  config: CalendarSyncSourceConfig;
+}
+
+export interface ForwardedMessagesDataIngestSource {
+  id: string;
+  type: DataIngestSourceType.Forwarded;
+  description: string;
+  active: boolean;
+  config?: ForwardedMessagesSourceConfig;
+}
+
+export type DataIngestSource =
+  | EmailMonitorDataIngestSource
+  | CalendarSyncDataIngestSource
+  | ForwardedMessagesDataIngestSource;
 
 export interface DataIngestConfig {
   sources: DataIngestSource[];
@@ -83,13 +113,13 @@ export interface ProcessedIngestItem {
 
 export interface IngestSourceState {
   active: boolean;
-  last_poll?: Date | null;
+  last_poll: Date | null;
   last_poll_result?: string;
-  last_sync?: Date | null;
+  last_sync: Date | null;
   last_received?: Date;
   processed: ProcessedIngestItem[];
-  watermark?: Date | null;
-  total_processed?: number;
+  watermark: Date | null;
+  total_processed: number;
 }
 
 export interface DataIngestState {

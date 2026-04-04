@@ -5,7 +5,10 @@ import BetterSqlite3 from "better-sqlite3";
 import { pino, type Logger } from "pino";
 
 import type { ActionRouterResult, StackQueueItem } from "../../01-service-stack/types.js";
-import { createMinimalSystemConfig } from "../../config/minimal-system-config.js";
+import {
+  createMinimalSystemConfig,
+  createMinimalSystemState,
+} from "../../config/minimal-system-config.js";
 import type { SystemConfig } from "../../index.js";
 import type { ThreadHistory } from "../05-routing-service/types.js";
 import type { StateService } from "../types.js";
@@ -107,17 +110,6 @@ function serializeForStorage(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function createEmptyIngestSourceState() {
-  return {
-    active: false,
-    last_poll: null,
-    last_sync: null,
-    watermark: null,
-    processed: [],
-    total_processed: 0,
-  };
-}
-
 function validateStateSlices(state: SystemState): void {
   queueStateRecordSchema.parse(state.queue);
   confirmationsStateRecordSchema.parse(state.confirmations);
@@ -152,90 +144,7 @@ function extractQueueItemId(queueItem: StackQueueItem): string {
 }
 
 function createDefaultStateSnapshot(now: Date): SystemState {
-  return {
-    queue: {
-      pending: [],
-      recently_dispatched: [],
-    },
-    outbound_budget_tracker: {
-      date: now,
-      by_person: {},
-      by_thread: {},
-    },
-    escalation_status: {
-      active: [],
-    },
-    calendar: {
-      events: [],
-    },
-    chores: {
-      active: [],
-      completed_recent: [],
-    },
-    finances: {
-      bills: [],
-      expenses_recent: [],
-      savings_goals: [],
-    },
-    grocery: {
-      list: [],
-      recently_purchased: [],
-    },
-    health: {
-      profiles: [],
-    },
-    pets: {
-      profiles: [],
-    },
-    school: {
-      students: [],
-      communications: [],
-    },
-    travel: {
-      trips: [],
-    },
-    vendors: {
-      records: [],
-    },
-    business: {
-      profiles: [],
-      leads: [],
-    },
-    relationship: {
-      last_nudge: {
-        date: now,
-        thread: "",
-        content: "",
-        response_received: false,
-      },
-      next_nudge_eligible: now,
-      nudge_history: [],
-    },
-    family_status: {
-      current: [],
-    },
-    meals: {
-      planned: [],
-      dietary_notes: [],
-    },
-    maintenance: {
-      assets: [],
-      items: [],
-    },
-    confirmations: {
-      pending: [],
-      recent: [],
-    },
-    threads: {},
-    data_ingest_state: {
-      email_monitor: createEmptyIngestSourceState(),
-      calendar_sync: createEmptyIngestSourceState(),
-      forwarded_messages: createEmptyIngestSourceState(),
-    },
-    digests: {
-      history: [],
-    },
-  };
+  return createMinimalSystemState(now);
 }
 
 export class SqliteStateService implements StateService {
