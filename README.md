@@ -133,6 +133,8 @@ npm start              # serve backend + /admin
 
 Subsequent boots use `npm start` — the database is already initialized.
 
+`npm run bootstrap` initializes SQLite only. If you want a truly fresh local reset, clear the app's BullMQ queues in Redis as well; wiping `data/fcc.db` alone does not remove pending scheduler, timer, or queue jobs preserved by Redis AOF.
+
 ## Development Setup
 
 ### 1. Clone and install

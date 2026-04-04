@@ -30,7 +30,7 @@ Good scenarios are:
 
 - plausible phone-native messages a participant would actually send
 - routed to threads that exist in the persisted system configuration
-- aligned with topic boundaries already defined in system config
+- aligned with topic boundaries already defined in the bootstrap defaults under `src/config/default-system-config.ts` and the persisted runtime config
 - written with expectations that match the app's actual rules
 
 Bad scenarios are:
@@ -46,6 +46,7 @@ Before adding a scenario set, verify:
 
 - The `prompt_input.origin_thread` is a real thread from persisted config.
 - The `prompt_input.concerning` entities are real persisted entities.
+- Any expectation based on topic behavior, routing, confirmation, priority, or disambiguation matches the config defaults in `src/config/default-system-config.ts` plus any persisted overrides.
 - The message is realistic for the topic.
 - The expected topic and intent are defensible under the configured disambiguation rules.
 - The expected target thread is one the application would actually choose.

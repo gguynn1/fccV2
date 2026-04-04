@@ -23,7 +23,6 @@ export * from "./01-service-stack/types.js";
 export * from "./02-supporting-services/types.js";
 
 export interface ScenarioTesting {
-  description: string;
   parts: string[];
 }
 

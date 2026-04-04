@@ -17,6 +17,7 @@ This folder contains the current eval implementation. It is a local sequential r
 
 - Runs are sequential only.
 - The runner uses deterministic keyword matching in `inferTopic()` to classify messages into all 14 `TopicKey` values, and reads configuration from the persisted SQLite-backed state service.
+- Fresh bootstrap defaults now live in `src/config/default-system-config.ts` and are assembled by `src/config/minimal-system-config.ts`. If an eval failure looks like a config/routing/tone mismatch, inspect those files before assuming the scenario is wrong.
 - The current statuses are `queued`, `running`, `passed`, `prompt_fix_suggested`, `investigation_needed`, `failed`, and `regressed`.
 - `prompt_fix_suggested` means the tuner decided the failure was prompt-fixable and embedded a prompt suggestion in the run artifact.
 - `investigation_needed` means the failure touches structural behavior like topic, routing, priority, or confirmation.
@@ -32,4 +33,5 @@ This folder contains the current eval implementation. It is a local sequential r
 - Treat `eval/results/` as generated output.
 - Treat `eval/scenarios/generated/` as editable scaffolding, then register finished sets in `eval/scenarios/index.ts`.
 - Prefer changing scenario definitions, runner logic, tuner logic, or artifact generation instead of editing generated files.
+- When behavior depends on configured topic profiles, dispatch rules, confirmation gates, or input disambiguation, inspect `src/config/default-system-config.ts`, `src/config/minimal-system-config.ts`, and `src/config/runtime-system-config.ts`.
 - Do not describe this implementation as full pipeline eval unless the code actually runs the real pipeline.

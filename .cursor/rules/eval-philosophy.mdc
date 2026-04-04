@@ -29,6 +29,8 @@ The Eval page can generate scenario scaffolds into `eval/scenarios/generated/`. 
 
 The current runner uses **deterministic keyword matching** to classify messages, not model inference. The `inferTopic()` function in `eval/runners/sequential-runner.ts` matches keywords like "bill", "electrician", "homework", "dentist" to their respective `TopicKey` values. This means scenario messages must contain recognizable keywords for their topic to be classified correctly.
 
+When eval failures involve configured behavior like topic routing, confirmation requirements, tone, format, priority, or disambiguation, inspect `src/config/default-system-config.ts` and `src/config/minimal-system-config.ts` first. Those files now define the fresh-bootstrap defaults that flow into persisted runtime config.
+
 ## Pasteable Prompt Workflow
 
 Each completed eval run produces a `.prompt.md` artifact with a pasteable prompt block designed for Cursor or Claude Code:
@@ -68,3 +70,9 @@ When all scenarios pass, the pasteable prompt shifts to a coverage-expansion mod
 4. Run the eval suite and inspect the per-scenario status, logs, and generated prompt markdown.
 5. If there are failures, paste the prompt into a coding agent and iterate.
 6. Review any embedded prompt suggestion manually before promoting anything.
+
+## Config Source Of Truth
+
+- `src/config/default-system-config.ts` holds the non-entity bootstrap defaults used for first-run config.
+- `src/config/minimal-system-config.ts` assembles the first persisted config shape.
+- Runtime and eval both operate against persisted config loaded through the state service, not checked-in seed snapshots.

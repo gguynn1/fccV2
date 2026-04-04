@@ -1,4 +1,13 @@
 import type { SystemConfig } from "../index.js";
+import {
+  defaultConfirmationGates,
+  defaultDataIngest,
+  defaultDispatch,
+  defaultEscalationProfiles,
+  defaultInputRecognition,
+  defaultTopics,
+  defaultWorker,
+} from "./default-system-config.js";
 
 export function createMinimalSystemConfig(): SystemConfig {
   return {
@@ -9,37 +18,11 @@ export function createMinimalSystemConfig(): SystemConfig {
     },
     entities: [],
     threads: [],
-    topics: {} as SystemConfig["topics"],
-    escalation_profiles: {} as SystemConfig["escalation_profiles"],
-    confirmation_gates: {
-      always_require_approval: [],
-      expiry_minutes: 30,
-      on_expiry: "notify_and_offer_reissue",
-    },
-    dispatch: {
-      priority_levels: {} as SystemConfig["dispatch"]["priority_levels"],
-      outbound_budget: {} as SystemConfig["dispatch"]["outbound_budget"],
-      routing_rules: {},
-      collision_avoidance: {
-        description: "Default collision policy",
-        precedence_order: [],
-        same_precedence_strategy: "batch",
-      },
-    },
-    input_recognition: {
-      text: { description: "Plain text messages" },
-      structured_choice: { description: "Structured choices", formats: [] },
-      reaction: { positive: "positive", negative: "negative" },
-      image: { description: "Image attachments", examples: {} },
-      forwarded_content: { description: "Forwarded messages" },
-      silence: {
-        high_accountability: "escalate",
-        low_accountability: "disappear",
-        never: "never_escalate",
-      },
-      topic_disambiguation: { description: "Topic disambiguation rules", rules: [] },
-      intent_disambiguation: { description: "Intent disambiguation rules", rules: [] },
-    },
+    topics: structuredClone(defaultTopics),
+    escalation_profiles: structuredClone(defaultEscalationProfiles),
+    confirmation_gates: structuredClone(defaultConfirmationGates),
+    dispatch: structuredClone(defaultDispatch),
+    input_recognition: structuredClone(defaultInputRecognition),
     daily_rhythm: {
       morning_digest: { times: {} },
       evening_checkin: { times: {} },
@@ -52,17 +35,9 @@ export function createMinimalSystemConfig(): SystemConfig {
         include_unresolved_from_yesterday: true,
       },
     },
-    worker: {
-      processing_sequence: [],
-      max_thread_history_messages: 15,
-      stale_after_hours: 24,
-    },
-    data_ingest: {
-      sources: [],
-      future: [],
-    },
+    worker: structuredClone(defaultWorker),
+    data_ingest: structuredClone(defaultDataIngest),
     scenario_testing: {
-      description: "Default scenario testing configuration",
       parts: [],
     },
   };
