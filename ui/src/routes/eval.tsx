@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +51,84 @@ function toStatusVariant(status: string): "default" | "secondary" | "destructive
     default:
       return "outline";
   }
+}
+
+function extractPasteablePrompt(markdown: string): string | null {
+  const marker = "```text\n";
+  const idx = markdown.indexOf(marker);
+  if (idx === -1) return null;
+  const start = idx + marker.length;
+  const end = markdown.indexOf("\n```", start);
+  if (end === -1) return markdown.slice(start);
+  return markdown.slice(start, end);
+}
+
+interface PromptMarkdownPanelProps {
+  markdownPath: string | null;
+  content: string | null;
+  error: Error | null;
+  runStatus: string;
+}
+
+function PromptMarkdownPanel({
+  markdownPath,
+  content,
+  error,
+  runStatus,
+}: PromptMarkdownPanelProps) {
+  const [copied, setCopied] = useState(false);
+
+  const pasteableBlock = useMemo(() => {
+    if (!content) return null;
+    return extractPasteablePrompt(content);
+  }, [content]);
+
+  const copyPrompt = useCallback(() => {
+    if (!pasteableBlock) return;
+    void navigator.clipboard.writeText(pasteableBlock).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [pasteableBlock]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Prompt Markdown</CardTitle>
+          {pasteableBlock && (
+            <Button variant="outline" size="sm" onClick={copyPrompt}>
+              {copied ? "Copied" : "Copy Prompt"}
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="text-sm text-muted-foreground">
+          {markdownPath
+            ? `Artifact: ${markdownPath}`
+            : "Markdown artifact will appear when the run completes."}
+        </div>
+        {content ? (
+          <div className="max-h-[28rem] overflow-y-auto rounded-md border border-border p-3 font-mono text-xs whitespace-pre-wrap">
+            {content}
+          </div>
+        ) : error instanceof Error ? (
+          <p className="text-sm text-destructive">{error.message}</p>
+        ) : runStatus === "completed" && !markdownPath ? (
+          <p className="text-sm text-muted-foreground">
+            No markdown artifact was written for this run.
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {runStatus === "completed"
+              ? "Loading generated markdown…"
+              : "Run the suite to generate the markdown artifact."}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export function EvalRoute() {
@@ -371,35 +449,12 @@ export function EvalRoute() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Prompt Markdown</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  {selectedRun.artifacts.markdown_path
-                    ? `Artifact: ${selectedRun.artifacts.markdown_path}`
-                    : "Markdown artifact will appear when the run completes."}
-                </div>
-                {markdownQuery.data ? (
-                  <div className="max-h-[28rem] overflow-y-auto rounded-md border border-border p-3 font-mono text-xs whitespace-pre-wrap">
-                    {markdownQuery.data.content}
-                  </div>
-                ) : markdownQuery.error instanceof Error ? (
-                  <p className="text-sm text-destructive">{markdownQuery.error.message}</p>
-                ) : selectedRun.status === "completed" && !selectedRun.artifacts.markdown_path ? (
-                  <p className="text-sm text-muted-foreground">
-                    No markdown artifact was written for this run.
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {selectedRun.status === "completed"
-                      ? "Loading generated markdown…"
-                      : "Run the suite to generate the markdown artifact."}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <PromptMarkdownPanel
+              markdownPath={selectedRun.artifacts.markdown_path}
+              content={markdownQuery.data?.content ?? null}
+              error={markdownQuery.error}
+              runStatus={selectedRun.status}
+            />
           </div>
         </>
       )}
