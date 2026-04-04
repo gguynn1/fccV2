@@ -15,7 +15,13 @@ import {
   createTestSystemState,
   installTestSystemConfig,
 } from "../../02-supporting-services/test-fixtures.js";
-import { ClassifierIntent, DispatchPriority, QueueItemSource, TopicKey } from "../../types.js";
+import {
+  ClassifierIntent,
+  DispatchPriority,
+  QueueItemSource,
+  TopicKey,
+  type ClarificationReason,
+} from "../../types.js";
 import type {
   IdentityResolutionResult,
   StackClassificationResult,
@@ -74,6 +80,25 @@ function createRuntimeStubs(
       item: StackQueueItem,
       threadHistory?: ThreadHistory | null,
     ) => Promise<StackClassificationResult>;
+    interpretAction?: () => Promise<
+      | {
+          kind: "resolved";
+          topic: TopicKey;
+          intent: ClassifierIntent;
+          action: Record<string, unknown> & { type: string };
+        }
+      | {
+          kind: "clarification_required";
+          clarification: {
+            reason: ClarificationReason;
+            message_to_participant: string;
+            options?: string[];
+            original_queue_item_id: string;
+            context: Record<string, unknown>;
+          };
+        }
+      | null
+    >;
     now?: () => Date;
     budgetPriority?: DispatchPriority;
     escalationDecision?: { should_escalate: boolean; next_target_thread?: string };
@@ -94,6 +119,7 @@ function createRuntimeStubs(
           intent: item.intent ?? ClassifierIntent.Request,
           concerning: item.concerning,
         })),
+    interpretAction: overrides.interpretAction,
   };
   const classifierMock = vi.fn(classifier.classify);
 
@@ -105,6 +131,7 @@ function createRuntimeStubs(
     worker: createWorker({
       classifier_service: {
         classify: classifierMock,
+        interpretAction: classifier.interpretAction,
       },
       identity_service: createIdentityStub(),
       topic_profile_service: createTopicProfileService(),
@@ -284,6 +311,131 @@ describe("Worker", () => {
     expect(trace.outcome).toBe("clarification_requested");
     expect(runtime.transportCalls[0]?.content).toContain("date and time");
     expect(runtime.transportCalls[0]?.target_thread).toBe("family");
+  });
+
+  it("uses interpreter action before deterministic fallback", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Grocery,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_1"],
+        }),
+      interpretAction: () =>
+        resolved({
+          kind: "resolved",
+          topic: TopicKey.Grocery,
+          intent: ClassifierIntent.Request,
+          action: {
+            type: "add_items",
+            items: [{ item: "apples" }, { item: "eggs" }],
+          },
+        }),
+    });
+
+    await runtime.worker.process({
+      id: "interp_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1"],
+      target_thread: "family",
+      created_at: new Date("2026-04-03T18:10:00.000Z"),
+      content: "please handle groceries",
+    });
+
+    expect(runtime.transportCalls[0]?.content.toLowerCase()).toContain("apples");
+  });
+
+  it("falls back when interpreter returns unsupported action type", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Grocery,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_1"],
+        }),
+      interpretAction: () =>
+        resolved({
+          kind: "resolved",
+          topic: TopicKey.Grocery,
+          intent: ClassifierIntent.Request,
+          action: { type: "not_supported" },
+        }),
+    });
+
+    await runtime.worker.process({
+      id: "interp_2",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1"],
+      target_thread: "family",
+      created_at: new Date("2026-04-03T18:10:00.000Z"),
+      content: "add milk and bread",
+    });
+
+    expect(runtime.transportCalls[0]?.content.toLowerCase()).toContain("milk");
+  });
+
+  it("uses interpreter topic and intent context for downstream routing", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Grocery,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_1"],
+        }),
+      interpretAction: () =>
+        resolved({
+          kind: "resolved",
+          topic: TopicKey.Relationship,
+          intent: ClassifierIntent.Request,
+          action: {
+            type: "respond_to_nudge",
+            acknowledged: true,
+          },
+        }),
+    });
+
+    await runtime.worker.process({
+      id: "interp_3",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1"],
+      target_thread: "family",
+      created_at: new Date("2026-04-03T18:12:00.000Z"),
+      content: "new client inquiry came in",
+    });
+
+    const dispatchCalls = runtime.stateService.appendDispatchResult.mock.calls as unknown as Array<
+      [StackQueueItem, unknown]
+    >;
+    expect(dispatchCalls.some((call) => call[0].topic === TopicKey.Relationship)).toBe(true);
+  });
+
+  it("falls back when interpreter returns malformed allowlisted payload", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Grocery,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_1"],
+        }),
+      interpretAction: () =>
+        resolved({
+          kind: "resolved",
+          topic: TopicKey.Grocery,
+          intent: ClassifierIntent.Request,
+          action: { type: "add_items" },
+        }),
+    });
+
+    await runtime.worker.process({
+      id: "interp_4",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1"],
+      target_thread: "family",
+      created_at: new Date("2026-04-03T18:13:00.000Z"),
+      content: "add yogurt",
+    });
+
+    expect(runtime.transportCalls[0]?.content.toLowerCase()).toContain("yogurt");
   });
 
   it("stores stale urgent backlog instead of dispatching late", async () => {

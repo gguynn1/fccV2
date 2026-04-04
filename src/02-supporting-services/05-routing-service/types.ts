@@ -58,4 +58,10 @@ export interface ThreadTarget {
 export interface RoutingDecision {
   target: ThreadTarget;
   follow_up_target?: ThreadTarget;
+  reply_policy?: {
+    action: "reply_here" | "notify_there" | "suppress_duplicate" | "defer_to_digest";
+    dedupe_key?: string;
+    cooldown_seconds?: number;
+    reason: string;
+  };
 }

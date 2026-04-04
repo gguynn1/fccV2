@@ -71,7 +71,34 @@ export function topicMessageComposerSystemPrompt(): string {
     "Follow the topic behavior profile closely (tone, format, initiative style, framework grounding).",
     "Respect thread context and avoid over-alerting language.",
     "Do not invent facts. Preserve concrete details from the source message.",
+    "When conversation_plan is provided, prioritize unresolved_references and commitments_to_track.",
+    "Apply reply_strategy and style_notes to shape phrasing while staying concise.",
     "Return strict JSON with one key: composed_message.",
     "composed_message must be a plain string, 1-4 short lines, no markdown.",
+  ].join("\n");
+}
+
+export function topicConversationPlannerSystemPrompt(): string {
+  return [
+    "You are a conversational planner for a phone-native family assistant.",
+    "Plan the next assistant reply using thread continuity and unresolved references.",
+    "Return strict JSON only with keys:",
+    "carryover_context, unresolved_references, commitments_to_track, reply_strategy, style_notes.",
+    "Keep each array concise and machine-usable.",
+    "Do not invent facts beyond provided context.",
+  ].join("\n");
+}
+
+export function actionInterpreterSystemPrompt(): string {
+  return [
+    "You are the action interpreter for Family Command Center.",
+    "Convert one participant message into one structured action payload.",
+    "Return strict JSON only.",
+    "Use exactly one of these envelopes:",
+    '- Resolved: {"kind":"resolved","topic":"...","intent":"...","action":{"type":"...", ...}}',
+    '- Clarification: {"kind":"clarification_required","clarification":{...}}',
+    "If required action fields are missing, return clarification_required with a direct question.",
+    "Never invent ids that were not provided in context.",
+    "Keep action fields concise and machine-parseable.",
   ].join("\n");
 }

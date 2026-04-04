@@ -1,73 +1,42 @@
-# React + TypeScript + Vite
+# Admin UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This directory contains the local operator UI for Family Command Center.
 
-Currently, two official plugins are available:
+It is a React + TypeScript + Vite app served by the backend at `/admin` in production, and by Vite during development.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Purpose
 
-## React Compiler
+The admin UI is an operator surface for:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- configuration editing
+- queue and activity visibility
+- eval run start, progress polling, and artifact review
 
-## Expanding the ESLint configuration
+It is intentionally not a participant-facing interface and does not expose raw participant message bodies.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Local Development
 
-```js
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
+From repo root:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
+```bash
+npm run ui:dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+This starts Vite on port `5173` and proxies API requests to backend `:3000`.
 
-```js
-// eslint.config.js
-import reactDom from "eslint-plugin-react-dom";
-import reactX from "eslint-plugin-react-x";
+## Production Build
 
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs["recommended-typescript"],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
+From repo root:
+
+```bash
+npm run ui:build
 ```
+
+The compiled assets are emitted to `ui/dist/` and served by Fastify at `/admin`.
+
+## Constraints
+
+- Local-network operator surface only.
+- Polling-based live updates (`refetchInterval`), no websocket or SSE transport.
+- Dark mode only.
+- shadcn/ui primitives for interactive UI controls.

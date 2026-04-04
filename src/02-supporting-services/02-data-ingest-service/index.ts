@@ -42,6 +42,8 @@ export interface InboxMessage {
   text?: string;
   html?: string;
   attachments?: IngestAttachment[];
+  parse_confidence?: number;
+  parse_warnings?: string[];
 }
 
 export interface DataIngestServiceOptions {
@@ -158,67 +160,80 @@ function parseMimeMessage(rawMessage: string): {
   text: string | null;
   html: string | null;
   attachments: IngestAttachment[];
+  parse_confidence: number;
+  parse_warnings: string[];
 } {
+  const warnings: string[] = [];
   const normalized = rawMessage.replace(/\r\n/gu, "\n");
-  const separatorIndex = normalized.indexOf("\n\n");
-  const rawHeaders = separatorIndex >= 0 ? normalized.slice(0, separatorIndex) : "";
-  const rawBody = separatorIndex >= 0 ? normalized.slice(separatorIndex + 2) : normalized;
-  const headers = parseMimeHeaders(rawHeaders);
-  const contentType = headers["content-type"] ?? "text/plain";
-  const transferEncoding = headers["content-transfer-encoding"];
-  const boundary = extractBoundary(contentType);
 
-  if (!boundary) {
-    const decodedBody = decodeMimeBody(rawBody, transferEncoding);
-    if (contentType.toLowerCase().includes("text/html")) {
-      return { text: null, html: decodedBody, attachments: [] };
-    }
-    return { text: decodedBody, html: null, attachments: [] };
-  }
+  const parsePart = (
+    partSource: string,
+    aggregate: { text: string | null; html: string | null; attachments: IngestAttachment[] },
+  ): void => {
+    const separatorIndex = partSource.indexOf("\n\n");
+    const rawHeaders = separatorIndex >= 0 ? partSource.slice(0, separatorIndex) : "";
+    const rawBody = separatorIndex >= 0 ? partSource.slice(separatorIndex + 2) : partSource;
+    const headers = parseMimeHeaders(rawHeaders);
+    const contentType = headers["content-type"] ?? "text/plain";
+    const transferEncoding = headers["content-transfer-encoding"];
+    const disposition = headers["content-disposition"];
+    const boundary = extractBoundary(contentType);
+    const partType = contentType.split(";")[0]?.trim().toLowerCase() ?? "text/plain";
 
-  const parts = rawBody.split(new RegExp(`--${boundary}(?:--)?\\n`, "u"));
-  const attachments: IngestAttachment[] = [];
-  let text: string | null = null;
-  let html: string | null = null;
-
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const partSeparator = trimmed.indexOf("\n\n");
-    if (partSeparator < 0) {
-      continue;
-    }
-    const partHeaders = parseMimeHeaders(trimmed.slice(0, partSeparator));
-    const partBody = trimmed.slice(partSeparator + 2);
-    const partType = partHeaders["content-type"] ?? "text/plain";
-    const partEncoding = partHeaders["content-transfer-encoding"];
-    const disposition = partHeaders["content-disposition"];
-    const decodedPart = decodeMimeBody(partBody, partEncoding);
-    const filename = parseDispositionFilename(disposition) ?? parseDispositionFilename(partType);
-
-    if (partType.toLowerCase().includes("text/plain") && !filename) {
-      text = text ?? decodedPart;
-      continue;
-    }
-    if (partType.toLowerCase().includes("text/html") && !filename) {
-      html = html ?? decodedPart;
-      continue;
+    if (!boundary) {
+      let decodedBody = rawBody;
+      try {
+        decodedBody = decodeMimeBody(rawBody, transferEncoding);
+      } catch {
+        warnings.push(`decode_failed:${partType}`);
+      }
+      const filename =
+        parseDispositionFilename(disposition) ?? parseDispositionFilename(contentType);
+      if (partType === "text/plain" && !filename) {
+        aggregate.text = aggregate.text ?? decodedBody;
+        return;
+      }
+      if (partType === "text/html" && !filename) {
+        aggregate.html = aggregate.html ?? decodedBody;
+        return;
+      }
+      aggregate.attachments.push({
+        filename: filename ?? `attachment_${aggregate.attachments.length + 1}`,
+        content_type: partType || "application/octet-stream",
+        content:
+          transferEncoding?.toLowerCase() === "base64"
+            ? rawBody.replace(/\s+/gu, "")
+            : Buffer.from(decodedBody, "utf8").toString("base64"),
+        content_transfer_encoding: transferEncoding?.toLowerCase() === "base64" ? "base64" : "utf8",
+      });
+      return;
     }
 
-    attachments.push({
-      filename: filename ?? `attachment_${attachments.length + 1}`,
-      content_type: partType.split(";")[0]?.trim() ?? "application/octet-stream",
-      content:
-        partEncoding?.toLowerCase() === "base64"
-          ? partBody.replace(/\s+/gu, "")
-          : Buffer.from(decodedPart, "utf8").toString("base64"),
-      content_transfer_encoding: partEncoding?.toLowerCase() === "base64" ? "base64" : "utf8",
-    });
-  }
+    const parts = rawBody.split(`--${boundary}`);
+    for (const candidate of parts) {
+      const trimmed = candidate.trim();
+      if (!trimmed || trimmed === "--") {
+        continue;
+      }
+      const nested = trimmed.endsWith("--") ? trimmed.slice(0, -2).trimEnd() : trimmed;
+      parsePart(nested, aggregate);
+    }
+  };
 
-  return { text, html, attachments };
+  const aggregate = {
+    text: null as string | null,
+    html: null as string | null,
+    attachments: [] as IngestAttachment[],
+  };
+  parsePart(normalized, aggregate);
+  const parseConfidence = warnings.length === 0 ? 1 : Math.max(0.4, 1 - warnings.length * 0.15);
+  return {
+    text: aggregate.text,
+    html: aggregate.html,
+    attachments: aggregate.attachments,
+    parse_confidence: parseConfidence,
+    parse_warnings: warnings,
+  };
 }
 
 function summarizeQueueContent(content: StackQueueItem["content"]): string {
@@ -395,6 +410,8 @@ export class DataIngestService implements DataIngestServiceContract {
       attachments: message.attachments ?? [],
     };
     const extracted = await this.extractPayload(envelope);
+    extracted.parse_confidence = message.parse_confidence ?? extracted.parse_confidence;
+    extracted.parse_warnings = message.parse_warnings ?? extracted.parse_warnings;
     const attribution = this.resolveAttribution(message.inbox_address, extracted);
     const classification = await this.classifyEnvelope(
       {
@@ -526,6 +543,8 @@ export class DataIngestService implements DataIngestServiceContract {
             text: parsedMime.text ?? sourceText.slice(0, 20_000),
             html: parsedMime.html ?? undefined,
             attachments: parsedMime.attachments,
+            parse_confidence: parsedMime.parse_confidence,
+            parse_warnings: parsedMime.parse_warnings,
           };
           await this.processInboxMessage(inboxMessage);
           await client.messageFlagsAdd(message.uid, ["\\Seen"]);
@@ -590,6 +609,13 @@ export class DataIngestService implements DataIngestServiceContract {
         relevant_until: parsed.relevant_until ? new Date(parsed.relevant_until) : null,
         attributed_entity: parsed.attributed_entity ?? null,
         confidence: parsed.confidence,
+        parse_confidence:
+          typeof parsed.parse_confidence === "number" ? parsed.parse_confidence : undefined,
+        parse_warnings: Array.isArray(parsed.parse_warnings)
+          ? parsed.parse_warnings.filter(
+              (warning): warning is string => typeof warning === "string",
+            )
+          : undefined,
       };
     } catch (error: unknown) {
       this.logger.warn(
@@ -618,6 +644,8 @@ export class DataIngestService implements DataIngestServiceContract {
       relevant_until: relevantUntil,
       attributed_entity: null,
       confidence: 0.25,
+      parse_confidence: 0.5,
+      parse_warnings: ["fallback_extraction"],
     };
   }
 
@@ -666,6 +694,8 @@ export class DataIngestService implements DataIngestServiceContract {
         extracted: {
           summary: extracted.summary,
           ...extracted.details,
+          parse_confidence: String(extracted.parse_confidence ?? ""),
+          parse_warnings: (extracted.parse_warnings ?? []).join(" | "),
         },
       },
       concerning: classification.concerning,

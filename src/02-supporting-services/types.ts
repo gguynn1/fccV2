@@ -99,6 +99,7 @@ export interface BudgetDecision {
   hold_until?: Date;
   included_queue_item_ids?: string[];
   reason: string;
+  reason_codes?: string[];
 }
 
 export interface BudgetService {

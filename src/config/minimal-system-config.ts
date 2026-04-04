@@ -538,6 +538,8 @@ const defaultWorker: SystemConfig["worker"] = {
         "Determine target thread, then dispatch (immediate), hold (batched), or store (silent).",
     },
   ],
+  ai_action_interpreter_enabled: true,
+  ai_action_interpreter_topic_allowlist: [],
 };
 
 const defaultDataIngest: SystemConfig["data_ingest"] = {

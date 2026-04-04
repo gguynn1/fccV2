@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import type { ClassifierIntent, EscalationLevel, GrocerySection, TopicKey } from "../../types.js";
+import {
+  ClarificationReason,
+  ClassifierIntent,
+  TopicKey,
+  type EscalationLevel,
+  type GrocerySection,
+} from "../../types.js";
 
 export interface ClassificationResult {
   topic: TopicKey;
@@ -372,6 +378,41 @@ export const topicScopedContentSchema = z.object({
 export const topicMessageSchema = z.object({
   composed_message: z.string().trim().min(1),
 });
+
+export const topicConversationPlanSchema = z.object({
+  carryover_context: z.array(z.string().trim().min(1)).max(5).default([]),
+  unresolved_references: z.array(z.string().trim().min(1)).max(3).default([]),
+  commitments_to_track: z.array(z.string().trim().min(1)).max(3).default([]),
+  reply_strategy: z
+    .enum(["direct_answer", "confirm_then_act", "ask_one_question", "brief_status_then_next_step"])
+    .default("direct_answer"),
+  style_notes: z.array(z.string().trim().min(1)).max(3).default([]),
+});
+
+export const interpreterActionSchema = z
+  .object({
+    type: z.string().trim().min(1),
+  })
+  .catchall(z.unknown());
+
+export const actionInterpreterResolutionSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("resolved"),
+    topic: z.nativeEnum(TopicKey),
+    intent: z.nativeEnum(ClassifierIntent),
+    action: interpreterActionSchema,
+  }),
+  z.object({
+    kind: z.literal("clarification_required"),
+    clarification: z.object({
+      reason: z.nativeEnum(ClarificationReason),
+      message_to_participant: z.string().trim().min(1),
+      options: z.array(z.string().trim().min(1)).optional(),
+      original_queue_item_id: z.string().trim().min(1),
+      context: z.record(z.string(), z.unknown()),
+    }),
+  }),
+]);
 
 export interface ClassifierServiceOptions {
   anthropic_api_key: string;

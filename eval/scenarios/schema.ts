@@ -35,6 +35,22 @@ export const evalTurnSchema = z.object({
 
 export const evalScenarioSimulationSchema = z.object({
   actual_overrides: z.record(z.string(), z.unknown()).optional(),
+  interpreter_fixture: z
+    .object({
+      topic: z.string().min(1).optional(),
+      intent: z.string().min(1).optional(),
+      action_type: z.string().min(1).optional(),
+    })
+    .optional(),
+  parity_assertion: z
+    .object({
+      against_simulator: z.boolean().optional(),
+      match_fields: z
+        .array(z.enum(["topic", "intent", "target_thread", "priority"]))
+        .min(1)
+        .optional(),
+    })
+    .optional(),
   tuning_scope: z.enum(["prompt", "structural"]).optional(),
 });
 

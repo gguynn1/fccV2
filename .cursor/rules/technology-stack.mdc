@@ -9,7 +9,7 @@ alwaysApply: true
 
 | Service                           | Purpose                                                                              |
 | --------------------------------- | ------------------------------------------------------------------------------------ |
-| Twilio Programmable Messaging API | All inbound/outbound SMS/MMS across all threads                                      |
+| Twilio Programmable Messaging API | All inbound/outbound phone-native messaging across all threads                       |
 | Anthropic Claude API              | Classification, message composition, image parsing, email extraction, digest merging |
 
 Email (IMAP via imapflow) connects to existing family inboxes — no new subscription.

@@ -130,6 +130,45 @@ export interface ClassifierServiceContract {
     classification: StackClassificationResult,
     thread_history?: ThreadHistory | null,
   ): Promise<string | null>;
+  planTopicResponse?(input: {
+    topic: TopicKey;
+    intent: ClassifierIntent;
+    source_message: string;
+    recent_messages: Array<{
+      from: string;
+      content: string;
+      at: string;
+      topic_context: string | null;
+    }>;
+  }): Promise<{
+    carryover_context: string[];
+    unresolved_references: string[];
+    commitments_to_track: string[];
+    reply_strategy:
+      | "direct_answer"
+      | "confirm_then_act"
+      | "ask_one_question"
+      | "brief_status_then_next_step";
+    style_notes: string[];
+  } | null>;
+  interpretAction?(input: {
+    queue_item: StackQueueItem;
+    classification: StackClassificationResult;
+    thread_history?: ThreadHistory | null;
+    scoped_content: string;
+  }): Promise<
+    | {
+        kind: "resolved";
+        topic: TopicKey;
+        intent: ClassifierIntent;
+        action: Record<string, unknown> & { type: string };
+      }
+    | {
+        kind: "clarification_required";
+        clarification: ClarificationRequest;
+      }
+    | null
+  >;
 }
 
 export interface QueueServiceContract {

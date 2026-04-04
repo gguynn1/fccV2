@@ -6,15 +6,19 @@ import { pino, type Logger } from "pino";
 import type { ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
 import type { StateService } from "../../02-supporting-services/types.js";
 import { ClassifierIntent, QueueItemSource, TopicKey } from "../../types.js";
-import type { StackClassificationResult, StackQueueItem } from "../types.js";
+import type { ClarificationRequest, StackClassificationResult, StackQueueItem } from "../types.js";
 import {
+  actionInterpreterSystemPrompt,
   classifierSystemPrompt,
   classifierUserPrompt,
+  topicConversationPlannerSystemPrompt,
   topicMessageComposerSystemPrompt,
   topicScopedContentSystemPrompt,
 } from "./prompts.js";
 import {
+  actionInterpreterResolutionSchema,
   classificationResultSchema,
+  topicConversationPlanSchema,
   topicMessageSchema,
   topicScopedContentSchema,
   type ClassifierContextMessage,
@@ -195,6 +199,17 @@ export class ClaudeClassifierService {
       at: string;
       topic_context: string | null;
     }>;
+    conversation_plan?: {
+      carryover_context: string[];
+      unresolved_references: string[];
+      commitments_to_track: string[];
+      reply_strategy:
+        | "direct_answer"
+        | "confirm_then_act"
+        | "ask_one_question"
+        | "brief_status_then_next_step";
+      style_notes: string[];
+    } | null;
   }): Promise<string | null> {
     try {
       const response = await this.anthropic.messages.create({
@@ -221,6 +236,131 @@ export class ClaudeClassifierService {
       this.logger.warn(
         { err: error instanceof Error ? error.message : String(error) },
         "Topic-native composition failed; using deterministic fallback message.",
+      );
+      return null;
+    }
+  }
+
+  public async planTopicResponse(input: {
+    topic: TopicKey;
+    intent: ClassifierIntent;
+    source_message: string;
+    recent_messages: Array<{
+      from: string;
+      content: string;
+      at: string;
+      topic_context: string | null;
+    }>;
+  }): Promise<{
+    carryover_context: string[];
+    unresolved_references: string[];
+    commitments_to_track: string[];
+    reply_strategy:
+      | "direct_answer"
+      | "confirm_then_act"
+      | "ask_one_question"
+      | "brief_status_then_next_step";
+    style_notes: string[];
+  } | null> {
+    try {
+      const response = await this.anthropic.messages.create({
+        model: this.model,
+        max_tokens: 240,
+        temperature: 0,
+        system: topicConversationPlannerSystemPrompt(),
+        messages: [{ role: "user", content: JSON.stringify(input, null, 2) }],
+      });
+      const textBlock = response.content.find((block) => block.type === "text");
+      if (!textBlock || textBlock.type !== "text") {
+        return null;
+      }
+      const raw = this.extractJson(textBlock.text);
+      return topicConversationPlanSchema.parse(JSON.parse(raw));
+    } catch (error: unknown) {
+      this.logger.warn(
+        { err: error instanceof Error ? error.message : String(error) },
+        "Topic conversation planning failed; continuing without plan.",
+      );
+      return null;
+    }
+  }
+
+  public async interpretAction(input: {
+    queue_item: StackQueueItem;
+    classification: StackClassificationResult;
+    thread_history?: ThreadHistory | null;
+    scoped_content: string;
+  }): Promise<
+    | {
+        kind: "resolved";
+        topic: TopicKey;
+        intent: ClassifierIntent;
+        action: Record<string, unknown> & { type: string };
+      }
+    | {
+        kind: "clarification_required";
+        clarification: ClarificationRequest;
+      }
+    | null
+  > {
+    try {
+      const history = (input.thread_history?.recent_messages ?? [])
+        .slice(-this.contextWindowLimit)
+        .map((message) => ({
+          from: message.from,
+          content: message.content,
+          at: message.at.toISOString(),
+          topic_context: message.topic_context ?? null,
+        }));
+      const response = await this.anthropic.messages.create({
+        model: this.model,
+        max_tokens: 500,
+        temperature: 0,
+        system: actionInterpreterSystemPrompt(),
+        messages: [
+          {
+            role: "user",
+            content: JSON.stringify(
+              {
+                queue_item: {
+                  id: input.queue_item.id ?? null,
+                  source: input.queue_item.source,
+                  concerning: input.queue_item.concerning,
+                  target_thread: input.queue_item.target_thread,
+                  created_at: input.queue_item.created_at.toISOString(),
+                },
+                classification: input.classification,
+                scoped_content: input.scoped_content,
+                thread_history: history,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      });
+      const textBlock = response.content.find((block) => block.type === "text");
+      if (!textBlock || textBlock.type !== "text") {
+        return null;
+      }
+      const raw = this.extractJson(textBlock.text);
+      const parsed = actionInterpreterResolutionSchema.parse(JSON.parse(raw));
+      if (parsed.kind === "resolved") {
+        return {
+          kind: "resolved",
+          topic: parsed.topic,
+          intent: parsed.intent,
+          action: parsed.action,
+        };
+      }
+      return {
+        kind: "clarification_required",
+        clarification: parsed.clarification,
+      };
+    } catch (error: unknown) {
+      this.logger.warn(
+        { err: error instanceof Error ? error.message : String(error) },
+        "Action interpreter failed; worker fallback will run.",
       );
       return null;
     }

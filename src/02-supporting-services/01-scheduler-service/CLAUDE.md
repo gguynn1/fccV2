@@ -7,14 +7,12 @@ Maintains scheduled events:
 Implemented:
 morning digests (BullMQ repeatable cron job)
 evening check-ins (BullMQ repeatable cron job)
+policy-driven proactive queue items from topic configuration (follow-ups, nudges, reminders)
+stale/relevance filtering before enqueue
 
-Design intent (not yet wired through this service):
-reminder timers — currently managed by escalation service timers
-follow-up windows — currently managed by escalation service timers
-escalation deadlines — currently managed by escalation service timers
-confirmation expiry — currently managed by confirmation service timers
-relationship nudge cooldowns
-financial due date alerts
+Owned by other services:
+escalation deadlines and step timers — escalation service
+confirmation expiry timers — confirmation service
 
 When a trigger fires:
 creates a queue item

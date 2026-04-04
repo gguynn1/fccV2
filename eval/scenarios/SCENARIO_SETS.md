@@ -53,6 +53,8 @@ Before adding a scenario set, verify:
 - The expected priority makes sense for the scenario.
 - `confirmation_required` is true only when the action should require approval.
 - `tone_markers` and `format_markers` are observable in output text, not abstract ideas.
+- When using `simulation.interpreter_fixture`, keep `action_type` valid for the fixture topic.
+- Use `simulation.parity_assertion` to enforce worker-vs-simulator parity on critical fields.
 
 ## File Shape
 

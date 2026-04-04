@@ -34,6 +34,8 @@ export interface WorkerConfig {
   stale_after_hours?: number;
   urgent_relevance_minutes?: number;
   clarification_timeout_minutes?: number;
+  ai_action_interpreter_enabled?: boolean;
+  ai_action_interpreter_topic_allowlist?: string[];
 }
 
 export interface ClarificationRequest {

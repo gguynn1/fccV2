@@ -95,6 +95,8 @@ export interface ExtractedIngestPayload {
   relevant_until?: Date | null;
   attributed_entity?: string | null;
   confidence?: number;
+  parse_confidence?: number;
+  parse_warnings?: string[];
 }
 
 export interface ProcessedIngestItem {

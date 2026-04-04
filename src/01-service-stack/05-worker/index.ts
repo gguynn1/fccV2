@@ -1,4 +1,5 @@
 import { pino, type Logger } from "pino";
+import { z } from "zod";
 
 import { CalendarEventStatus } from "../../02-supporting-services/04-topic-profile-service/04.01-calendar/types.js";
 import { ChoreStatus } from "../../02-supporting-services/04-topic-profile-service/04.02-chores/types.js";
@@ -106,6 +107,204 @@ const CLARIFICATION_PROMPTS = [
   "Who should this be for?",
 ];
 
+const INTERPRETER_RESPONSE_ACTIONS_BY_TOPIC: Record<TopicKey, Set<string>> = {
+  [TopicKey.Calendar]: new Set([
+    "query_events",
+    "cancel_event",
+    "reschedule_event",
+    "create_event",
+  ]),
+  [TopicKey.Chores]: new Set(["query_chores", "complete_chore", "cancel_chore", "assign_chore"]),
+  [TopicKey.Finances]: new Set(["query_finances", "log_expense"]),
+  [TopicKey.Grocery]: new Set(["query_list", "remove_items", "add_items"]),
+  [TopicKey.Health]: new Set(["query_health", "log_visit", "add_appointment"]),
+  [TopicKey.Pets]: new Set(["query_pets"]),
+  [TopicKey.School]: new Set(["query_school", "add_assignment"]),
+  [TopicKey.Travel]: new Set(["query_trips", "create_trip"]),
+  [TopicKey.Vendors]: new Set(["query_vendors"]),
+  [TopicKey.Business]: new Set(["query_leads"]),
+  [TopicKey.Relationship]: new Set(["query_nudge_history"]),
+  [TopicKey.FamilyStatus]: new Set(["query_status", "update_status"]),
+  [TopicKey.Meals]: new Set(["query_plans"]),
+  [TopicKey.Maintenance]: new Set(["query_maintenance"]),
+};
+
+const INTERPRETER_SUPPORTED_ACTIONS_BY_TOPIC: Record<TopicKey, Set<string>> = {
+  [TopicKey.Calendar]: new Set([
+    "query_events",
+    "cancel_event",
+    "reschedule_event",
+    "create_event",
+  ]),
+  [TopicKey.Chores]: new Set(["query_chores", "complete_chore", "cancel_chore", "assign_chore"]),
+  [TopicKey.Finances]: new Set(["query_finances", "log_expense"]),
+  [TopicKey.Grocery]: new Set(["query_list", "remove_items", "add_items"]),
+  [TopicKey.Health]: new Set(["query_health", "log_visit", "add_appointment"]),
+  [TopicKey.Pets]: new Set(["query_pets", "log_care"]),
+  [TopicKey.School]: new Set(["query_school", "add_assignment"]),
+  [TopicKey.Travel]: new Set(["query_trips", "create_trip"]),
+  [TopicKey.Vendors]: new Set(["query_vendors", "add_vendor"]),
+  [TopicKey.Business]: new Set(["query_leads", "add_lead"]),
+  [TopicKey.Relationship]: new Set(["query_nudge_history", "respond_to_nudge"]),
+  [TopicKey.FamilyStatus]: new Set(["query_status", "update_status"]),
+  [TopicKey.Meals]: new Set(["query_plans", "plan_meal"]),
+  [TopicKey.Maintenance]: new Set(["query_maintenance", "add_asset"]),
+};
+
+const nonEmptyStringSchema = z.string().trim().min(1);
+const nonNegativeNumberSchema = z.number().min(0);
+const dateSchema = z.coerce.date();
+
+const INTERPRETER_ACTION_SCHEMA_BY_TYPE: Record<string, z.ZodTypeAny> = {
+  query_events: z.object({ type: z.literal("query_events") }),
+  create_event: z.object({
+    type: z.literal("create_event"),
+    title: nonEmptyStringSchema,
+    date_start: dateSchema,
+    concerning: z.array(nonEmptyStringSchema).min(1),
+  }),
+  reschedule_event: z.object({
+    type: z.literal("reschedule_event"),
+    event_id: nonEmptyStringSchema,
+    new_start: dateSchema,
+  }),
+  cancel_event: z.object({
+    type: z.literal("cancel_event"),
+    event_id: nonEmptyStringSchema,
+  }),
+  query_chores: z.object({ type: z.literal("query_chores") }),
+  assign_chore: z.object({
+    type: z.literal("assign_chore"),
+    task: nonEmptyStringSchema,
+    assigned_to: nonEmptyStringSchema,
+    due: dateSchema,
+  }),
+  complete_chore: z.object({ type: z.literal("complete_chore"), chore_id: nonEmptyStringSchema }),
+  cancel_chore: z.object({ type: z.literal("cancel_chore"), chore_id: nonEmptyStringSchema }),
+  query_finances: z.object({ type: z.literal("query_finances") }),
+  log_expense: z.object({
+    type: z.literal("log_expense"),
+    description: nonEmptyStringSchema,
+    amount: nonNegativeNumberSchema,
+    logged_by: nonEmptyStringSchema,
+    requires_confirmation: z.literal(true).default(true),
+  }),
+  query_list: z.object({ type: z.literal("query_list") }),
+  add_items: z.object({
+    type: z.literal("add_items"),
+    items: z.array(z.object({ item: nonEmptyStringSchema })).min(1),
+  }),
+  remove_items: z.object({
+    type: z.literal("remove_items"),
+    item_ids: z.array(nonEmptyStringSchema).min(1),
+  }),
+  query_health: z.object({
+    type: z.literal("query_health"),
+    entity: nonEmptyStringSchema.optional(),
+  }),
+  add_appointment: z.object({
+    type: z.literal("add_appointment"),
+    entity: nonEmptyStringSchema,
+    provider_type: z.nativeEnum(HealthProviderType),
+    date: dateSchema,
+  }),
+  log_visit: z.object({
+    type: z.literal("log_visit"),
+    entity: nonEmptyStringSchema,
+    provider_type: z.nativeEnum(HealthProviderType),
+    notes: nonEmptyStringSchema,
+  }),
+  query_pets: z.object({
+    type: z.literal("query_pets"),
+    entity: nonEmptyStringSchema.optional(),
+  }),
+  log_care: z.object({
+    type: z.literal("log_care"),
+    entity: nonEmptyStringSchema,
+    activity: nonEmptyStringSchema,
+    by: nonEmptyStringSchema,
+    category: z.nativeEnum(PetCareCategory),
+  }),
+  query_school: z.object({
+    type: z.literal("query_school"),
+    entity: nonEmptyStringSchema.optional(),
+  }),
+  add_assignment: z.object({
+    type: z.literal("add_assignment"),
+    entity: nonEmptyStringSchema,
+    parent_entity: nonEmptyStringSchema,
+    title: nonEmptyStringSchema,
+    due_date: dateSchema,
+    source: z.nativeEnum(SchoolInputSource),
+  }),
+  query_trips: z.object({
+    type: z.literal("query_trips"),
+    status: z.nativeEnum(TripStatus).optional(),
+  }),
+  create_trip: z.object({
+    type: z.literal("create_trip"),
+    name: nonEmptyStringSchema,
+    dates: z.object({ start: dateSchema, end: dateSchema }),
+    travelers: z.array(nonEmptyStringSchema).min(1),
+    source: z.nativeEnum(TravelInputSource),
+  }),
+  query_vendors: z.object({ type: z.literal("query_vendors") }),
+  add_vendor: z.object({
+    type: z.literal("add_vendor"),
+    name: nonEmptyStringSchema,
+    vendor_type: nonEmptyStringSchema,
+    contact: nonEmptyStringSchema,
+    managed_by: nonEmptyStringSchema,
+  }),
+  query_leads: z.object({
+    type: z.literal("query_leads"),
+    owner: nonEmptyStringSchema.optional(),
+    status: z.nativeEnum(BusinessLeadStatus).optional(),
+  }),
+  add_lead: z.object({
+    type: z.literal("add_lead"),
+    owner: nonEmptyStringSchema,
+    client_name: nonEmptyStringSchema,
+  }),
+  query_nudge_history: z.object({
+    type: z.literal("query_nudge_history"),
+    nudge_type: z.nativeEnum(NudgeType).optional(),
+  }),
+  respond_to_nudge: z.object({
+    type: z.literal("respond_to_nudge"),
+    acknowledged: z.boolean(),
+  }),
+  query_status: z.object({
+    type: z.literal("query_status"),
+    entity: nonEmptyStringSchema.optional(),
+  }),
+  update_status: z.object({
+    type: z.literal("update_status"),
+    entity: nonEmptyStringSchema,
+    status: nonEmptyStringSchema,
+    expires_at: dateSchema,
+  }),
+  query_plans: z.object({ type: z.literal("query_plans") }),
+  plan_meal: z.object({
+    type: z.literal("plan_meal"),
+    date: dateSchema,
+    meal_type: z.nativeEnum(MealType),
+    description: nonEmptyStringSchema,
+    planned_by: nonEmptyStringSchema,
+  }),
+  query_maintenance: z.object({
+    type: z.literal("query_maintenance"),
+    asset_type: z.nativeEnum(MaintenanceAssetType).optional(),
+    status: z.nativeEnum(MaintenanceStatus).optional(),
+  }),
+  add_asset: z.object({
+    type: z.literal("add_asset"),
+    asset_type: z.nativeEnum(MaintenanceAssetType),
+    name: nonEmptyStringSchema,
+    details: z.record(z.string(), z.string()),
+  }),
+};
+
 interface WorkerIdentityService {
   resolve(item: StackQueueItem): Promise<IdentityResolutionResult>;
 }
@@ -130,6 +329,8 @@ export interface WorkerOptions {
 interface DeterminedAction {
   is_response: boolean;
   typed_action: TopicAction;
+  resolved_topic?: TopicKey;
+  resolved_intent?: ClassifierIntent;
 }
 
 interface ClarificationDispatch {
@@ -551,6 +752,14 @@ export class Worker {
       urgent_relevance_minutes:
         options.config?.urgent_relevance_minutes ?? DEFAULT_URGENT_RELEVANCE_MINUTES,
       clarification_timeout_minutes: options.config?.clarification_timeout_minutes ?? 10,
+      ai_action_interpreter_enabled:
+        options.config?.ai_action_interpreter_enabled ??
+        runtimeSystemConfig.worker.ai_action_interpreter_enabled ??
+        true,
+      ai_action_interpreter_topic_allowlist:
+        options.config?.ai_action_interpreter_topic_allowlist ??
+        runtimeSystemConfig.worker.ai_action_interpreter_topic_allowlist ??
+        [],
     };
   }
 
@@ -684,14 +893,12 @@ export class Worker {
         undefined,
         `${classification.topic}/${classification.intent}`,
         () =>
-          Promise.resolve(
-            this.resolveAction(
-              classifiedQueueItem,
-              classification,
-              identity,
-              cappedHistory,
-              actionContent,
-            ),
+          this.resolveAction(
+            classifiedQueueItem,
+            classification,
+            identity,
+            cappedHistory,
+            actionContent,
           ),
         (output) => ({
           output_summary: output.is_response ? "response" : "proactive",
@@ -724,12 +931,23 @@ export class Worker {
 
     const effectiveIsResponse =
       determined.is_response || this.isParticipantInitiatedSource(classifiedQueueItem.source);
+    const effectiveClassification: StackClassificationResult = {
+      ...classification,
+      topic: determined.resolved_topic ?? classification.topic,
+      intent: determined.resolved_intent ?? classification.intent,
+    };
+    const effectiveQueueItem: StackQueueItem = {
+      ...classifiedQueueItem,
+      topic: effectiveClassification.topic,
+      intent: effectiveClassification.intent,
+      concerning: effectiveClassification.concerning,
+    };
 
     const provisionalTargetThread = await this.routingService.resolveTargetThread({
-      topic: classification.topic,
-      intent: classification.intent,
-      concerning: classification.concerning,
-      origin_thread: classifiedQueueItem.target_thread,
+      topic: effectiveClassification.topic,
+      intent: effectiveClassification.intent,
+      concerning: effectiveClassification.concerning,
+      origin_thread: effectiveQueueItem.target_thread,
       is_response: effectiveIsResponse,
     });
 
@@ -741,7 +959,7 @@ export class Worker {
       provisionalTargetThread,
       async () =>
         this.budgetService.evaluateOutbound(
-          classifiedQueueItem,
+          effectiveQueueItem,
           provisionalTargetThread,
           toCollisionPolicy(),
         ),
@@ -757,7 +975,7 @@ export class Worker {
       WorkerAction.CheckEscalation,
       WorkerService.Escalation,
       provisionalTargetThread,
-      async () => this.escalationService.evaluate(classifiedQueueItem, provisionalTargetThread),
+      async () => this.escalationService.evaluate(effectiveQueueItem, provisionalTargetThread),
       (output) => ({
         output_summary: output.should_escalate ? "escalating" : "no_escalation",
         metadata: {
@@ -780,8 +998,8 @@ export class Worker {
       determined.typed_action.type,
       async () =>
         this.handleConfirmation(
-          classifiedQueueItem,
-          classification,
+          effectiveQueueItem,
+          effectiveClassification,
           identity,
           determined.typed_action,
           escalationTargetThread,
@@ -812,8 +1030,8 @@ export class Worker {
         { ...classifiedQueueItem, target_thread: escalationTargetThread },
         `Confirmation resolved as ${confirmationResult.resolution}; action execution halted.`,
       );
-      await this.appendInboundHistory(classifiedQueueItem, classification.topic);
-      await this.stateService.appendDispatchResult(classifiedQueueItem, haltedAction);
+      await this.appendInboundHistory(effectiveQueueItem, effectiveClassification.topic);
+      await this.stateService.appendDispatchResult(effectiveQueueItem, haltedAction);
       const completedAt = this.now();
       return {
         queue_item_id: queueItemId,
@@ -832,23 +1050,25 @@ export class Worker {
         ? confirmationResult.approved_action_payload
         : determined.typed_action;
 
-    await this.applyStateMutation(classifiedQueueItem, actionToExecute);
+    await this.applyStateMutation(effectiveQueueItem, actionToExecute);
 
     const profileResult = await this.traceStep(
       traceSteps,
       7,
       WorkerAction.ApplyBehaviorProfile,
       WorkerService.TopicProfile,
-      classification.topic,
+      effectiveClassification.topic,
       async () => {
-        const profile = await this.topicProfileService.getTopicConfig(classification.topic);
+        const profile = await this.topicProfileService.getTopicConfig(
+          effectiveClassification.topic,
+        );
         const placeholderAction = this.toStoreAction(
-          classifiedQueueItem,
+          effectiveQueueItem,
           "Pre-dispatch composition.",
         );
         const decision: WorkerDecision = {
-          queue_item: classifiedQueueItem,
-          classification,
+          queue_item: effectiveQueueItem,
+          classification: effectiveClassification,
           identity,
           action: placeholderAction,
         };
@@ -858,6 +1078,27 @@ export class Worker {
           composed = stateBackedMessage;
         }
         const classifierWithComposer = this.classifierService as {
+          planTopicResponse?: (input: {
+            topic: TopicKey;
+            intent: ClassifierIntent;
+            source_message: string;
+            recent_messages: Array<{
+              from: string;
+              content: string;
+              at: string;
+              topic_context: string | null;
+            }>;
+          }) => Promise<{
+            carryover_context: string[];
+            unresolved_references: string[];
+            commitments_to_track: string[];
+            reply_strategy:
+              | "direct_answer"
+              | "confirm_then_act"
+              | "ask_one_question"
+              | "brief_status_then_next_step";
+            style_notes: string[];
+          } | null>;
           composeTopicMessage?: (input: {
             topic: TopicKey;
             intent: ClassifierIntent;
@@ -875,22 +1116,42 @@ export class Worker {
               at: string;
               topic_context: string | null;
             }>;
+            conversation_plan?: {
+              carryover_context: string[];
+              unresolved_references: string[];
+              commitments_to_track: string[];
+              reply_strategy:
+                | "direct_answer"
+                | "confirm_then_act"
+                | "ask_one_question"
+                | "brief_status_then_next_step";
+              style_notes: string[];
+            } | null;
           }) => Promise<string | null>;
         };
         if (typeof classifierWithComposer.composeTopicMessage === "function") {
           const sourceMessage =
-            typeof classifiedQueueItem.content === "string"
-              ? classifiedQueueItem.content
-              : JSON.stringify(classifiedQueueItem.content);
+            typeof effectiveQueueItem.content === "string"
+              ? effectiveQueueItem.content
+              : JSON.stringify(effectiveQueueItem.content);
           const recentMessages = (cappedHistory?.recent_messages ?? []).map((message) => ({
             from: message.from,
             content: message.content,
             at: message.at.toISOString(),
             topic_context: message.topic_context ?? null,
           }));
+          const conversationPlan =
+            typeof classifierWithComposer.planTopicResponse === "function"
+              ? await classifierWithComposer.planTopicResponse({
+                  topic: effectiveClassification.topic,
+                  intent: effectiveClassification.intent,
+                  source_message: sourceMessage,
+                  recent_messages: recentMessages,
+                })
+              : null;
           const composedFromModel = await classifierWithComposer.composeTopicMessage({
-            topic: classification.topic,
-            intent: classification.intent,
+            topic: effectiveClassification.topic,
+            intent: effectiveClassification.intent,
             source_message: sourceMessage,
             proposed_message: composed,
             behavior: {
@@ -900,12 +1161,13 @@ export class Worker {
               framework_grounding: profile.framework_grounding,
             },
             recent_messages: recentMessages,
+            conversation_plan: conversationPlan,
           });
           if (typeof composedFromModel === "string" && composedFromModel.trim().length > 0) {
             composed = composedFromModel.trim();
           }
         }
-        await this.enqueueCrossTopicEvents(classifiedQueueItem, classification, profile, {
+        await this.enqueueCrossTopicEvents(effectiveQueueItem, effectiveClassification, profile, {
           ...determined,
           typed_action: actionToExecute,
         });
@@ -929,10 +1191,10 @@ export class Worker {
       escalationTargetThread,
       async () => {
         const routingDecision = this.resolveRoutingDecision({
-          topic: classification.topic,
-          intent: classification.intent,
-          concerning: classification.concerning,
-          origin_thread: classifiedQueueItem.target_thread,
+          topic: effectiveClassification.topic,
+          intent: effectiveClassification.intent,
+          concerning: effectiveClassification.concerning,
+          origin_thread: effectiveQueueItem.target_thread,
           is_response: effectiveIsResponse,
         });
         const routedTargetThread =
@@ -953,13 +1215,13 @@ export class Worker {
           effectiveRoutingDecision.target.thread_id === provisionalTargetThread
             ? budget
             : await this.budgetService.evaluateOutbound(
-                classifiedQueueItem,
+                effectiveQueueItem,
                 effectiveRoutingDecision.target.thread_id,
                 toCollisionPolicy(),
               );
         const finalAction = await this.routeToAction(
-          classifiedQueueItem,
-          classification,
+          effectiveQueueItem,
+          effectiveClassification,
           identity,
           effectiveRoutingDecision,
           effectiveBudget,
@@ -967,8 +1229,8 @@ export class Worker {
         );
 
         await this.persistOutcome(
-          classifiedQueueItem,
-          classification,
+          effectiveQueueItem,
+          effectiveClassification,
           finalAction,
           profileResult.composed,
           effectiveRoutingDecision,
@@ -1155,16 +1417,25 @@ export class Worker {
     return scoped;
   }
 
-  private resolveAction(
+  private async resolveAction(
     queueItem: StackQueueItem,
     classification: StackClassificationResult,
     identity: IdentityResolutionResult,
     threadHistory: ThreadHistory | null,
     actionContent?: string,
-  ): DeterminedAction {
+  ): Promise<DeterminedAction> {
     const content = stripConversationalLeadIns(
       actionContent ?? summarizeContent(queueItem.content),
     );
+    const interpreted = await this.resolveActionViaInterpreter(
+      queueItem,
+      classification,
+      threadHistory,
+      content,
+    );
+    if (interpreted) {
+      return interpreted;
+    }
     const explicitDateHint = extractDateHint(content, queueItem.created_at);
     const inferredReference = this.inferClarificationReference(queueItem, threadHistory);
     const referenceId =
@@ -1608,6 +1879,199 @@ export class Worker {
           ),
         );
     }
+  }
+
+  private async resolveActionViaInterpreter(
+    queueItem: StackQueueItem,
+    classification: StackClassificationResult,
+    threadHistory: ThreadHistory | null,
+    scopedContent: string,
+  ): Promise<DeterminedAction | null> {
+    if (!this.config.ai_action_interpreter_enabled) {
+      this.logger.debug(
+        { queue_item_id: extractQueueItemId(queueItem), interpreter_fallback_reason: "disabled" },
+        "Interpreter skipped; deterministic fallback active.",
+      );
+      return null;
+    }
+    const allowlist = this.config.ai_action_interpreter_topic_allowlist;
+    if (allowlist.length > 0 && !allowlist.includes(classification.topic)) {
+      this.logger.debug(
+        {
+          queue_item_id: extractQueueItemId(queueItem),
+          topic: classification.topic,
+          interpreter_fallback_reason: "topic_not_allowlisted",
+        },
+        "Interpreter skipped by topic allowlist; deterministic fallback active.",
+      );
+      return null;
+    }
+    if (typeof this.classifierService.interpretAction !== "function") {
+      this.logger.debug(
+        {
+          queue_item_id: extractQueueItemId(queueItem),
+          interpreter_fallback_reason: "interpreter_not_implemented",
+        },
+        "Interpreter unavailable; deterministic fallback active.",
+      );
+      return null;
+    }
+
+    const interpreted = await this.classifierService.interpretAction({
+      queue_item: queueItem,
+      classification,
+      thread_history: threadHistory,
+      scoped_content: scopedContent,
+    });
+    if (!interpreted) {
+      this.logger.debug(
+        {
+          queue_item_id: extractQueueItemId(queueItem),
+          topic: classification.topic,
+          interpreter_failed: true,
+          fallback_used: true,
+        },
+        "AI action interpreter returned no result; using deterministic fallback.",
+      );
+      return null;
+    }
+    if (interpreted.kind === "clarification_required") {
+      this.logger.info(
+        {
+          queue_item_id: extractQueueItemId(queueItem),
+          topic: classification.topic,
+          reason: interpreted.clarification.reason,
+          clarification_from_interpreter: true,
+        },
+        "AI action interpreter requested clarification.",
+      );
+      throw new ClarificationSignal(interpreted.clarification);
+    }
+
+    if (allowlist.length > 0 && !allowlist.includes(interpreted.topic)) {
+      this.logger.warn(
+        {
+          queue_item_id: extractQueueItemId(queueItem),
+          classifier_topic: classification.topic,
+          interpreter_topic: interpreted.topic,
+          fallback_used: true,
+        },
+        "Interpreter returned topic outside allowlist; using deterministic fallback.",
+      );
+      return null;
+    }
+
+    const normalized = this.normalizeInterpretedAction(
+      interpreted.topic,
+      interpreted.intent,
+      interpreted.action,
+    );
+    if (!normalized) {
+      this.logger.warn(
+        {
+          queue_item_id: extractQueueItemId(queueItem),
+          topic: classification.topic,
+          interpreter_topic: interpreted.topic,
+          schema_error: true,
+          fallback_used: true,
+        },
+        "AI action interpreter returned unsupported action payload; using deterministic fallback.",
+      );
+      return null;
+    }
+    this.logger.info(
+      {
+        queue_item_id: extractQueueItemId(queueItem),
+        topic: interpreted.topic,
+        action_type: normalized.typed_action.type,
+        intent: interpreted.intent,
+        interpreter_used: true,
+      },
+      "Resolved action via AI action interpreter.",
+    );
+    return normalized;
+  }
+
+  private normalizeInterpretedAction(
+    topic: TopicKey,
+    intent: ClassifierIntent,
+    action: Record<string, unknown> & { type: string },
+  ): DeterminedAction | null {
+    const type = action.type;
+    if (!INTERPRETER_SUPPORTED_ACTIONS_BY_TOPIC[topic].has(type)) {
+      return null;
+    }
+    const normalized: Record<string, unknown> = { ...action };
+    if (typeof normalized.new_start === "string") {
+      normalized.new_start = new Date(normalized.new_start);
+    }
+    if (typeof normalized.date_start === "string") {
+      normalized.date_start = new Date(normalized.date_start);
+    }
+    if (typeof normalized.due === "string") {
+      normalized.due = new Date(normalized.due);
+    }
+    if (typeof normalized.date === "string") {
+      normalized.date = new Date(normalized.date);
+    }
+    if (typeof normalized.due_date === "string") {
+      normalized.due_date = new Date(normalized.due_date);
+    }
+    if (typeof normalized.expires_at === "string") {
+      normalized.expires_at = new Date(normalized.expires_at);
+    }
+    if (
+      normalized.dates &&
+      typeof normalized.dates === "object" &&
+      !Array.isArray(normalized.dates)
+    ) {
+      const dates = normalized.dates as { start?: unknown; end?: unknown };
+      normalized.dates = {
+        start: typeof dates.start === "string" ? new Date(dates.start) : dates.start,
+        end: typeof dates.end === "string" ? new Date(dates.end) : dates.end,
+      };
+    }
+    if (typeof normalized.amount === "string") {
+      const parsed = Number(normalized.amount);
+      if (Number.isFinite(parsed)) {
+        normalized.amount = parsed;
+      }
+    }
+    if (Array.isArray(normalized.items)) {
+      normalized.items = normalized.items
+        .map((entry) => {
+          if (typeof entry === "string") {
+            return { item: entry };
+          }
+          if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+            const item = (entry as { item?: unknown }).item;
+            if (typeof item === "string" && item.trim().length > 0) {
+              return { item: item.trim() };
+            }
+          }
+          return null;
+        })
+        .filter((value): value is { item: string } => value !== null);
+    }
+    if (Array.isArray(normalized.item_ids)) {
+      normalized.item_ids = normalized.item_ids.filter(
+        (value): value is string => typeof value === "string" && value.trim().length > 0,
+      );
+    }
+    const schema = INTERPRETER_ACTION_SCHEMA_BY_TYPE[type];
+    if (!schema) {
+      return null;
+    }
+    const parsed = schema.safeParse(normalized);
+    if (!parsed.success) {
+      return null;
+    }
+    return {
+      is_response: INTERPRETER_RESPONSE_ACTIONS_BY_TOPIC[topic].has(type),
+      typed_action: parsed.data as TopicAction,
+      resolved_topic: topic,
+      resolved_intent: intent,
+    };
   }
 
   private inferHealthProvider(content: string): HealthProviderType {
@@ -2615,12 +3079,28 @@ export class Worker {
   }): RoutingDecision {
     const decision = this.routingService.resolveRoutingDecision(request);
     if (request.is_response && this.shouldCreateFollowUpTarget(request.intent)) {
+      const followUpTarget = this.routingService.resolveRoutingDecision({
+        ...request,
+        is_response: false,
+      }).target;
+      const dedupeKey = `${request.topic}:${[...request.concerning].sort().join(",")}:${request.origin_thread}:${followUpTarget.thread_id}`;
       return {
         ...decision,
-        follow_up_target: this.routingService.resolveRoutingDecision({
-          ...request,
-          is_response: false,
-        }).target,
+        follow_up_target: followUpTarget,
+        reply_policy:
+          followUpTarget.thread_id === request.origin_thread
+            ? {
+                action: "suppress_duplicate",
+                dedupe_key: dedupeKey,
+                cooldown_seconds: 20 * 60,
+                reason: "Follow-up target matches origin thread; duplicate notice suppressed.",
+              }
+            : {
+                action: "notify_there",
+                dedupe_key: dedupeKey,
+                cooldown_seconds: 20 * 60,
+                reason: "Primary reply stays here; concise notice may be sent to paired thread.",
+              },
       };
     }
     return decision;
@@ -2859,6 +3339,9 @@ export class Worker {
     primaryTargetThread: string,
     routingDecision: RoutingDecision,
   ): Promise<void> {
+    if (routingDecision.reply_policy?.action !== "notify_there") {
+      return;
+    }
     const followUpThread = routingDecision.follow_up_target?.thread_id;
     if (!followUpThread || followUpThread === primaryTargetThread) {
       return;
@@ -2876,7 +3359,8 @@ export class Worker {
 
     const state = await this.stateService.getSystemState();
     const now = this.now();
-    const cooldownMs = 20 * 60 * 1000;
+    const cooldownMs = (routingDecision.reply_policy?.cooldown_seconds ?? 20 * 60) * 1000;
+    const dedupeKey = routingDecision.reply_policy?.dedupe_key;
     const hasRecentNotice = state.queue.recently_dispatched.some(
       (record) =>
         record.target_thread === followUpThread &&
@@ -2904,6 +3388,14 @@ export class Worker {
       outbound,
     );
     await this.appendOutboundHistory(followUpThread, notice, TopicKey.FamilyStatus);
+    this.logger.debug(
+      {
+        queue_item_id: extractQueueItemId(queueItem),
+        follow_up_thread: followUpThread,
+        dedupe_key: dedupeKey,
+      },
+      "Sent follow-up thread notice with reply policy dedupe metadata.",
+    );
   }
 
   private async dispatchClarification(

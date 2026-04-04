@@ -2,9 +2,9 @@
 
 This file is the single source of truth for remaining work.
 
-## TODO-03 — Complete Manual And External Verification
+## TODO-01 — Complete Manual And External Verification
 
-**Status:** in progress
+**Status:** LATER
 
 ### Infrastructure And Credentials
 
@@ -22,9 +22,3 @@ This file is the single source of truth for remaining work.
 - [ ] IMAP reconnect behavior is verified after disconnect, sleep/wake, and provider timeout
 - [ ] stale time-sensitive email is stored silently instead of dispatched late
 - [ ] local-network calendar subscription renders expected events
-
-## Working Rules
-
-- Keep `__BUILD_PLAN/PROGRESS.json` lightweight and current-state only.
-- Keep `__BUILD_PLAN/DEFERRED.md` limited to unresolved technical debt.
-- Do not recreate step files or per-step audit history unless explicitly requested.

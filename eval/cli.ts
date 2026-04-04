@@ -8,7 +8,7 @@ interface ParsedArgs {
   command: string;
   run_id: string;
   scenario_set: string;
-  mode: "simulator" | "worker";
+  mode: "simulator" | "worker" | "fixture-interpreter";
   set_name?: string;
   step_delay_ms?: number;
 }
@@ -19,7 +19,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     command,
     run_id: `eval-run-${randomUUID()}`,
     scenario_set: "default",
-    mode: "simulator",
+    mode: "worker",
   };
 
   for (let index = 0; index < rest.length; index += 1) {
@@ -46,7 +46,11 @@ function parseArgs(argv: string[]): ParsedArgs {
       index += 1;
       continue;
     }
-    if (token === "--mode" && next && (next === "simulator" || next === "worker")) {
+    if (
+      token === "--mode" &&
+      next &&
+      (next === "simulator" || next === "worker" || next === "fixture-interpreter")
+    ) {
       parsed.mode = next;
       index += 1;
     }

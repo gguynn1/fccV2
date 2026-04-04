@@ -4,7 +4,7 @@ This folder contains the current eval implementation. It is a local sequential r
 
 ## What Exists
 
-- `cli.ts` is the entrypoint used by `npm run eval`, `npm run eval:run`, and `npm run eval:coverage`.
+- `cli.ts` is the entrypoint used by `npm run eval`, `npm run eval:run`, `npm run eval:run:worker`, `npm run eval:run:fixture`, and `npm run eval:coverage`.
 - `runners/sequential-runner.ts` runs one scenario at a time, persists JSON run state, appends structured logs, and writes the final markdown artifact.
 - `scenarios/` contains the current scenario schema and the default scenario set.
 - `scenarios/SCENARIO_SETS.md` explains how to author realistic scenario sets and where generated scaffolds should live.
@@ -16,11 +16,21 @@ This folder contains the current eval implementation. It is a local sequential r
 ## Current Behavior
 
 - Runs are sequential only.
-- The runner uses deterministic keyword matching in `inferTopic()` to classify messages into all 14 `TopicKey` values, and reads configuration from the persisted SQLite-backed state service.
+- Eval supports three execution modes:
+  - `simulator` (default): deterministic scenario simulation
+  - `worker`: worker replay harness over an in-memory runtime pipeline
+  - `fixture-interpreter`: deterministic interpreter-fixture mode for structured action expectations
+- Simulator mode still uses deterministic keyword matching in `inferTopic()` for classification behavior and reads configuration from the persisted SQLite-backed state service.
 - Fresh bootstrap defaults now live in `src/config/default-system-config.ts` and are assembled by `src/config/minimal-system-config.ts`. If an eval failure looks like a config/routing/tone mismatch, inspect those files before assuming the scenario is wrong.
 - The current statuses are `queued`, `running`, `passed`, `prompt_fix_suggested`, `investigation_needed`, `failed`, and `regressed`.
 - `prompt_fix_suggested` means the tuner decided the failure was prompt-fixable and embedded a prompt suggestion in the run artifact.
 - `investigation_needed` means the failure touches structural behavior like topic, routing, priority, or confirmation.
+
+### Current Gaps
+
+- Simulator remains the default path, so full live-runtime behavior parity is still incomplete.
+- Worker replay improves fidelity but is still not equivalent to full production integration replay.
+- Fixture interpreter mode is deterministic by design and does not exercise live model variance.
 
 ## UI Integration
 

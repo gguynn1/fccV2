@@ -47,6 +47,15 @@ export interface EvalScenarioExpectation {
 
 export interface EvalScenarioSimulation {
   actual_overrides?: Partial<EvalScenarioActual>;
+  interpreter_fixture?: {
+    topic?: TopicKey;
+    intent?: ClassifierIntent;
+    action_type?: string;
+  };
+  parity_assertion?: {
+    against_simulator?: boolean;
+    match_fields?: Array<"topic" | "intent" | "target_thread" | "priority">;
+  };
   tuning_scope?: "prompt" | "structural";
 }
 

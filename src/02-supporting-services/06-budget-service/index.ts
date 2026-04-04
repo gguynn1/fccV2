@@ -125,6 +125,14 @@ export class RedisBudgetService implements BudgetService {
     const isPersonAtLimit = personCounts.some(
       (count) => count >= budget.max_unprompted_per_person_per_day,
     );
+    const suppressionSignals = this.collectSuppressionSignals({
+      queue_item,
+      state,
+      quiet_window_ms: Math.max(threadQuietMs, ...personQuietMs, 0),
+      collision_count: collisionIds.length,
+      is_thread_at_limit: isThreadAtLimit,
+      is_person_at_limit: isPersonAtLimit,
+    });
     if (
       (isThreadAtLimit || isPersonAtLimit || collisionIds.length > 0) &&
       priority !== DispatchPriority.Immediate
@@ -134,6 +142,7 @@ export class RedisBudgetService implements BudgetService {
         hold_until: new Date(now.getTime() + budget.batch_window_minutes * 60_000),
         included_queue_item_ids: collisionIds,
         reason: "Collision or budget limit detected; item moved into batch window.",
+        reason_codes: suppressionSignals,
       };
     }
 
@@ -151,6 +160,7 @@ export class RedisBudgetService implements BudgetService {
         hold_until: holdUntil,
         included_queue_item_ids: collisionIds,
         reason: "Active quiet window or topic cooldown; deferred to reduce alert fatigue.",
+        reason_codes: suppressionSignals.length > 0 ? suppressionSignals : ["noise_suppression"],
       };
     }
 
@@ -160,6 +170,8 @@ export class RedisBudgetService implements BudgetService {
         priority === DispatchPriority.Immediate
           ? "Immediate item bypasses batching and sends now."
           : "Within budget and no collision pressure.",
+      reason_codes:
+        priority === DispatchPriority.Immediate ? ["immediate_bypass"] : ["within_budget"],
     };
   }
 
@@ -518,6 +530,40 @@ export class RedisBudgetService implements BudgetService {
       source === QueueItemSource.ForwardedMessage ||
       source === QueueItemSource.ImageAttachment
     );
+  }
+
+  private collectSuppressionSignals(input: {
+    queue_item: StackQueueItem;
+    state: Awaited<ReturnType<StateService["getSystemState"]>>;
+    quiet_window_ms: number;
+    collision_count: number;
+    is_thread_at_limit: boolean;
+    is_person_at_limit: boolean;
+  }): string[] {
+    const reasonCodes: string[] = [];
+    if (input.collision_count > 0) {
+      reasonCodes.push("collision_pressure");
+    }
+    if (input.is_thread_at_limit) {
+      reasonCodes.push("thread_budget_exhausted");
+    }
+    if (input.is_person_at_limit) {
+      reasonCodes.push("participant_budget_exhausted");
+    }
+    if (input.quiet_window_ms > 0) {
+      reasonCodes.push("quiet_window_active");
+    }
+    const hasPendingConfirmation = input.state.confirmations.pending.some((confirmation) =>
+      input.queue_item.concerning.includes(confirmation.requested_by),
+    );
+    if (hasPendingConfirmation) {
+      reasonCodes.push("pending_confirmation_pressure");
+    }
+    const hasActiveEscalation = input.state.escalation_status.active.length > 0;
+    if (hasActiveEscalation) {
+      reasonCodes.push("active_escalation_pressure");
+    }
+    return reasonCodes;
   }
 }
 

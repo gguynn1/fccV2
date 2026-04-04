@@ -35,6 +35,7 @@ import type {
   EvalScenarioFailure,
   EvalScenarioLogEvent,
   EvalScenarioResult,
+  EvalScenarioSimulation,
   EvalTurn,
   EvalTurnResult,
 } from "../types.js";
@@ -44,7 +45,7 @@ export interface RunSequentialEvalOptions {
   run_id: string;
   scenario_set: string;
   step_delay_ms?: number;
-  mode?: "simulator" | "worker";
+  mode?: "simulator" | "worker" | "fixture-interpreter";
 }
 
 function pause(delayMs: number): Promise<void> {
@@ -517,7 +518,10 @@ function evaluateScenario(
 }
 
 function createWorkerReplayHarness(config: SystemConfig): {
-  evaluate: (scenario: EvalScenarioDefinition) => Promise<EvalScenarioActual>;
+  evaluate: (
+    scenario: EvalScenarioDefinition,
+    options?: { interpreter_fixture?: EvalScenarioSimulation["interpreter_fixture"] },
+  ) => Promise<EvalScenarioActual>;
 } {
   const state: SystemState = createMinimalSystemState(new Date());
   const transportCalls: TransportOutboundEnvelope[] = [];
@@ -540,6 +544,166 @@ function createWorkerReplayHarness(config: SystemConfig): {
       undefined,
   };
 
+  let activeInterpreterFixture: EvalScenarioSimulation["interpreter_fixture"] | null = null;
+
+  function defaultActionTypeForTopic(topic: TopicKey): string {
+    switch (topic) {
+      case TopicKey.Calendar:
+        return "query_events";
+      case TopicKey.Chores:
+        return "query_chores";
+      case TopicKey.Finances:
+        return "query_finances";
+      case TopicKey.Grocery:
+        return "query_list";
+      case TopicKey.Health:
+        return "query_health";
+      case TopicKey.Pets:
+        return "query_pets";
+      case TopicKey.School:
+        return "query_school";
+      case TopicKey.Travel:
+        return "query_trips";
+      case TopicKey.Vendors:
+        return "query_vendors";
+      case TopicKey.Business:
+        return "query_leads";
+      case TopicKey.Relationship:
+        return "query_nudge_history";
+      case TopicKey.FamilyStatus:
+        return "query_status";
+      case TopicKey.Meals:
+        return "query_plans";
+      case TopicKey.Maintenance:
+        return "query_maintenance";
+      default:
+        return "query_status";
+    }
+  }
+
+  function buildFixtureActionPayload(
+    actionType: string,
+    topic: TopicKey,
+    queueItem: StackQueueItem,
+  ): Record<string, unknown> {
+    const actor = queueItem.concerning[0] ?? "participant_1";
+    switch (actionType) {
+      case "add_items":
+        return { type: actionType, items: [{ item: "fixture_item" }] };
+      case "remove_items":
+        return { type: actionType, item_ids: ["fixture_item"] };
+      case "create_event":
+        return {
+          type: actionType,
+          title: "Fixture event",
+          date_start: queueItem.created_at.toISOString(),
+          concerning: queueItem.concerning.length > 0 ? queueItem.concerning : [actor],
+        };
+      case "reschedule_event":
+        return {
+          type: actionType,
+          event_id: queueItem.id ?? "fixture_event",
+          new_start: queueItem.created_at.toISOString(),
+        };
+      case "cancel_event":
+        return { type: actionType, event_id: queueItem.id ?? "fixture_event" };
+      case "assign_chore":
+        return {
+          type: actionType,
+          task: "Fixture chore",
+          assigned_to: actor,
+          due: queueItem.created_at.toISOString(),
+        };
+      case "complete_chore":
+      case "cancel_chore":
+        return { type: actionType, chore_id: queueItem.id ?? "fixture_chore" };
+      case "log_expense":
+        return {
+          type: actionType,
+          description: "Fixture expense",
+          amount: 1,
+          logged_by: actor,
+          requires_confirmation: true,
+        };
+      case "add_appointment":
+        return {
+          type: actionType,
+          entity: actor,
+          provider_type: "primary",
+          date: queueItem.created_at.toISOString(),
+        };
+      case "log_visit":
+        return {
+          type: actionType,
+          entity: actor,
+          provider_type: "primary",
+          notes: "Fixture visit",
+        };
+      case "log_care":
+        return {
+          type: actionType,
+          entity: actor,
+          activity: "Fixture care",
+          by: actor,
+          category: "general_care",
+        };
+      case "add_assignment":
+        return {
+          type: actionType,
+          entity: actor,
+          parent_entity: actor,
+          title: "Fixture assignment",
+          due_date: queueItem.created_at.toISOString(),
+          source: "conversation",
+        };
+      case "create_trip":
+        return {
+          type: actionType,
+          name: "Fixture trip",
+          dates: {
+            start: queueItem.created_at.toISOString(),
+            end: new Date(queueItem.created_at.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+          },
+          travelers: queueItem.concerning.length > 0 ? queueItem.concerning : [actor],
+          source: "conversation",
+        };
+      case "add_vendor":
+        return {
+          type: actionType,
+          name: "Fixture vendor",
+          vendor_type: "general_service",
+          contact: "unknown",
+          managed_by: actor,
+        };
+      case "add_lead":
+        return { type: actionType, owner: actor, client_name: "Fixture lead" };
+      case "respond_to_nudge":
+        return { type: actionType, acknowledged: true };
+      case "update_status":
+        return {
+          type: actionType,
+          entity: actor,
+          status: "Fixture status",
+          expires_at: new Date(queueItem.created_at.getTime() + 60 * 60 * 1000).toISOString(),
+        };
+      case "plan_meal":
+        return {
+          type: actionType,
+          date: queueItem.created_at.toISOString(),
+          meal_type: "dinner",
+          description: "Fixture meal",
+          planned_by: actor,
+        };
+      case "add_asset":
+        return { type: actionType, asset_type: "home", name: "Fixture asset", details: {} };
+      default:
+        return {
+          type: actionType || defaultActionTypeForTopic(topic),
+          entity: actor,
+        };
+    }
+  }
+
   const worker = createWorker({
     classifier_service: {
       classify: async (item: StackQueueItem) =>
@@ -549,6 +713,23 @@ function createWorkerReplayHarness(config: SystemConfig): {
           concerning: item.concerning,
           confidence: 0.99,
         }) satisfies StackClassificationResult,
+      interpretAction: async (input) => {
+        if (!activeInterpreterFixture) {
+          return null;
+        }
+        const topic = activeInterpreterFixture.topic ?? input.classification.topic;
+        const intent = activeInterpreterFixture.intent ?? input.classification.intent;
+        const actionType = activeInterpreterFixture.action_type ?? defaultActionTypeForTopic(topic);
+        return {
+          kind: "resolved",
+          topic,
+          intent,
+          action: buildFixtureActionPayload(actionType, topic, input.queue_item) as Record<
+            string,
+            unknown
+          > & { type: string },
+        };
+      },
     },
     identity_service: {
       resolve: async (item: StackQueueItem) => ({
@@ -598,8 +779,12 @@ function createWorkerReplayHarness(config: SystemConfig): {
   });
 
   return {
-    evaluate: async (scenario: EvalScenarioDefinition): Promise<EvalScenarioActual> => {
+    evaluate: async (
+      scenario: EvalScenarioDefinition,
+      options?: { interpreter_fixture?: EvalScenarioSimulation["interpreter_fixture"] },
+    ): Promise<EvalScenarioActual> => {
       transportCalls.length = 0;
+      activeInterpreterFixture = options?.interpreter_fixture ?? null;
       const inferredTopic = inferTopic(scenario.prompt_input.message);
       const inferredIntent = inferIntent(scenario.prompt_input.message);
       const queueItem: StackQueueItem = {
@@ -614,7 +799,7 @@ function createWorkerReplayHarness(config: SystemConfig): {
       };
       const trace = await worker.process(queueItem);
       const outbound = transportCalls.at(-1);
-      return {
+      const actual: EvalScenarioActual = {
         topic: inferredTopic,
         intent: inferredIntent,
         target_thread: outbound?.target_thread ?? scenario.prompt_input.origin_thread,
@@ -625,6 +810,8 @@ function createWorkerReplayHarness(config: SystemConfig): {
             outbound.content.toLowerCase().includes("please confirm")),
         composed_message: outbound?.content ?? "No outbound generated.",
       };
+      activeInterpreterFixture = null;
+      return actual;
     },
   };
 }
@@ -720,6 +907,37 @@ function collectTurnFailures(
     });
   }
 
+  return failures;
+}
+
+function collectParityFailures(input: {
+  scenario: EvalScenarioDefinition;
+  runtime_actual: EvalScenarioActual;
+  simulator_actual: EvalScenarioActual;
+}): EvalScenarioFailure[] {
+  const shouldAssert = input.scenario.simulation?.parity_assertion?.against_simulator ?? true;
+  if (!shouldAssert) {
+    return [];
+  }
+  const fields = input.scenario.simulation?.parity_assertion?.match_fields ?? [
+    "topic",
+    "intent",
+    "target_thread",
+    "priority",
+  ];
+  const failures: EvalScenarioFailure[] = [];
+  for (const field of fields) {
+    if (input.runtime_actual[field] === input.simulator_actual[field]) {
+      continue;
+    }
+    failures.push({
+      field,
+      expected: input.simulator_actual[field],
+      actual: input.runtime_actual[field],
+      prompt_fixable: false,
+      message: `Runtime replay diverged from simulator on ${field}.`,
+    });
+  }
   return failures;
 }
 
@@ -953,7 +1171,11 @@ export async function runSequentialEval(options: RunSequentialEvalOptions): Prom
   const jsonPath = join(workspace.results_dir, `${options.run_id}.json`);
   const scenarioSet = getScenarioSet(options.scenario_set);
   const state = createRunState(options, scenarioSet.scenarios);
-  const workerReplay = mode === "worker" ? createWorkerReplayHarness(systemConfig) : null;
+  const workerReplay =
+    mode === "worker" || mode === "fixture-interpreter"
+      ? createWorkerReplayHarness(systemConfig)
+      : null;
+  const fixtureInterpreterMode = mode === "fixture-interpreter";
   let logSequence = 0;
 
   async function persistState(): Promise<void> {
@@ -1027,15 +1249,31 @@ export async function runSequentialEval(options: RunSequentialEvalOptions): Prom
       } else {
         actual =
           workerReplay !== null
-            ? await workerReplay.evaluate(scenario)
+            ? await workerReplay.evaluate(scenario, {
+                interpreter_fixture: fixtureInterpreterMode
+                  ? scenario.simulation?.interpreter_fixture
+                  : undefined,
+              })
             : evaluateScenario(scenario, systemConfig);
         scenarioResult.actual = actual;
         failures = collectFailures(scenario, actual);
+        if (workerReplay !== null) {
+          const simulatorActual = evaluateScenario(scenario, systemConfig);
+          failures = failures.concat(
+            collectParityFailures({
+              scenario,
+              runtime_actual: actual,
+              simulator_actual: simulatorActual,
+            }),
+          );
+        }
         await pushLog(
           "evaluate",
           workerReplay !== null
             ? "Scenario input evaluated using worker replay mode."
-            : "Scenario input evaluated against the current prompt/runtime simulator.",
+            : fixtureInterpreterMode
+              ? "Scenario input evaluated using fixture-interpreter mode."
+              : "Scenario input evaluated against the current prompt/runtime simulator.",
           scenario.id,
           {
             mode,

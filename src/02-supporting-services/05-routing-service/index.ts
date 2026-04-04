@@ -64,11 +64,21 @@ export class StaticRoutingService implements RoutingService {
     if (input.is_response) {
       return {
         target: this.buildResponseTarget(input.origin_thread),
+        reply_policy: {
+          action: "reply_here",
+          reason: "Participant-initiated response remains in origin thread.",
+        },
       };
     }
 
     return {
       target: this.buildProactiveTarget(input.topic, input.concerning, input.origin_thread),
+      reply_policy: {
+        action: "notify_there",
+        dedupe_key: `${input.topic}:${[...input.concerning].sort().join(",")}`,
+        cooldown_seconds: 20 * 60,
+        reason: "Proactive item may notify another thread when audience differs.",
+      },
     };
   }
 
