@@ -364,6 +364,11 @@ export const classificationResultSchema = z.object({
   confidence: z.number().min(0).max(1).optional(),
 });
 
+export const topicScopedContentSchema = z.object({
+  scoped_content: z.string().trim().min(1),
+  mixed_intent: z.boolean().optional(),
+});
+
 export interface ClassifierServiceOptions {
   anthropic_api_key: string;
   model?: string;

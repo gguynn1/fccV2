@@ -64,6 +64,14 @@ function inferTopic(message: string): TopicKey {
   const normalized = message.toLowerCase();
 
   if (
+    normalized.includes("running late") ||
+    normalized.includes("on my way") ||
+    normalized.includes("eta")
+  ) {
+    return TopicKey.FamilyStatus;
+  }
+
+  if (
     normalized.includes("bill") ||
     normalized.includes("expense") ||
     normalized.includes("budget")
@@ -102,6 +110,7 @@ function inferTopic(message: string): TopicKey {
   }
   if (
     normalized.includes("vet") ||
+    normalized.includes("pet") ||
     normalized.includes("walk the dog") ||
     normalized.includes("kibble") ||
     normalized.includes("pet food")
@@ -112,6 +121,7 @@ function inferTopic(message: string): TopicKey {
     normalized.includes("flight") ||
     normalized.includes("hotel") ||
     normalized.includes("luggage") ||
+    normalized.includes("trip") ||
     normalized.includes("pack for the trip") ||
     normalized.includes("travel")
   ) {
@@ -120,6 +130,8 @@ function inferTopic(message: string): TopicKey {
   if (
     normalized.includes("date night") ||
     normalized.includes("anniversary") ||
+    normalized.includes("couple reminder") ||
+    normalized.includes("couple reminders") ||
     normalized.includes("couples")
   ) {
     return TopicKey.Relationship;
@@ -176,6 +188,8 @@ function inferIntent(message: string): ClassifierIntent {
   if (
     normalized.startsWith("what") ||
     normalized.startsWith("when") ||
+    normalized.startsWith("how") ||
+    normalized.startsWith("any") ||
     normalized.startsWith("do we")
   ) {
     return ClassifierIntent.Query;
@@ -208,10 +222,13 @@ function inferTargetThread(topic: TopicKey, input: EvalScenarioDefinition["promp
     case TopicKey.Business:
       return "participant_2_private";
     case TopicKey.Health:
-    case TopicKey.Pets:
     case TopicKey.Maintenance:
     case TopicKey.Vendors:
       return `${input.concerning[0] ?? "participant_1"}_private`;
+    case TopicKey.Pets:
+      return input.origin_thread === "family"
+        ? "family"
+        : `${input.concerning[0] ?? "participant_1"}_private`;
     case TopicKey.School:
     case TopicKey.Chores:
       return `${input.concerning[0] ?? "participant_3"}_private`;

@@ -200,7 +200,7 @@ export class BullConfirmationService implements ConfirmationService {
     return confirmation;
   }
 
-  public async resolveFromQueueItem(queueItem: StackQueueItem): Promise<ConfirmationResult | null> {
+  public async resolveFromQueueItem(queueItem: StackQueueItem): Promise<ResolvedConfirmation | null> {
     const state = await this.stateService.getSystemState();
     const expiredState = this.expireOverduePending(
       state.confirmations.pending,
@@ -249,7 +249,7 @@ export class BullConfirmationService implements ConfirmationService {
       },
       "Confirmation resolved from queue item.",
     );
-    return resolved.result;
+    return resolved;
   }
 
   public async expirePending(now: Date): Promise<ExpiredConfirmation[]> {

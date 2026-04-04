@@ -45,6 +45,7 @@ interface ScenarioTemplate {
   priority: string;
   confirmation_required: boolean;
   format_markers: string[];
+  must_not?: string[];
   variants: MessageVariant[];
 }
 
@@ -82,10 +83,11 @@ const scenarioTemplates: ScenarioTemplate[] = [
     priority: "DispatchPriority.Immediate",
     confirmation_required: false,
     format_markers: ["list"],
+    must_not: ["actually", "bill due", "note $"],
     variants: [
       { message: "Add eggs and yogurt to the list", tone_markers: ["added", "grocery"] },
       { message: "We need ground beef and bread", tone_markers: ["added", "grocery"] },
-      { message: "Add cereal and bananas to the grocery list", tone_markers: ["added", "grocery"] },
+      { message: "Actually, add cereal and bananas to the grocery list on 6/3", tone_markers: ["added", "grocery"] },
     ],
   },
   {
@@ -218,9 +220,9 @@ const scenarioTemplates: ScenarioTemplate[] = [
     confirmation_required: false,
     format_markers: ["list"],
     variants: [
-      { message: "What should we eat for dinner tonight?", tone_markers: ["dinner", "meal"] },
-      { message: "Find a recipe for dinner tomorrow", tone_markers: ["recipe", "dinner"] },
-      { message: "Plan a meal for Saturday dinner", tone_markers: ["meal", "dinner"] },
+      { message: "Plan dinner for tonight", tone_markers: ["dinner", "meal"] },
+      { message: "Find a dinner recipe for tomorrow", tone_markers: ["recipe", "dinner"] },
+      { message: "Create a meal plan for Saturday dinner", tone_markers: ["meal", "dinner"] },
     ],
   },
   {
@@ -340,6 +342,115 @@ const scenarioTemplates: ScenarioTemplate[] = [
       },
     ],
   },
+  {
+    suffix: "mixed-intent-finance-over-grocery",
+    title: "Mixed grocery and bill note stays finance-first with confirmation",
+    category: "pipeline",
+    topic: "TopicKey.Finances",
+    intent: "ClassifierIntent.Request",
+    origin_thread: "couple",
+    target_thread: "couple",
+    concerning: ["participant_1", "participant_2"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: true,
+    format_markers: ["confirm"],
+    must_not: ["grocery list update", "added items"],
+    variants: [
+      {
+        message: "Get bananas at the store, note $100 bill due next week",
+        tone_markers: ["approval", "bill"],
+      },
+      {
+        message: "Add milk to the grocery list and pay the electric bill Friday",
+        tone_markers: ["approval", "bill"],
+      },
+      {
+        message: "Grab oranges and log a $75 internet bill due tomorrow",
+        tone_markers: ["approval", "bill"],
+      },
+    ],
+  },
+  {
+    suffix: "calendar-conversational-time",
+    title: "Conversational calendar scheduling keeps date-and-time intent",
+    category: "pipeline",
+    topic: "TopicKey.Calendar",
+    intent: "ClassifierIntent.Request",
+    origin_thread: "family",
+    target_thread: "family",
+    concerning: ["participant_1", "participant_2"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: false,
+    format_markers: ["summary"],
+    variants: [
+      {
+        message: "Actually, add a recital to my calendar on 6/3 at 6pm",
+        tone_markers: ["schedule", "6/3"],
+      },
+      {
+        message: "Please put parent meeting on the calendar June 3 at 6pm",
+        tone_markers: ["schedule", "june"],
+      },
+      {
+        message: "Schedule conference on the calendar for 6/3 at 18:00",
+        tone_markers: ["schedule", "6/3"],
+      },
+    ],
+  },
+  {
+    suffix: "health-date-followup-style",
+    title: "Health updates retain appointment timing details",
+    category: "pipeline",
+    topic: "TopicKey.Health",
+    intent: "ClassifierIntent.Update",
+    origin_thread: "participant_1_private",
+    target_thread: "participant_1_private",
+    concerning: ["participant_1"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: false,
+    format_markers: ["record"],
+    variants: [
+      {
+        message: "Actually, the doctor checkup moved to 6/3 at 6pm",
+        tone_markers: ["appointment", "checkup"],
+      },
+      {
+        message: "Please update the dentist appointment to June 3 at 6pm",
+        tone_markers: ["appointment", "dentist"],
+      },
+      {
+        message: "The prescription follow-up is confirmed for 6/3 at 6pm",
+        tone_markers: ["appointment", "prescription"],
+      },
+    ],
+  },
+  {
+    suffix: "family-status-conversational",
+    title: "Family status handles conversational lead-ins cleanly",
+    category: "composition",
+    topic: "TopicKey.FamilyStatus",
+    intent: "ClassifierIntent.Request",
+    origin_thread: "family",
+    target_thread: "family",
+    concerning: ["participant_2"],
+    priority: "DispatchPriority.Immediate",
+    confirmation_required: false,
+    format_markers: ["status"],
+    variants: [
+      {
+        message: "Actually, running late from school pickup and home around 6",
+        tone_markers: ["status", "recorded"],
+      },
+      {
+        message: "Ok, at the store and back in 20 minutes",
+        tone_markers: ["status", "recorded"],
+      },
+      {
+        message: "Just a heads up, on my way and ETA 15 minutes",
+        tone_markers: ["status", "recorded"],
+      },
+    ],
+  },
 ];
 
 function hashSlug(slug: string): number {
@@ -359,6 +470,11 @@ function buildScenarioSetFile(slug: string): string {
     const concerningLiteral = template.concerning.map((c) => `"${c}"`).join(", ");
     const toneMarkersLiteral = variant.tone_markers.map((m) => `"${m}"`).join(", ");
     const formatMarkersLiteral = template.format_markers.map((m) => `"${m}"`).join(", ");
+    const mustNotLiteral = (template.must_not ?? []).map((marker) => `"${marker}"`).join(", ");
+    const mustNotLine =
+      template.must_not && template.must_not.length > 0
+        ? `      must_not: [${mustNotLiteral}],\n`
+        : "";
     const notesLine =
       templateIndex === 0
         ? `\n    notes: "Generated scaffold. Verify that the message and markers still match the intended behavior.",`
@@ -381,7 +497,7 @@ function buildScenarioSetFile(slug: string): string {
       confirmation_required: ${String(template.confirmation_required)},
       tone_markers: [${toneMarkersLiteral}],
       format_markers: [${formatMarkersLiteral}],
-    },${notesLine}
+${mustNotLine}    },${notesLine}
   }`;
   });
 

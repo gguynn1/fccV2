@@ -1,4 +1,5 @@
 import type { PendingQueueItem } from "../../01-service-stack/04-queue/types.js";
+import type { TopicAction } from "../04-topic-profile-service/types.js";
 
 export enum ConfirmationActionType {
   SendingOnBehalf = "sending_on_behalf",
@@ -41,6 +42,7 @@ export interface ConfirmationRecordBase {
   id: string;
   type: ConfirmationActionType;
   action: string;
+  requested_action_payload?: TopicAction;
   requested_by: string;
   requested_in_thread: string;
   requested_at: Date;

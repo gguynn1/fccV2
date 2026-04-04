@@ -31,7 +31,7 @@ import {
   type TopicAction,
   type TopicProfile,
 } from "../../02-supporting-services/04-topic-profile-service/types.js";
-import type { RoutingDecision } from "../../02-supporting-services/05-routing-service/types.js";
+import type { RoutingDecision, ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
 import {
   ConfirmationActionType,
   ConfirmationResult,
@@ -202,6 +202,17 @@ function extractDateHint(content: string, fallback: Date): Date | null {
     const parsed = new Date(year, month - 1, day, 12, 0, 0, 0);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
+  const timeOnlyMatch = normalized.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/iu);
+  if (timeOnlyMatch) {
+    const hour12 = Number(timeOnlyMatch[1]);
+    const minute = timeOnlyMatch[2] ? Number(timeOnlyMatch[2]) : 0;
+    const meridiem = timeOnlyMatch[3]?.toLowerCase();
+    const hour24 =
+      meridiem === "pm" ? (hour12 % 12) + 12 : meridiem === "am" ? hour12 % 12 : hour12;
+    const parsed = new Date(fallback);
+    parsed.setHours(hour24, minute, 0, 0);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
   const monthNameMatch = normalized.match(
     /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,\s*(\d{4}))?(?:\s+at)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/iu,
   );
@@ -261,6 +272,7 @@ function extractAmount(content: string): number | null {
 }
 
 function splitListItems(content: string): string[] {
+  const containsRemovalCue = /\b(?:remove|delete|drop|take off|cross off|not)\b/iu.test(content);
   return content
     .split(/,| and |\n/iu)
     .map((part) =>
@@ -274,11 +286,138 @@ function splitListItems(content: string): string[] {
           /\s+(?:to|onto|on|from|off)\s+(?:the\s+)?(?:grocery|shopping)?\s*(?:list|cart)\.?$/iu,
           "",
         )
+        .replace(/^(?:and|also)\s+/iu, "")
+        .replace(/^(?:actually|just|okay|ok)\s*,?\s*/iu, "")
+        .replace(/^(?:not|no)\s+/iu, containsRemovalCue ? "" : "$&")
+        .replace(
+          /\b(?:note|remind(?: me)?|track|log)\s+\$?\d[\d,.]*(?:\.\d{1,2})?.*$/iu,
+          "",
+        )
+        .replace(/\b(?:bill|invoice|payment|pay|due)\b.*$/iu, "")
+        .replace(
+          /\s+\b(?:on|for)\s+(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\w*\s+\d{1,2}(?:,\s*\d{4})?)\b.*$/iu,
+          "",
+        )
         .replace(/^(?:the\s+)?/iu, "")
         .trim(),
     )
+    .filter((part) => !isLikelyNonGroceryClause(part))
     .filter((part) => part.length > 0)
     .slice(0, 6);
+}
+
+function canonicalizeGroceryItem(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/^(?:and|also)\s+/iu, "")
+    .replace(/^(?:not|no)\s+/iu, "")
+    .replace(/^(?:the\s+)/iu, "")
+    .replace(/\s+(?:at|from)\s+(?:the\s+)?store$/iu, "")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function isLikelyNonGroceryClause(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (normalized.length === 0) {
+    return true;
+  }
+  if (
+    /^(?:actually|calendar|it|that|this|them|these|those|one|ones|please|thanks|thank you)$/u.test(
+      normalized,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(?:bill|invoice|payment|pay|due|owed|budget|expense|refund|reimburse|mortgage|rent)\b/u.test(
+      normalized,
+    )
+  ) {
+    return true;
+  }
+  if (/\$\s*\d/u.test(normalized)) {
+    return true;
+  }
+  return false;
+}
+
+function groceryItemsMatch(candidate: string, target: string): boolean {
+  const left = canonicalizeGroceryItem(candidate);
+  const right = canonicalizeGroceryItem(target);
+  if (left.length === 0 || right.length === 0) {
+    return false;
+  }
+  if (left === right) {
+    return true;
+  }
+  return left.includes(right) || right.includes(left);
+}
+
+function normalizeLegacyGroceryItemForStorage(value: string): string | null {
+  const normalized = canonicalizeGroceryItem(value)
+    .replace(
+      /^(?:please\s+)?(?:add|get|buy|grab|pick up|put)\s+(?:me\s+)?(?:some\s+)?/iu,
+      "",
+    )
+    .replace(
+      /\s+\b(?:on|for)\s+(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\w*\s+\d{1,2}(?:,\s*\d{4})?)\b.*$/iu,
+      "",
+    )
+    .trim();
+  if (normalized.length === 0) {
+    return null;
+  }
+  return isLikelyNonGroceryClause(normalized) ? null : normalized;
+}
+
+function isLikelyMixedIntent(content: string): boolean {
+  const text = content.toLowerCase();
+  const hasClauseSeparator = /,|\band\b|\bthen\b|\balso\b|\n/u.test(text);
+  if (!hasClauseSeparator) {
+    return false;
+  }
+
+  const groceryCue = /\b(grocery|shopping|list|cart|buy|get|pick up|grab)\b/u.test(text);
+  const financeCue = /\b(\$|bill|invoice|payment|pay|expense|due|budget)\b/u.test(text);
+  const calendarCue = /\b(calendar|appointment|schedule|meeting|at\s+\d{1,2}(?::\d{2})?\s*(am|pm))\b/u.test(
+    text,
+  );
+  const choresCue = /\b(chore|trash|laundry|dishes|vacuum|clean|yard)\b/u.test(text);
+
+  const domains = [groceryCue, financeCue, calendarCue, choresCue].filter(Boolean).length;
+  return domains >= 2;
+}
+
+function stripTemporalPhrases(content: string): string {
+  return content
+    .replace(
+      /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?\b/giu,
+      " ",
+    )
+    .replace(
+      /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,\s*\d{4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?\b/giu,
+      " ",
+    )
+    .replace(/\b(?:tomorrow|tonight|today|next\s+week|this\s+week)\b/giu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function stripConversationalLeadIns(content: string): string {
+  return content
+    .replace(/^(?:actually|just|okay|ok|well|so|yeah|yep|nope)\s*,?\s*/iu, "")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function isDigestRequest(content: string): boolean {
+  const normalized = content.toLowerCase();
+  return (
+    /\b(digest|summary|recap|highlights|overview)\b/u.test(normalized) &&
+    /\b(today|tonight|this\s+day|this\s+week|right\s+now|now)\b/u.test(normalized)
+  );
 }
 
 function buildClarification(
@@ -523,6 +662,12 @@ export class Worker {
       };
     }
 
+    const actionContent = await this.resolveActionContent(
+      classifiedQueueItem,
+      classification,
+      cappedHistory,
+    );
+
     let determined: DeterminedAction | ClarificationDispatch;
     try {
       determined = await this.traceStep(
@@ -533,7 +678,13 @@ export class Worker {
         `${classification.topic}/${classification.intent}`,
         () =>
           Promise.resolve(
-            this.resolveAction(classifiedQueueItem, classification, identity, cappedHistory),
+            this.resolveAction(
+              classifiedQueueItem,
+              classification,
+              identity,
+              cappedHistory,
+              actionContent,
+            ),
           ),
         (output) => ({
           output_summary: output.is_response ? "response" : "proactive",
@@ -664,7 +815,14 @@ export class Worker {
       };
     }
 
-    await this.applyStateMutation(classifiedQueueItem, determined.typed_action);
+    const actionToExecute =
+      confirmationResult.kind === "resolved_reply" &&
+      confirmationResult.resolution === ConfirmationResult.Approved &&
+      confirmationResult.approved_action_payload
+        ? confirmationResult.approved_action_payload
+        : determined.typed_action;
+
+    await this.applyStateMutation(classifiedQueueItem, actionToExecute);
 
     const profileResult = await this.traceStep(
       traceSteps,
@@ -685,7 +843,7 @@ export class Worker {
           action: placeholderAction,
         };
         let composed = await this.topicProfileService.composeMessage(decision);
-        const stateBackedMessage = await this.composeStateBackedMessage(determined.typed_action);
+        const stateBackedMessage = await this.composeStateBackedMessage(actionToExecute);
         if (stateBackedMessage) {
           composed = stateBackedMessage;
         }
@@ -693,7 +851,7 @@ export class Worker {
           classifiedQueueItem,
           classification,
           profile,
-          determined,
+          { ...determined, typed_action: actionToExecute },
         );
         return { profile, composed };
       },
@@ -854,21 +1012,61 @@ export class Worker {
     return [fallbackEntityId];
   }
 
+  private async resolveActionContent(
+    queueItem: StackQueueItem,
+    classification: StackClassificationResult,
+    threadHistory: ThreadHistory | null,
+  ): Promise<string> {
+    const fallback = summarizeContent(queueItem.content);
+    if (
+      classification.intent === ClassifierIntent.Query ||
+      classification.intent === ClassifierIntent.Confirmation
+    ) {
+      return fallback;
+    }
+    if (!isLikelyMixedIntent(fallback)) {
+      return fallback;
+    }
+
+    const classifierWithScopedContent = this.classifierService as {
+      extractTopicScopedContent?: (
+        item: StackQueueItem,
+        classification: StackClassificationResult,
+        thread_history?: ThreadHistory | null,
+      ) => Promise<string | null>;
+    };
+    if (typeof classifierWithScopedContent.extractTopicScopedContent !== "function") {
+      return fallback;
+    }
+    const scoped = await classifierWithScopedContent.extractTopicScopedContent(
+      queueItem,
+      classification,
+      threadHistory,
+    );
+    if (typeof scoped !== "string" || scoped.trim().length === 0) {
+      return fallback;
+    }
+    this.logger.debug(
+      {
+        topic: classification.topic,
+        intent: classification.intent,
+        original: fallback,
+        scoped,
+      },
+      "Using AI-scoped content for action resolution.",
+    );
+    return scoped;
+  }
+
   private resolveAction(
     queueItem: StackQueueItem,
     classification: StackClassificationResult,
     identity: IdentityResolutionResult,
-    threadHistory: {
-      recent_messages: Array<{
-        id: string;
-        from: string;
-        content: string;
-        state_ref?: string;
-      }>;
-    } | null,
+    threadHistory: ThreadHistory | null,
+    actionContent?: string,
   ): DeterminedAction {
-    const content = summarizeContent(queueItem.content);
-    const dateHint = extractDateHint(content, queueItem.created_at);
+    const content = stripConversationalLeadIns(actionContent ?? summarizeContent(queueItem.content));
+    const explicitDateHint = extractDateHint(content, queueItem.created_at);
     const inferredReference = this.inferClarificationReference(queueItem, threadHistory);
     const referenceId =
       queueItem.clarification_of ?? inferredReference ?? extractQueueItemId(queueItem);
@@ -897,9 +1095,25 @@ export class Worker {
       this.getFirstEntityIdByType(EntityType.Pet) ?? actor,
       { includePets: true, onlyTypes: [EntityType.Pet] },
     );
+    const dateHint =
+      explicitDateHint ?? this.inferDateFromHistory(threadHistory, content, queueItem.created_at);
+    const amountHint = this.resolveAmountHint(content, threadHistory);
 
     switch (classification.topic) {
       case TopicKey.Calendar: {
+        if (
+          classification.intent === ClassifierIntent.Update &&
+          !hasReference &&
+          /\b(?:grocery|shopping|buy|get|grab|pick up|list)\b/iu.test(content)
+        ) {
+          const groceryItems = splitListItems(content);
+          if (groceryItems.length > 0) {
+            return {
+              is_response: true,
+              typed_action: { type: "add_items", items: groceryItems.map((item) => ({ item })) },
+            };
+          }
+        }
         if (classification.intent === ClassifierIntent.Query) {
           return { is_response: true, typed_action: { type: "query_events" } };
         }
@@ -942,11 +1156,22 @@ export class Worker {
             ),
           );
         }
+        const titleFromCurrent = stripTemporalPhrases(content)
+          .replace(
+            /^(?:please\s+)?(?:add|put|set|schedule)\s+(?:that|it|this)\s+(?:to|on)?\s*(?:my\s+)?calendar$/iu,
+            "",
+          )
+          .replace(/^(?:actually|just|okay|ok)\s*,?\s*/iu, "")
+          .trim();
+        const inferredTitle =
+          titleFromCurrent.length > 0
+            ? titleFromCurrent.slice(0, 80)
+            : this.inferCalendarTitleFromHistory(threadHistory, content);
         return {
           is_response: true,
           typed_action: {
             type: "create_event",
-            title: content.slice(0, 80),
+            title: inferredTitle && inferredTitle.length > 0 ? inferredTitle : "Calendar item",
             date_start: dateHint,
             concerning: humanConcerning,
           },
@@ -1000,8 +1225,7 @@ export class Worker {
         if (classification.intent === ClassifierIntent.Query) {
           return { is_response: true, typed_action: { type: "query_finances" } };
         }
-        const amount = extractAmount(content);
-        if (amount === null) {
+        if (amountHint === null) {
           throw new ClarificationSignal(
             buildClarification(
               queueItem,
@@ -1015,7 +1239,7 @@ export class Worker {
           typed_action: {
             type: "log_expense",
             description: content.slice(0, 120),
-            amount,
+            amount: amountHint,
             logged_by: actor,
             requires_confirmation: true,
           },
@@ -1217,6 +1441,12 @@ export class Worker {
       }
       case TopicKey.FamilyStatus: {
         if (classification.intent === ClassifierIntent.Query) {
+          if (isDigestRequest(content)) {
+            return {
+              is_response: true,
+              typed_action: { type: "query_status", entity: "__digest__" },
+            };
+          }
           return {
             is_response: true,
             typed_action: { type: "query_status", entity: humanConcerning[0] },
@@ -1303,14 +1533,7 @@ export class Worker {
 
   private inferClarificationReference(
     queueItem: StackQueueItem,
-    threadHistory: {
-      recent_messages: Array<{
-        id: string;
-        from: string;
-        content: string;
-        state_ref?: string;
-      }>;
-    } | null,
+    threadHistory: ThreadHistory | null,
   ): string | null {
     if (queueItem.clarification_of) {
       return queueItem.clarification_of;
@@ -1348,6 +1571,93 @@ export class Worker {
       return message.state_ref ?? message.id ?? null;
     }
 
+    return null;
+  }
+
+  private inferCalendarTitleFromHistory(
+    threadHistory: ThreadHistory | null,
+    currentContent: string,
+  ): string | null {
+    if (!threadHistory) {
+      return null;
+    }
+    const normalizedCurrent = currentContent.trim().toLowerCase();
+    const genericCalendarCommandPattern =
+      /^(?:add|put|set|schedule)?\s*(?:that|it|this)\s+(?:to|on)?\s*(?:my\s+)?calendar$/iu;
+
+    for (let index = threadHistory.recent_messages.length - 1; index >= 0; index -= 1) {
+      const message = threadHistory.recent_messages[index];
+      if (!message || message.from !== "participant") {
+        continue;
+      }
+      const candidate = message.content.trim();
+      if (candidate.length === 0 || candidate.toLowerCase() === normalizedCurrent) {
+        continue;
+      }
+      if (genericCalendarCommandPattern.test(candidate)) {
+        continue;
+      }
+      const temporalStripped = stripTemporalPhrases(candidate)
+        .replace(/^(?:actually|just|okay|ok)\s*,?\s*/iu, "")
+        .replace(/^(?:please\s+)?(?:add|put|get|buy|grab|pick up|schedule)\s+/iu, "")
+        .replace(/\s+/gu, " ")
+        .trim();
+      if (temporalStripped.length > 0) {
+        return temporalStripped.slice(0, 80);
+      }
+    }
+    return null;
+  }
+
+  private inferDateFromHistory(
+    threadHistory: ThreadHistory | null,
+    currentContent: string,
+    fallback: Date,
+  ): Date | null {
+    if (!threadHistory) {
+      return null;
+    }
+    const normalizedCurrent = currentContent.trim().toLowerCase();
+    for (let index = threadHistory.recent_messages.length - 1; index >= 0; index -= 1) {
+      const message = threadHistory.recent_messages[index];
+      if (!message || message.from !== "participant") {
+        continue;
+      }
+      const candidate = message.content.trim();
+      if (candidate.length === 0 || candidate.toLowerCase() === normalizedCurrent) {
+        continue;
+      }
+      const parsed = extractDateHint(candidate, fallback);
+      if (parsed) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  private resolveAmountHint(content: string, threadHistory: ThreadHistory | null): number | null {
+    const direct = extractAmount(content);
+    if (direct !== null) {
+      return direct;
+    }
+    if (!threadHistory) {
+      return null;
+    }
+    const normalizedCurrent = content.trim().toLowerCase();
+    for (let index = threadHistory.recent_messages.length - 1; index >= 0; index -= 1) {
+      const message = threadHistory.recent_messages[index];
+      if (!message || message.from !== "participant") {
+        continue;
+      }
+      const candidate = message.content.trim();
+      if (candidate.length === 0 || candidate.toLowerCase() === normalizedCurrent) {
+        continue;
+      }
+      const inferred = extractAmount(candidate);
+      if (inferred !== null) {
+        return inferred;
+      }
+    }
     return null;
   }
 
@@ -1446,21 +1756,42 @@ export class Worker {
         break;
       }
       case "add_items": {
+        const rebuiltList: typeof state.grocery.list = [];
+        const rebuiltNormalized = new Set<string>();
+        for (const entry of state.grocery.list) {
+          const normalized = normalizeLegacyGroceryItemForStorage(entry.item);
+          if (!normalized || rebuiltNormalized.has(normalized)) {
+            mutated = true;
+            continue;
+          }
+          rebuiltList.push({ ...entry, item: normalized });
+          rebuiltNormalized.add(normalized);
+          if (normalized !== entry.item) {
+            mutated = true;
+          }
+        }
+        if (rebuiltList.length !== state.grocery.list.length || mutated) {
+          state.grocery.list = rebuiltList;
+        }
+
         const existing = new Set(
-          state.grocery.list.map((entry) => entry.item.toLowerCase().trim()),
+          state.grocery.list.map((entry) => canonicalizeGroceryItem(entry.item)),
         );
         for (const [index, candidate] of action.items.entries()) {
           const itemName = candidate.item.trim();
           if (itemName.length === 0) {
             continue;
           }
-          const normalized = itemName.toLowerCase();
+          const normalized = canonicalizeGroceryItem(itemName);
+          if (normalized.length === 0) {
+            continue;
+          }
           if (existing.has(normalized)) {
             continue;
           }
           state.grocery.list.push({
             id: `g_${now.getTime()}_${index}`,
-            item: itemName,
+            item: normalized,
             section: candidate.section ?? GrocerySection.Other,
             added_by: actor,
             added_at: now,
@@ -1471,11 +1802,13 @@ export class Worker {
         break;
       }
       case "remove_items": {
-        const removals = new Set(action.item_ids.map((item) => item.toLowerCase().trim()));
-        if (removals.size > 0) {
+        const removals = action.item_ids
+          .map((item) => canonicalizeGroceryItem(item))
+          .filter((item) => item.length > 0);
+        if (removals.length > 0) {
           const before = state.grocery.list.length;
           state.grocery.list = state.grocery.list.filter(
-            (entry) => !removals.has(entry.item.toLowerCase().trim()),
+            (entry) => !removals.some((removal) => groceryItemsMatch(entry.item, removal)),
           );
           mutated = state.grocery.list.length !== before;
         }
@@ -1860,6 +2193,34 @@ export class Worker {
         return `Nudge history: ${state.relationship.nudge_history.length} item(s).`;
       }
       case "query_status": {
+        if (action.entity === "__digest__") {
+          const lines: string[] = [];
+          lines.push(
+            `Today snapshot: ${state.calendar.events.length} calendar item(s), ${state.grocery.list.length} grocery item(s), ${state.finances.expenses_recent.length} expense log(s), ${state.chores.active.length} active chore(s).`,
+          );
+          if (state.calendar.events.length > 0) {
+            const upcoming = state.calendar.events
+              .slice(0, 3)
+              .map((entry) => entry.title)
+              .join(", ");
+            lines.push(`Calendar: ${upcoming}.`);
+          }
+          if (state.meals.planned.length > 0) {
+            const meals = state.meals.planned
+              .slice(0, 3)
+              .map((entry) => entry.description)
+              .join(", ");
+            lines.push(`Meals: ${meals}.`);
+          }
+          if (state.family_status.current.length > 0) {
+            const statuses = state.family_status.current
+              .slice(0, 3)
+              .map((entry) => `${entry.entity}: ${entry.status}`)
+              .join("; ");
+            lines.push(`Status: ${statuses}.`);
+          }
+          return lines.join("\n");
+        }
         if (state.family_status.current.length === 0) return "No current family status entries.";
         return `Family status:\n${state.family_status.current
           .map((entry, i) => `${i + 1}. ${entry.entity}: ${entry.status}`)
@@ -1911,6 +2272,7 @@ export class Worker {
         kind: "resolved_reply";
         metadata: Record<string, unknown>;
         resolution: ConfirmationResult;
+        approved_action_payload?: TopicAction;
       }
     | { kind: "confirmation_prompted"; metadata: Record<string, unknown> }
   > {
@@ -1918,8 +2280,12 @@ export class Worker {
     if (replyResolution) {
       return {
         kind: "resolved_reply",
-        metadata: { result: replyResolution },
-        resolution: replyResolution,
+        metadata: { result: replyResolution.result },
+        resolution: replyResolution.result,
+        approved_action_payload:
+          replyResolution.result === ConfirmationResult.Approved
+            ? replyResolution.requested_action_payload
+            : undefined,
       };
     }
 
@@ -1931,6 +2297,7 @@ export class Worker {
     const confirmation = await this.confirmationService.openConfirmation({
       type: confirmationType,
       action: action.type,
+      requested_action_payload: action,
       requested_by: queueItem.concerning[0] ?? getDefaultHumanEntityId(),
       requested_in_thread: targetThread,
       expires_at: new Date(
@@ -2003,10 +2370,11 @@ export class Worker {
       if (content === null) {
         continue;
       }
+      const crossTopicRef = `${sourceId}__to__${targetTopic}`;
 
       enqueuePromises.push(
         this.queueService.enqueue({
-          id: `${sourceId}:${targetTopic}`,
+          id: crossTopicRef,
           source: QueueItemSource.CrossTopic,
           content,
           concerning: classification.concerning,
@@ -2014,7 +2382,7 @@ export class Worker {
           created_at: queueItem.created_at,
           topic: targetTopic,
           intent: ClassifierIntent.Request,
-          idempotency_key: `${sourceId}:${targetTopic}`,
+          idempotency_key: crossTopicRef,
         }),
       );
     }

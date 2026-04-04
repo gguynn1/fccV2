@@ -10,7 +10,7 @@ import type { ClassifierIntent, DispatchPriority, TopicKey } from "../types.js";
 import type { DigestDay } from "./01-scheduler-service/types.js";
 import type { DataIngestState } from "./02-data-ingest-service/types.js";
 import type { SystemState } from "./03-state-service/types.js";
-import type { TopicProfileConfig } from "./04-topic-profile-service/types.js";
+import type { TopicAction, TopicProfileConfig } from "./04-topic-profile-service/types.js";
 import type { RoutingDecision, Thread, ThreadHistory } from "./05-routing-service/types.js";
 import type { OutboundBudgetTracker } from "./06-budget-service/types.js";
 import type { ActiveEscalation, EscalationStatus } from "./07-escalation-service/types.js";
@@ -21,6 +21,7 @@ import type {
   ConfirmationReplyOption,
   ConfirmationResult,
   ConfirmationsState,
+  ResolvedConfirmation,
 } from "./08-confirmation-service/types.js";
 
 export * from "./01-scheduler-service/types.js";
@@ -121,6 +122,7 @@ export interface EscalationService {
 export interface ConfirmationRequest {
   type: ConfirmationActionType;
   action: string;
+  requested_action_payload?: TopicAction;
   requested_by: string;
   requested_in_thread: string;
   expires_at: Date;
@@ -133,7 +135,7 @@ export interface ConfirmationService {
   getState(): Promise<ConfirmationsState>;
   requiresConfirmation(type: ConfirmationActionType): boolean;
   openConfirmation(request: ConfirmationRequest): Promise<Confirmation>;
-  resolveFromQueueItem(queue_item: StackQueueItem): Promise<ConfirmationResult | null>;
+  resolveFromQueueItem(queue_item: StackQueueItem): Promise<ResolvedConfirmation | null>;
   expirePending(now: Date): Promise<Confirmation[]>;
   reconcileOnStartup(now: Date): Promise<ConfirmationRecoveryResult>;
   close(): Promise<void>;

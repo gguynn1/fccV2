@@ -43,3 +43,13 @@ export function classifierUserPrompt(input: ClassifierInput): string {
     2,
   );
 }
+
+export function topicScopedContentSystemPrompt(): string {
+  return [
+    "You extract only the clause relevant to one already-selected topic and intent.",
+    "Return strict JSON only with keys: scoped_content, mixed_intent.",
+    "scoped_content must keep original wording relevant to the selected topic/intent.",
+    "Remove unrelated clauses from other domains (e.g., grocery vs finances).",
+    "If message is not mixed-intent, return the original message as scoped_content and mixed_intent=false.",
+  ].join("\n");
+}

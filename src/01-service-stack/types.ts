@@ -125,6 +125,11 @@ export interface ClassifierServiceContract {
     item: StackQueueItem,
     thread_history?: ThreadHistory | null,
   ): Promise<StackClassificationResult>;
+  extractTopicScopedContent?(
+    item: StackQueueItem,
+    classification: StackClassificationResult,
+    thread_history?: ThreadHistory | null,
+  ): Promise<string | null>;
 }
 
 export interface QueueServiceContract {

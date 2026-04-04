@@ -4,7 +4,13 @@ import { type SystemState } from "../../02-supporting-services/03-state-service/
 import { createTopicProfileService } from "../../02-supporting-services/04-topic-profile-service/index.js";
 import { createRoutingService } from "../../02-supporting-services/05-routing-service/index.js";
 import { type ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
-import { ConfirmationResult } from "../../02-supporting-services/08-confirmation-service/types.js";
+import {
+  ConfirmationActionType,
+  ConfirmationReplyDecision,
+  ConfirmationResult,
+  ConfirmationStatus,
+  type ResolvedConfirmation,
+} from "../../02-supporting-services/08-confirmation-service/types.js";
 import {
   createTestSystemState,
   installTestSystemConfig,
@@ -71,7 +77,7 @@ function createRuntimeStubs(
     now?: () => Date;
     budgetPriority?: DispatchPriority;
     escalationDecision?: { should_escalate: boolean; next_target_thread?: string };
-    confirmationResolution?: ConfirmationResult | null;
+    confirmationResolution?: ConfirmationResult | ResolvedConfirmation | null;
   } = {},
 ) {
   const config = installTestSystemConfig();
@@ -128,7 +134,42 @@ function createRuntimeStubs(
         getState: vi.fn(() => resolved(state.confirmations)),
         requiresConfirmation: vi.fn(() => false),
         openConfirmation: vi.fn(),
-        resolveFromQueueItem: vi.fn(() => resolved(overrides.confirmationResolution ?? null)),
+        resolveFromQueueItem: vi.fn(() => {
+          const resolution = overrides.confirmationResolution ?? null;
+          if (resolution === null) {
+            return resolved(null);
+          }
+          if (typeof resolution === "object") {
+            return resolved(resolution);
+          }
+          if (
+            resolution !== ConfirmationResult.Approved &&
+            resolution !== ConfirmationResult.Rejected
+          ) {
+            return resolved(null);
+          }
+          return resolved<ResolvedConfirmation>({
+            id: "confirm_test",
+            type: ConfirmationActionType.FinancialAction,
+            action: "log_expense",
+            requested_by: "participant_1",
+            requested_in_thread: "couple",
+            requested_at: new Date("2026-04-03T19:00:00.000Z"),
+            expires_at: new Date("2026-04-03T19:10:00.000Z"),
+            status: ConfirmationStatus.Resolved,
+            result: resolution,
+            resolved_at: new Date("2026-04-03T19:01:00.000Z"),
+            resolved_in_thread: "couple",
+            reply_options: [
+              {
+                key: "yes",
+                label: "Yes",
+                aliases: ["yes"],
+                decision: ConfirmationReplyDecision.Approve,
+              },
+            ],
+          });
+        }),
         expirePending: vi.fn(() => resolved([])),
         reconcileOnStartup: vi.fn(() => resolved({ expired: [], notifications: [] })),
         close: vi.fn(() => resolved(undefined)),
