@@ -3,7 +3,13 @@ import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -120,15 +126,17 @@ export function EvalRoute() {
           <div className="flex flex-col gap-4 md:flex-row md:items-end">
             <div className="w-full max-w-xs space-y-2">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Scenario set</p>
-              <Select
-                value={selectedScenarioSet}
-                onChange={(event) => setSelectedScenarioSet(event.target.value)}
-              >
-                {overviewQuery.data.scenario_sets.map((scenarioSet) => (
-                  <option key={scenarioSet.name} value={scenarioSet.name}>
-                    {scenarioSet.label}
-                  </option>
-                ))}
+              <Select value={selectedScenarioSet} onValueChange={setSelectedScenarioSet}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {overviewQuery.data.scenario_sets.map((scenarioSet) => (
+                    <SelectItem key={scenarioSet.name} value={scenarioSet.name}>
+                      {scenarioSet.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <Button

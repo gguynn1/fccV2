@@ -744,8 +744,6 @@ export class Worker {
     this.actionRouter = options.action_router ?? createActionRouter({ logger: this.logger });
     this.now = options.now ?? (() => new Date());
     this.config = {
-      processing_sequence:
-        options.config?.processing_sequence ?? runtimeSystemConfig.worker.processing_sequence,
       max_thread_history_messages:
         options.config?.max_thread_history_messages ?? DEFAULT_MAX_THREAD_HISTORY_MESSAGES,
       stale_after_hours: options.config?.stale_after_hours ?? DEFAULT_STALE_AFTER_HOURS,

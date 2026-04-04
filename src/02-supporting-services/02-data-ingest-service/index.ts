@@ -347,11 +347,86 @@ export class DataIngestService implements DataIngestServiceContract {
   public async produceIngestItems(reference_time: Date): Promise<StackQueueItem[]> {
     const ingestState = await this.getIngestState();
     ingestState.email_monitor.last_poll = reference_time;
-    ingestState.email_monitor.last_poll_result = this.isImapConfigured()
-      ? "ready_for_runtime_poll"
-      : "deferred_until_imap_credentials_are_configured";
+
+    if (!this.isImapConfigured()) {
+      ingestState.email_monitor.last_poll_result = "deferred_until_imap_credentials_are_configured";
+      await this.updateIngestState(ingestState);
+      return [];
+    }
+
+    const items: StackQueueItem[] = [];
+    let client: ImapFlow | null = null;
+    try {
+      client = new ImapFlow({
+        host: this.imapConfig.host,
+        port: this.imapConfig.port,
+        secure: this.imapConfig.secure,
+        auth: { user: this.imapConfig.user, pass: this.imapConfig.password },
+      });
+      await client.connect();
+      await client.mailboxOpen(this.imapConfig.mailbox);
+
+      const lock = await client.getMailboxLock(this.imapConfig.mailbox);
+      try {
+        const unseenResult = await client.search({ seen: false });
+        const unseen = Array.isArray(unseenResult) ? unseenResult : [];
+        for await (const message of client.fetch(unseen, {
+          uid: true,
+          envelope: true,
+          source: true,
+          internalDate: true,
+        })) {
+          const envelope = message.envelope;
+          const fromAddress = envelope?.from?.[0];
+          const sourceText = Buffer.isBuffer(message.source)
+            ? message.source.toString("utf8")
+            : typeof message.source === "string"
+              ? message.source
+              : "";
+          const parsedMime = parseMimeMessage(sourceText);
+          const inboxMessage: InboxMessage = {
+            message_id: String(message.uid),
+            inbox_address: this.imapConfig.user,
+            received_at:
+              message.internalDate instanceof Date
+                ? message.internalDate
+                : new Date(message.internalDate ?? Date.now()),
+            from: fromAddress?.address ?? fromAddress?.name ?? "unknown",
+            subject: envelope?.subject ?? "Inbox update",
+            text: parsedMime.text ?? sourceText.slice(0, 20_000),
+            html: parsedMime.html ?? undefined,
+            attachments: parsedMime.attachments,
+            parse_confidence: parsedMime.parse_confidence,
+            parse_warnings: parsedMime.parse_warnings,
+          };
+          const produced = await this.processInboxMessage(inboxMessage);
+          items.push(...produced);
+          await client.messageFlagsAdd(message.uid, ["\\Seen"]);
+        }
+      } finally {
+        lock.release();
+      }
+
+      ingestState.email_monitor.last_poll_result =
+        items.length > 0 ? `ok:${items.length}_items` : "ok:no_new_items";
+    } catch (error: unknown) {
+      this.logger.error(
+        { err: error instanceof Error ? error.message : String(error) },
+        "IMAP poll during produceIngestItems failed.",
+      );
+      ingestState.email_monitor.last_poll_result = "poll_error";
+    } finally {
+      if (client) {
+        try {
+          await client.logout();
+        } catch {
+          /* connection may already be closed */
+        }
+      }
+    }
+
     await this.updateIngestState(ingestState);
-    return [];
+    return items;
   }
 
   public async processForwardedContent(

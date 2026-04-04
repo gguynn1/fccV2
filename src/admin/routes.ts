@@ -21,7 +21,10 @@ import {
   type ConfigEditSource,
   type ConfigReconciliationReport,
 } from "./config-hardening.js";
-import type { EmulationStore } from "./emulation-store.js";
+import type {
+  EmulationStore,
+  EmulationMessage as StoredEmulationMessage,
+} from "./emulation-store.js";
 import {
   generateScenarioSet,
   getActiveEvalRunId,
@@ -97,6 +100,46 @@ const budgetPayloadSchema = z.object({
 
 const schedulerPayloadSchema = z.object({
   daily_rhythm: dailyRhythmSchema,
+});
+
+const topicBehaviorSchema = z.record(z.string(), z.string());
+
+const topicConfigSchema = z.object({
+  label: z.string().min(1),
+  description: z.string(),
+  routing: z.record(z.string(), z.union([z.string(), z.boolean(), z.array(z.string())])),
+  behavior: topicBehaviorSchema,
+  escalation: z.string(),
+  proactive: z.record(z.string(), z.union([z.string(), z.boolean()])).optional(),
+  escalation_ladder: z.record(z.string(), z.union([z.string(), z.boolean(), z.null()])).optional(),
+  confirmation_required: z.boolean().optional(),
+  sections: z.array(z.string()).optional(),
+  cross_topic_connections: z.array(z.string()).optional(),
+  confirmation_required_for_sends: z.boolean().optional(),
+  follow_up_quiet_period_days: z.number().optional(),
+  on_ignored: z.string().optional(),
+  minimum_gap_between_nudges: z.string().optional(),
+  status_expiry: z.string().optional(),
+  grocery_linking: z.boolean().optional(),
+});
+
+const escalationProfileSchema = z.object({
+  label: z.string().min(1),
+  applies_to: z.array(z.string()),
+  steps: z.array(z.string()),
+  on_reassignment: z.string(),
+});
+
+const confirmationGatesSchema = z.object({
+  always_require_approval: z.array(z.string()),
+  expiry_minutes: z.number().min(1),
+  on_expiry: z.string(),
+});
+
+const topicsPayloadSchema = z.object({
+  topics: z.record(z.string(), topicConfigSchema),
+  escalation_profiles: z.record(z.string(), escalationProfileSchema),
+  confirmation_gates: confirmationGatesSchema,
 });
 
 const evalStartPayloadSchema = z.object({
@@ -178,6 +221,65 @@ function toDispatchMetadata(
     included_in: item.included_in ?? null,
     response_received: item.response_received ?? null,
     escalation_step: item.escalation_step ?? null,
+  };
+}
+
+function toRelationshipStateMetadata(
+  relationship: Awaited<ReturnType<SqliteStateService["getSystemState"]>>["relationship"],
+) {
+  return {
+    last_nudge: {
+      date: relationship.last_nudge.date,
+      thread: relationship.last_nudge.thread,
+      content_recorded: Boolean(relationship.last_nudge.content),
+      response_received: relationship.last_nudge.response_received,
+    },
+    next_nudge_eligible: relationship.next_nudge_eligible,
+    nudge_history: relationship.nudge_history.map((entry) => {
+      const { content, ...rest } = entry;
+      return {
+        ...rest,
+        content_recorded: Boolean(content),
+      };
+    }),
+  };
+}
+
+function toThreadStateMetadata(
+  threads: Awaited<ReturnType<SqliteStateService["getSystemState"]>>["threads"],
+) {
+  return Object.fromEntries(
+    Object.entries(threads).map(([threadId, history]) => [
+      threadId,
+      {
+        active_topic_context: history.active_topic_context,
+        last_activity: history.last_activity,
+        recent_messages: history.recent_messages.map((message) => ({
+          id: message.id,
+          from: message.from,
+          at: message.at,
+          topic_context: message.topic_context,
+        })),
+      },
+    ]),
+  );
+}
+
+function toEmulationMessageMetadata(message: StoredEmulationMessage) {
+  return {
+    id: message.id,
+    thread_id: message.thread_id,
+    sender: message.sender,
+    content: "",
+    direction: message.direction,
+    source_type: message.source_type,
+    created_at: message.created_at,
+    preview_label:
+      message.source_type === "reaction"
+        ? "Reaction recorded"
+        : message.source_type === "image"
+          ? "Image recorded"
+          : "Text message recorded",
   };
 }
 
@@ -454,12 +556,28 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     };
   });
 
-  fastify.put("/topics", async (_request, reply) => {
-    void reply.code(405).send({
-      error: "method_not_allowed",
-      message:
-        "Topic and confirmation-gate edits are read-only until runtime consumers use persisted topic config live.",
-    });
+  fastify.put("/topics", async (request) => {
+    const payload = topicsPayloadSchema.parse(request.body);
+    const result = await applyAdminConfigChange(
+      options.queue_service,
+      options.state_service,
+      "topics",
+      (nextConfig) => {
+        nextConfig.topics = payload.topics as unknown as typeof nextConfig.topics;
+        nextConfig.escalation_profiles =
+          payload.escalation_profiles as unknown as typeof nextConfig.escalation_profiles;
+        nextConfig.confirmation_gates =
+          payload.confirmation_gates as unknown as typeof nextConfig.confirmation_gates;
+      },
+    );
+    return {
+      ok: true,
+      topics: result.config.topics,
+      escalation_profiles: result.config.escalation_profiles,
+      confirmation_gates: result.config.confirmation_gates,
+      reconciliation: result.reconciliation,
+      queue_reconciliation: result.queue_reconciliation,
+    };
   });
 
   fastify.get("/budget", async () => {
@@ -563,7 +681,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
 
   fastify.get("/state/domain", async () => {
     const systemState = await options.state_service.getSystemState();
-    return {
+    const domainState = {
       outbound_budget_tracker: systemState.outbound_budget_tracker,
       calendar: systemState.calendar,
       chores: systemState.chores,
@@ -575,14 +693,15 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
       travel: systemState.travel,
       vendors: systemState.vendors,
       business: systemState.business,
-      relationship: systemState.relationship,
+      relationship: toRelationshipStateMetadata(systemState.relationship),
       family_status: systemState.family_status,
       meals: systemState.meals,
       maintenance: systemState.maintenance,
       data_ingest_state: systemState.data_ingest_state,
       digests: systemState.digests,
-      threads: systemState.threads,
+      threads: toThreadStateMetadata(systemState.threads),
     };
+    return domainState;
   });
 
   fastify.post("/state/domain/mutate", async (request, reply) => {
@@ -768,13 +887,17 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     const query = emulationMessagesQuerySchema.parse(request.query);
 
     if (query.thread_id) {
+      const messages = options.emulation_store.getMessages(query.thread_id, query.since);
+      const sanitizedMessages = messages.map(toEmulationMessageMetadata);
       return {
-        messages: options.emulation_store.getMessages(query.thread_id, query.since),
+        messages: sanitizedMessages,
       };
     }
 
+    const messages = options.emulation_store.getAllMessages();
+    const sanitizedMessages = messages.map(toEmulationMessageMetadata);
     return {
-      messages: options.emulation_store.getAllMessages(),
+      messages: sanitizedMessages,
     };
   });
 

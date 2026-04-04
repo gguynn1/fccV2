@@ -48,7 +48,8 @@ export interface DomainStateResponse {
     last_nudge: {
       date: string;
       thread: string;
-      content: string;
+      content?: string;
+      content_recorded: boolean;
       response_received: boolean;
     };
     next_nudge_eligible: string;
@@ -77,7 +78,6 @@ export interface DomainStateResponse {
       recent_messages: Array<{
         id: string;
         from: string;
-        content: string;
         at: string;
         topic_context: string;
       }>;

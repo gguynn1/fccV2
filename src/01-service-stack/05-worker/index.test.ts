@@ -105,7 +105,7 @@ function createRuntimeStubs(
     confirmationResolution?: ConfirmationResult | ResolvedConfirmation | null;
   } = {},
 ) {
-  const config = installTestSystemConfig();
+  installTestSystemConfig();
   const transportCalls: TransportOutboundEnvelope[] = [];
   const queuedItems: StackQueueItem[] = [];
   const stateService = createStateServiceStub();
@@ -135,7 +135,7 @@ function createRuntimeStubs(
       },
       identity_service: createIdentityStub(),
       topic_profile_service: createTopicProfileService(),
-      routing_service: createRoutingService({ threads: config.threads }),
+      routing_service: createRoutingService(),
       budget_service: {
         getBudgetTracker: vi.fn(() => resolved(state.outbound_budget_tracker)),
         evaluateOutbound: vi.fn(() =>

@@ -6,8 +6,6 @@ import {
   EscalationReassignmentPolicy,
   GrocerySection,
   TopicKey,
-  WorkerAction,
-  WorkerService,
   type SystemConfig,
   type SystemState,
 } from "../index.js";
@@ -487,57 +485,6 @@ const defaultInputRecognition: SystemConfig["input_recognition"] = {
 };
 
 const defaultWorker: SystemConfig["worker"] = {
-  processing_sequence: [
-    {
-      step: 1,
-      action: WorkerAction.ClassifyTopic,
-      service: WorkerService.Classifier,
-      description: "Determine which of the 14 topics this item belongs to.",
-    },
-    {
-      step: 2,
-      action: WorkerAction.IdentifyEntities,
-      service: WorkerService.Identity,
-      description: "Identify which people or pets are involved.",
-    },
-    {
-      step: 3,
-      action: WorkerAction.DetermineActionType,
-      description: "Is this a response, a proactive message, or internal storage?",
-    },
-    {
-      step: 4,
-      action: WorkerAction.CheckOutboundBudget,
-      service: WorkerService.Budget,
-      description: "Check if sending is within budget limits. If not, hold or batch.",
-    },
-    {
-      step: 5,
-      action: WorkerAction.CheckEscalation,
-      service: WorkerService.Escalation,
-      description: "Determine if this item requires escalation based on topic profile.",
-    },
-    {
-      step: 6,
-      action: WorkerAction.CheckConfirmation,
-      service: WorkerService.Confirmation,
-      description: "Does this action require approval? Is there a pending confirmation to resolve?",
-    },
-    {
-      step: 7,
-      action: WorkerAction.ApplyBehaviorProfile,
-      service: WorkerService.TopicProfile,
-      description:
-        "Apply tone, format, initiative style, and framework from the topic's behavior profile.",
-    },
-    {
-      step: 8,
-      action: WorkerAction.RouteAndDispatch,
-      service: WorkerService.Routing,
-      description:
-        "Determine target thread, then dispatch (immediate), hold (batched), or store (silent).",
-    },
-  ],
   ai_action_interpreter_enabled: true,
   ai_action_interpreter_topic_allowlist: [],
 };

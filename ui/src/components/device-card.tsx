@@ -1,11 +1,17 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   useEmulationMessages,
   useSendEmulationMessage,
@@ -41,7 +47,7 @@ function MessageBubble({
           isOwnMessage ? "bg-blue-600 text-white" : "bg-muted text-foreground",
         )}
       >
-        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        <p className="whitespace-pre-wrap break-words">{message.preview_label}</p>
         <p
           className={cn(
             "mt-1 text-[10px]",
@@ -70,7 +76,7 @@ export function DeviceCard({ entity, threads, sessionActive }: DeviceCardProps) 
   const { data } = useEmulationMessages(selectedThreadId || null);
   const sendMessage = useSendEmulationMessage();
 
-  const messages = data?.messages ?? [];
+  const messages = useMemo(() => data?.messages ?? [], [data?.messages]);
 
   useEffect(() => {
     if (messages.length > prevMessageCountRef.current) {
@@ -93,7 +99,7 @@ export function DeviceCard({ entity, threads, sessionActive }: DeviceCardProps) 
     });
   }
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     handleSend(inputValue);
     setInputValue("");
@@ -119,16 +125,17 @@ export function DeviceCard({ entity, threads, sessionActive }: DeviceCardProps) 
           </Badge>
         </div>
         {threads.length > 1 && (
-          <Select
-            value={selectedThreadId}
-            onChange={(e) => setSelectedThreadId(e.target.value)}
-            className="h-7 text-xs"
-          >
-            {threads.map((thread) => (
-              <option key={thread.id} value={thread.id}>
-                {thread.id}
-              </option>
-            ))}
+          <Select value={selectedThreadId} onValueChange={setSelectedThreadId}>
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {threads.map((thread) => (
+                <SelectItem key={thread.id} value={thread.id}>
+                  {thread.id}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         )}
       </CardHeader>

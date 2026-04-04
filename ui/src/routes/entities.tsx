@@ -7,7 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   Table,
@@ -247,10 +253,15 @@ export function EntitiesRoute() {
               />
               <Select
                 value={newPersonType}
-                onChange={(event) => setNewPersonType(event.target.value as typeof newPersonType)}
+                onValueChange={(v) => setNewPersonType(v as typeof newPersonType)}
               >
-                <option value={EntityType.Adult}>Adult</option>
-                <option value={EntityType.Child}>Child</option>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EntityType.Adult}>Adult</SelectItem>
+                  <SelectItem value={EntityType.Child}>Child</SelectItem>
+                </SelectContent>
               </Select>
             </div>
             <Input

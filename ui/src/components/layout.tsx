@@ -37,8 +37,8 @@ export function Layout({ children }: LayoutProps) {
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Admin UI</p>
             <h1 className="text-xl font-semibold">Family Command Center</h1>
           </div>
-          <nav className="overflow-x-auto">
-            <div className="flex min-w-max items-center gap-2">
+          <nav>
+            <div className="flex flex-wrap items-center gap-2">
               {navigationItems.map((item) => (
                 <NavLink key={item.label} to={item.to} end={item.end}>
                   {({ isActive }) => (

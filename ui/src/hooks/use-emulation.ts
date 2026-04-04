@@ -7,6 +7,7 @@ export interface EmulationMessage {
   thread_id: string;
   sender: string;
   content: string;
+  preview_label: string;
   direction: "inbound" | "outbound";
   source_type: "text" | "reaction" | "image";
   created_at: string;

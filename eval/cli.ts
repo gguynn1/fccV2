@@ -8,7 +8,7 @@ interface ParsedArgs {
   command: string;
   run_id: string;
   scenario_set: string;
-  mode: "simulator" | "worker" | "fixture-interpreter";
+  mode: "simulator" | "worker" | "fixture-interpreter" | "live-classifier";
   set_name?: string;
   step_delay_ms?: number;
 }
@@ -49,7 +49,10 @@ function parseArgs(argv: string[]): ParsedArgs {
     if (
       token === "--mode" &&
       next &&
-      (next === "simulator" || next === "worker" || next === "fixture-interpreter")
+      (next === "simulator" ||
+        next === "worker" ||
+        next === "fixture-interpreter" ||
+        next === "live-classifier")
     ) {
       parsed.mode = next;
       index += 1;
@@ -76,7 +79,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (!["run", "watch", "coverage"].includes(args.command)) {
+  if (args.command === "watch" || args.command === "coverage") {
+    throw new Error(`The "${args.command}" command is not yet implemented. Use "run" instead.`);
+  }
+
+  if (args.command !== "run") {
     throw new Error(`Unsupported eval command "${args.command}".`);
   }
 

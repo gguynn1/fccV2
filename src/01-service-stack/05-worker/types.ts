@@ -21,15 +21,7 @@ export enum WorkerService {
   Routing = "routing",
 }
 
-export interface WorkerStep {
-  step: number;
-  action: WorkerAction;
-  service?: WorkerService;
-  description: string;
-}
-
 export interface WorkerConfig {
-  processing_sequence: WorkerStep[];
   max_thread_history_messages?: number;
   stale_after_hours?: number;
   urgent_relevance_minutes?: number;

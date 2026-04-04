@@ -4,7 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useConfig, useUpdateConfig, type ConfigPayload } from "@/hooks/use-config";
 import { useUpdateEntities, type EntityPayload } from "@/hooks/use-entities";
 import { useSystem } from "@/hooks/use-system";
@@ -136,12 +142,17 @@ function LocaleStep({ config, onComplete }: LocaleStepProps) {
           <label htmlFor="onboard-tz" className="text-xs text-muted-foreground">
             Timezone *
           </label>
-          <Select id="onboard-tz" value={timezone} onChange={(e) => setTimezone(e.target.value)}>
-            {TIMEZONES.map((tz) => (
-              <option key={tz} value={tz}>
-                {tz.replaceAll("_", " ")}
-              </option>
-            ))}
+          <Select value={timezone} onValueChange={setTimezone}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TIMEZONES.map((tz) => (
+                <SelectItem key={tz} value={tz}>
+                  {tz.replaceAll("_", " ")}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
@@ -302,12 +313,15 @@ function PeopleStep({
                   <label className="text-xs text-muted-foreground">Type *</label>
                   <Select
                     value={person.type}
-                    onChange={(e) =>
-                      updatePerson(idx, { type: e.target.value as PersonDraft["type"] })
-                    }
+                    onValueChange={(v) => updatePerson(idx, { type: v as PersonDraft["type"] })}
                   >
-                    <option value={EntityType.Adult}>Adult</option>
-                    <option value={EntityType.Child}>Child</option>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={EntityType.Adult}>Adult</SelectItem>
+                      <SelectItem value={EntityType.Child}>Child</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
                 {people.length > 1 && (

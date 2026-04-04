@@ -171,3 +171,15 @@ Escalation check: If the responsible adult doesn't respond to the vet follow-up 
 Collision check: If the vet follow-up, a chore reminder, and a bill alert are all due Tuesday afternoon for the same entity, are they batched into one message or spaced appropriately? Does the immediate-priority bill alert go out separately while the others batch?
 
 When a scenario produces a wrong outcome — wrong thread, wrong timing, wrong tone, missed escalation, unnecessary notification — it's not a code bug. It's a model refinement. The topic behavior profile needs adjusting, or the routing rules need a new qualifier, or the batching logic needs a new threshold.
+
+## Accepted Cross-Boundary Imports
+
+The architecture states "services never directly import runtime code from another service" and the `contract.test.ts` in supporting services enforces this for inter-supporting-service imports. Stack services, however, have accepted pragmatic imports from supporting services. These are intentional and documented here rather than refactored away:
+
+- **Transport** imports `runtimeSystemConfig` for thread/entity lookup during webhook handling and `ThreadType` from routing service types.
+- **CalDAV** (inside transport) imports `StateService` and `CalendarEvent` types for serving calendar events.
+- **Classifier** imports `StateService` and `ThreadHistory` for context enrichment during classification.
+- **Worker** imports supporting service types (calendar event status, chore status, health provider type, pet care category, nudge type) and one runtime function (`extractGroceryItemsFromMealDescription` from meals profile).
+- **Identity** imports `Thread` type from routing service.
+
+These imports flow downward (stack consuming supporting service types and values) and are acceptable because the worker orchestrates all services. The boundary that matters — supporting services not importing from each other — is structurally enforced by contract tests.

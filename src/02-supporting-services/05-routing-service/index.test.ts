@@ -5,8 +5,8 @@ import { ClassifierIntent, TopicKey } from "../../types.js";
 import { createRoutingService } from "./index.js";
 
 describe("RoutingService decision table", () => {
-  const config = installTestSystemConfig();
-  const service = createRoutingService({ threads: config.threads });
+  installTestSystemConfig();
+  const service = createRoutingService();
 
   it("routes responses to the origin thread", async () => {
     const target = await service.resolveTargetThread({

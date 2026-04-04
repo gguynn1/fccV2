@@ -10,7 +10,7 @@ const FAMILY_THREAD_DESCRIPTION =
 const COUPLE_THREAD_DESCRIPTION =
   "Couple thread. Finances, relationship, couple-level coordination.";
 
-export type ConfigEditSource = "entities" | "config" | "scheduler" | "budget";
+export type ConfigEditSource = "entities" | "config" | "scheduler" | "budget" | "topics";
 
 export class AdminConfigInvariantError extends Error {
   public constructor(message: string) {
@@ -289,6 +289,29 @@ function assertConfigInvariants(config: SystemConfig, source: ConfigEditSource):
           `Thread ${thread.id} cannot include pet ${participant}.`,
         );
       }
+    }
+  }
+
+  if (source === "topics") {
+    const validEscalationLevels = new Set(Object.keys(config.escalation_profiles));
+    for (const [topicKey, topicConfig] of Object.entries(config.topics) as Array<
+      [string, { label?: string; escalation?: string }]
+    >) {
+      if (!topicConfig.label || typeof topicConfig.label !== "string") {
+        throw new AdminConfigInvariantError(`Topic "${topicKey}" must have a label.`);
+      }
+      if (
+        topicConfig.escalation &&
+        typeof topicConfig.escalation === "string" &&
+        !validEscalationLevels.has(topicConfig.escalation)
+      ) {
+        throw new AdminConfigInvariantError(
+          `Topic "${topicKey}" references unknown escalation level "${String(topicConfig.escalation)}".`,
+        );
+      }
+    }
+    if (Object.keys(config.topics).length === 0) {
+      throw new AdminConfigInvariantError("At least one topic is required.");
     }
   }
 }

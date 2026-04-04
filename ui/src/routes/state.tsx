@@ -221,7 +221,7 @@ export function StateRoute() {
       key: "relationship",
       label: "Relationship",
       populated:
-        data.relationship.nudge_history.length > 0 || !!data.relationship.last_nudge.content,
+        data.relationship.nudge_history.length > 0 || data.relationship.last_nudge.content_recorded,
     },
     {
       key: "family_status",
@@ -782,22 +782,21 @@ export function StateRoute() {
                       {data.relationship.last_nudge.response_received ? "yes" : "no"}
                     </div>
                     <div>
+                      <span className="text-muted-foreground">Content recorded: </span>
+                      {data.relationship.last_nudge.content_recorded ? "yes" : "no"}
+                    </div>
+                    <div>
                       <span className="text-muted-foreground">Next eligible: </span>
                       {formatDate(data.relationship.next_nudge_eligible)}
                     </div>
                   </div>
-                  {data.relationship.last_nudge.content && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {data.relationship.last_nudge.content}
-                    </p>
-                  )}
                 </div>
                 {data.relationship.nudge_history.length > 0 && (
                   <div>
                     <p className="mb-2 text-xs font-medium text-muted-foreground">Nudge History</p>
                     <GenericTable
                       rows={data.relationship.nudge_history}
-                      columns={["date", "type", "responded", "ignored", "content"]}
+                      columns={["date", "type", "responded", "ignored", "content_recorded"]}
                     />
                   </div>
                 )}
@@ -1105,7 +1104,6 @@ export function StateRoute() {
                                 <TableHead className="text-xs">Time</TableHead>
                                 <TableHead className="text-xs">From</TableHead>
                                 <TableHead className="text-xs">Topic</TableHead>
-                                <TableHead className="text-xs">Content</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1114,9 +1112,6 @@ export function StateRoute() {
                                   <TableCell className="text-xs">{formatDate(msg.at)}</TableCell>
                                   <TableCell className="font-mono text-xs">{msg.from}</TableCell>
                                   <TableCell className="text-xs">{msg.topic_context}</TableCell>
-                                  <TableCell className="max-w-xs truncate text-xs">
-                                    {msg.content}
-                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>

@@ -44,8 +44,11 @@ The worker pulls one item at a time and runs it through a fixed sequence:
 4. Check the outbound budget (priority, collision avoidance, batching)
 5. Check escalation (is this a follow-up? what step? should we escalate?)
 6. Check confirmation (does this action require approval?)
+   — `applyStateMutation` runs here, after confirmation and before composition —
 7. Apply the topic's behavior profile (tone, format, initiative style)
 8. Route and dispatch (target thread, then dispatch, hold, or store)
+
+State mutation (`applyStateMutation`) executes after confirmation resolution (step 6) and before topic profile composition (step 7). Composition and routing in steps 7-8 operate against already-mutated state. This is intentional: the composed message should reflect the current state, not the pre-action state.
 
 ## Decision Flow
 

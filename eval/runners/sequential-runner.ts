@@ -1,6 +1,8 @@
-import { writeFile } from "node:fs/promises";
+import { existsSync, readdirSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
+import { ClaudeClassifierService } from "../../src/01-service-stack/03-classifier-service/index.js";
 import { createWorker } from "../../src/01-service-stack/05-worker/index.js";
 import type {
   ActionRouterResult,
@@ -16,6 +18,7 @@ import { loadEnv } from "../../src/env.js";
 import {
   ClassifierIntent,
   DispatchPriority,
+  EscalationLevel,
   QueueItemSource,
   TopicKey,
   type SystemConfig,
@@ -45,7 +48,7 @@ export interface RunSequentialEvalOptions {
   run_id: string;
   scenario_set: string;
   step_delay_ms?: number;
-  mode?: "simulator" | "worker" | "fixture-interpreter";
+  mode?: "simulator" | "worker" | "fixture-interpreter" | "live-classifier";
 }
 
 function pause(delayMs: number): Promise<void> {
@@ -60,6 +63,53 @@ async function loadEvalSystemConfig(repoRoot: string): Promise<SystemConfig> {
   } finally {
     stateService.close();
   }
+}
+
+const CORE_EXPECTED_FIELDS: Array<keyof EvalScenarioExpectation> = [
+  "topic",
+  "intent",
+  "target_thread",
+  "priority",
+  "confirmation_required",
+];
+
+function isTotalMiss(failures: EvalScenarioFailure[]): boolean {
+  const failedFields = new Set(failures.map((f) => f.field));
+  return CORE_EXPECTED_FIELDS.every((field) => failedFields.has(field));
+}
+
+async function loadPriorRunStatuses(
+  resultsDir: string,
+  scenarioSet: string,
+  currentRunId: string,
+): Promise<Map<string, string>> {
+  const priorStatuses = new Map<string, string>();
+  if (!existsSync(resultsDir)) {
+    return priorStatuses;
+  }
+
+  const jsonFiles = readdirSync(resultsDir)
+    .filter((f) => f.endsWith(".json") && !f.includes(currentRunId))
+    .sort()
+    .reverse();
+
+  for (const fileName of jsonFiles) {
+    try {
+      const content = await readFile(join(resultsDir, fileName), "utf8");
+      const prior = JSON.parse(content) as EvalRunState;
+      if (prior.scenario_set !== scenarioSet || prior.status !== "completed") {
+        continue;
+      }
+      for (const scenario of prior.scenarios) {
+        priorStatuses.set(scenario.id, scenario.status);
+      }
+      return priorStatuses;
+    } catch {
+      continue;
+    }
+  }
+
+  return priorStatuses;
 }
 
 function buildSummary(scenarios: EvalScenarioResult[]): EvalRunSummary {
@@ -372,7 +422,7 @@ function inferPriority(
   }
 
   const escalation = config.topics[topic]?.escalation;
-  if (escalation === "none") {
+  if (escalation === EscalationLevel.None) {
     return DispatchPriority.Batched;
   }
 
@@ -522,26 +572,35 @@ function createWorkerReplayHarness(config: SystemConfig): {
     scenario: EvalScenarioDefinition,
     options?: { interpreter_fixture?: EvalScenarioSimulation["interpreter_fixture"] },
   ) => Promise<EvalScenarioActual>;
+  evaluateTurn: (
+    message: string,
+    concerning: string[],
+    originThread: string,
+    scenarioId: string,
+    turnIndex: number,
+  ) => Promise<EvalScenarioActual>;
 } {
   const state: SystemState = createMinimalSystemState(new Date());
   const transportCalls: TransportOutboundEnvelope[] = [];
   const threadHistory = new Map<string, Awaited<SystemState["threads"][string]>>();
   const stateService = {
-    getSystemConfig: async () => config,
-    saveSystemConfig: async () => undefined,
-    getSystemState: async () => state,
-    saveSystemState: async (nextState: SystemState) => {
+    getSystemConfig: () => Promise.resolve(config),
+    saveSystemConfig: () => Promise.resolve(undefined),
+    getSystemState: () => Promise.resolve(state),
+    saveSystemState: (nextState: SystemState) => {
       Object.assign(state, nextState);
+      return Promise.resolve(undefined);
     },
-    getThreadHistory: async (threadId: string) => threadHistory.get(threadId) ?? null,
-    saveThreadHistory: async (
+    getThreadHistory: (threadId: string) => Promise.resolve(threadHistory.get(threadId) ?? null),
+    saveThreadHistory: (
       threadId: string,
       history: NonNullable<Awaited<SystemState["threads"][string]>>,
     ) => {
       threadHistory.set(threadId, history);
+      return Promise.resolve(undefined);
     },
-    appendDispatchResult: async (_queueItem: StackQueueItem, _action: ActionRouterResult) =>
-      undefined,
+    appendDispatchResult: (_queueItem: StackQueueItem, _action: ActionRouterResult) =>
+      Promise.resolve(undefined),
   };
 
   let activeInterpreterFixture: EvalScenarioSimulation["interpreter_fixture"] | null = null;
@@ -706,73 +765,75 @@ function createWorkerReplayHarness(config: SystemConfig): {
 
   const worker = createWorker({
     classifier_service: {
-      classify: async (item: StackQueueItem) =>
-        ({
+      classify: (item: StackQueueItem) =>
+        Promise.resolve({
           topic: item.topic ?? TopicKey.FamilyStatus,
           intent: item.intent ?? ClassifierIntent.Request,
           concerning: item.concerning,
           confidence: 0.99,
-        }) satisfies StackClassificationResult,
-      interpretAction: async (input) => {
+        } satisfies StackClassificationResult),
+      interpretAction: (input) => {
         if (!activeInterpreterFixture) {
-          return null;
+          return Promise.resolve(null);
         }
         const topic = activeInterpreterFixture.topic ?? input.classification.topic;
         const intent = activeInterpreterFixture.intent ?? input.classification.intent;
         const actionType = activeInterpreterFixture.action_type ?? defaultActionTypeForTopic(topic);
-        return {
-          kind: "resolved",
+        return Promise.resolve({
+          kind: "resolved" as const,
           topic,
           intent,
           action: buildFixtureActionPayload(actionType, topic, input.queue_item) as Record<
             string,
             unknown
           > & { type: string },
-        };
+        });
       },
     },
     identity_service: {
-      resolve: async (item: StackQueueItem) => ({
-        source_entity_id: item.concerning[0] ?? "participant_1",
-        source_entity_type: "adult",
-        thread_id: item.target_thread,
-        concerning: item.concerning,
-      }),
+      resolve: (item: StackQueueItem) =>
+        Promise.resolve({
+          source_entity_id: item.concerning[0] ?? "participant_1",
+          source_entity_type: "adult",
+          thread_id: item.target_thread,
+          concerning: item.concerning,
+        }),
     },
     topic_profile_service: createTopicProfileService(),
     routing_service: createRoutingService(),
     budget_service: {
-      getBudgetTracker: async () => state.outbound_budget_tracker,
-      evaluateOutbound: async () => ({
-        priority: DispatchPriority.Immediate,
-        reason: "runtime replay",
-      }),
-      recordDispatch: async () => undefined,
+      getBudgetTracker: () => Promise.resolve(state.outbound_budget_tracker),
+      evaluateOutbound: () =>
+        Promise.resolve({
+          priority: DispatchPriority.Immediate,
+          reason: "runtime replay",
+        }),
+      recordDispatch: () => Promise.resolve(undefined),
     },
     escalation_service: {
-      getStatus: async () => state.escalation_status,
-      evaluate: async () => ({ should_escalate: false }),
-      reconcileOnStartup: async () => [],
+      getStatus: () => Promise.resolve(state.escalation_status),
+      evaluate: () => Promise.resolve({ should_escalate: false }),
+      reconcileOnStartup: () => Promise.resolve([]),
     },
     confirmation_service: {
-      getState: async () => state.confirmations,
+      getState: () => Promise.resolve(state.confirmations),
       requiresConfirmation: () => false,
-      openConfirmation: async () => {
-        throw new Error("runtime replay confirmation open is not supported");
-      },
-      resolveFromQueueItem: async () => null,
-      expirePending: async () => [],
-      reconcileOnStartup: async () => ({ expired: [], notifications: [] }),
-      close: async () => undefined,
+      openConfirmation: () =>
+        Promise.reject(new Error("runtime replay confirmation open is not supported")),
+      resolveFromQueueItem: () => Promise.resolve(null),
+      expirePending: () => Promise.resolve([]),
+      reconcileOnStartup: () => Promise.resolve({ expired: [], notifications: [] }),
+      close: () => Promise.resolve(undefined),
     },
     state_service: stateService,
     queue_service: {
-      enqueue: async () => undefined,
+      enqueue: () => Promise.resolve(undefined),
     },
     transport_service: {
       normalizeInbound: (input) => input,
-      sendOutbound: async (outbound: TransportOutboundEnvelope) => {
+      sendOutbound: (outbound: TransportOutboundEnvelope) => {
         transportCalls.push(outbound);
+        return Promise.resolve(undefined);
       },
     },
     now: () => new Date("2026-04-04T09:00:00.000Z"),
@@ -812,6 +873,41 @@ function createWorkerReplayHarness(config: SystemConfig): {
       };
       activeInterpreterFixture = null;
       return actual;
+    },
+    evaluateTurn: async (
+      message: string,
+      concerning: string[],
+      originThread: string,
+      scenarioId: string,
+      turnIndex: number,
+    ): Promise<EvalScenarioActual> => {
+      transportCalls.length = 0;
+      activeInterpreterFixture = null;
+      const inferredTopic = inferTopic(message);
+      const inferredIntent = inferIntent(message);
+      const queueItem: StackQueueItem = {
+        id: `eval_worker_${scenarioId}_turn_${turnIndex}`,
+        source: QueueItemSource.ScheduledTrigger,
+        content: message,
+        concerning,
+        target_thread: originThread,
+        created_at: new Date("2026-04-04T09:00:00.000Z"),
+        topic: inferredTopic,
+        intent: inferredIntent,
+      };
+      const trace = await worker.process(queueItem);
+      const outbound = transportCalls.at(-1);
+      return {
+        topic: inferredTopic,
+        intent: inferredIntent,
+        target_thread: outbound?.target_thread ?? originThread,
+        priority: outbound?.priority ?? DispatchPriority.Silent,
+        confirmation_required:
+          trace.outcome === "held" ||
+          (typeof outbound?.content === "string" &&
+            outbound.content.toLowerCase().includes("please confirm")),
+        composed_message: outbound?.content ?? "No outbound generated.",
+      };
     },
   };
 }
@@ -1025,6 +1121,69 @@ function evaluateMultiTurnScenario(
   return { allFailures, turnResults, lastActual };
 }
 
+async function evaluateMultiTurnViaWorker(
+  scenario: EvalScenarioDefinition,
+  turns: EvalTurn[],
+  workerReplay: {
+    evaluateTurn: (
+      message: string,
+      concerning: string[],
+      originThread: string,
+      scenarioId: string,
+      turnIndex: number,
+    ) => Promise<EvalScenarioActual>;
+  },
+): Promise<{
+  allFailures: EvalScenarioFailure[];
+  turnResults: EvalTurnResult[];
+  lastActual: EvalScenarioActual | null;
+}> {
+  const allFailures: EvalScenarioFailure[] = [];
+  const turnResults: EvalTurnResult[] = [];
+  let lastActual: EvalScenarioActual | null = null;
+
+  for (let i = 0; i < turns.length; i++) {
+    const turn = turns[i];
+
+    if (turn.role === "assistant") {
+      turnResults.push({
+        turn_index: i,
+        role: "assistant",
+        message: turn.message,
+        actual: null,
+        failures: [],
+      });
+      continue;
+    }
+
+    const actual = await workerReplay.evaluateTurn(
+      turn.message,
+      turn.entity_id ? [turn.entity_id] : scenario.prompt_input.concerning,
+      turn.thread_id,
+      scenario.id,
+      i,
+    );
+
+    lastActual = actual;
+
+    let turnFailures: EvalScenarioFailure[] = [];
+    if (turn.expected) {
+      turnFailures = collectTurnFailures(turn.expected, actual, i);
+      allFailures.push(...turnFailures);
+    }
+
+    turnResults.push({
+      turn_index: i,
+      role: "participant",
+      message: turn.message,
+      actual,
+      failures: turnFailures,
+    });
+  }
+
+  return { allFailures, turnResults, lastActual };
+}
+
 function matchesAllMarkers(message: string, markers: string[] | undefined): boolean {
   if (!markers || markers.length === 0) {
     return true;
@@ -1176,6 +1335,32 @@ export async function runSequentialEval(options: RunSequentialEvalOptions): Prom
       ? createWorkerReplayHarness(systemConfig)
       : null;
   const fixtureInterpreterMode = mode === "fixture-interpreter";
+  const liveClassifier =
+    mode === "live-classifier"
+      ? (() => {
+          const apiKey = process.env["ANTHROPIC_API_KEY"];
+          if (!apiKey) {
+            throw new Error(
+              'The "live-classifier" mode requires ANTHROPIC_API_KEY in the environment.',
+            );
+          }
+          const stateService = createStateService(
+            resolve(
+              options.repo_root,
+              loadEnv(process.env as Record<string, string | undefined>).DATABASE_PATH,
+            ),
+          );
+          return new ClaudeClassifierService({
+            anthropic_api_key: apiKey,
+            state_service: stateService,
+          });
+        })()
+      : null;
+  const priorStatuses = await loadPriorRunStatuses(
+    workspace.results_dir,
+    options.scenario_set,
+    options.run_id,
+  );
   let logSequence = 0;
 
   async function persistState(): Promise<void> {
@@ -1231,30 +1416,64 @@ export async function runSequentialEval(options: RunSequentialEvalOptions): Prom
 
       if (isMultiTurn && scenario.turns) {
         const turns = scenario.turns;
-        const result = evaluateMultiTurnScenario(scenario, turns, systemConfig);
+        let result: ReturnType<typeof evaluateMultiTurnScenario>;
+        if (workerReplay !== null) {
+          result = await evaluateMultiTurnViaWorker(scenario, turns, workerReplay);
+        } else {
+          result = evaluateMultiTurnScenario(scenario, turns, systemConfig);
+        }
         actual = result.lastActual ?? evaluateScenario(scenario, systemConfig);
         failures = result.allFailures;
         scenarioResult.turn_results = result.turnResults;
         scenarioResult.actual = actual;
         await pushLog(
           "evaluate",
-          `Multi-turn scenario evaluated across ${turns.length} turns; ${result.turnResults.filter((tr) => tr.role === "participant").length} participant turns checked.`,
+          `Multi-turn scenario evaluated across ${turns.length} turns${workerReplay !== null ? " (worker mode)" : ""}; ${result.turnResults.filter((tr) => tr.role === "participant").length} participant turns checked.`,
           scenario.id,
           {
             turns: turns.length,
             participant_turns: result.turnResults.filter((tr) => tr.role === "participant").length,
             failures: failures.length,
+            mode: workerReplay !== null ? "worker" : "simulator",
           },
         );
       } else {
-        actual =
-          workerReplay !== null
-            ? await workerReplay.evaluate(scenario, {
-                interpreter_fixture: fixtureInterpreterMode
-                  ? scenario.simulation?.interpreter_fixture
-                  : undefined,
-              })
-            : evaluateScenario(scenario, systemConfig);
+        if (liveClassifier !== null) {
+          const queueItem: StackQueueItem = {
+            id: `eval_live_${scenario.id}`,
+            source: QueueItemSource.ScheduledTrigger,
+            content: scenario.prompt_input.message,
+            concerning: scenario.prompt_input.concerning,
+            target_thread: scenario.prompt_input.origin_thread,
+            created_at: new Date(),
+          };
+          const classification = await liveClassifier.classify(queueItem);
+          actual = {
+            topic: classification.topic,
+            intent: classification.intent,
+            target_thread: inferTargetThread(
+              classification.topic,
+              scenario.prompt_input,
+              systemConfig,
+              classification.intent,
+            ),
+            priority: inferPriority(classification.topic, classification.intent, systemConfig),
+            confirmation_required: inferConfirmation(systemConfig, classification.topic),
+            composed_message: composeMessageWithTopicConfig(
+              classification.topic,
+              scenario.prompt_input,
+              systemConfig,
+            ),
+          };
+        } else if (workerReplay !== null) {
+          actual = await workerReplay.evaluate(scenario, {
+            interpreter_fixture: fixtureInterpreterMode
+              ? scenario.simulation?.interpreter_fixture
+              : undefined,
+          });
+        } else {
+          actual = evaluateScenario(scenario, systemConfig);
+        }
         scenarioResult.actual = actual;
         failures = collectFailures(scenario, actual);
         if (workerReplay !== null) {
@@ -1267,22 +1486,21 @@ export async function runSequentialEval(options: RunSequentialEvalOptions): Prom
             }),
           );
         }
-        await pushLog(
-          "evaluate",
-          workerReplay !== null
-            ? "Scenario input evaluated using worker replay mode."
-            : fixtureInterpreterMode
-              ? "Scenario input evaluated using fixture-interpreter mode."
-              : "Scenario input evaluated against the current prompt/runtime simulator.",
-          scenario.id,
-          {
-            mode,
-            topic: actual.topic,
-            intent: actual.intent,
-            target_thread: actual.target_thread,
-            priority: actual.priority,
-          },
-        );
+        const modeLabel =
+          liveClassifier !== null
+            ? "Scenario input evaluated using live Claude classifier."
+            : workerReplay !== null
+              ? "Scenario input evaluated using worker replay mode."
+              : fixtureInterpreterMode
+                ? "Scenario input evaluated using fixture-interpreter mode."
+                : "Scenario input evaluated against the current prompt/runtime simulator.";
+        await pushLog("evaluate", modeLabel, scenario.id, {
+          mode,
+          topic: actual.topic,
+          intent: actual.intent,
+          target_thread: actual.target_thread,
+          priority: actual.priority,
+        });
       }
       await pause(stepDelayMs);
 
@@ -1299,42 +1517,63 @@ export async function runSequentialEval(options: RunSequentialEvalOptions): Prom
 
       await pushLog(
         "diagnose",
-        `Scenario produced ${failures.length} failing dimension(s); sending to tuner.`,
+        `Scenario produced ${failures.length} failing dimension(s); checking regression and severity.`,
         scenario.id,
         { failures: failures.map((failure) => failure.field) },
         "warn",
       );
       await pause(stepDelayMs);
 
-      const diagnosis = diagnoseScenarioFailures(scenario, failures);
-
-      if (diagnosis.can_fix_with_prompt) {
-        const tunerOutcome = generateCandidatePrompt({
-          scenario,
-          actual,
-          failures,
-        });
-        scenarioResult.status = tunerOutcome.status;
-        scenarioResult.tuner = tunerOutcome;
+      const priorStatus = priorStatuses.get(scenario.id);
+      if (priorStatus === "passed") {
+        scenarioResult.status = "regressed";
         await pushLog(
-          "tuner",
-          "Prompt candidate created and scenario marked prompt_fix_suggested.",
+          "result",
+          "Scenario regressed: previously passed but now has failures.",
           scenario.id,
-          {
-            candidate_title: tunerOutcome.candidate?.title,
-          },
+          { prior_status: priorStatus, failure_count: failures.length },
+          "error",
+        );
+      } else if (isTotalMiss(failures)) {
+        scenarioResult.status = "failed";
+        await pushLog(
+          "result",
+          "Scenario failed: every core expected dimension missed.",
+          scenario.id,
+          { failure_count: failures.length },
+          "error",
         );
       } else {
-        const tunerOutcome = toDeferredTunerOutcome(diagnosis);
-        scenarioResult.status = tunerOutcome.status;
-        scenarioResult.tuner = tunerOutcome;
-        await pushLog(
-          "tuner",
-          "Scenario marked investigation_needed because the failure is outside prompt-only tuning scope.",
-          scenario.id,
-          { failing_dimensions: diagnosis.failing_dimensions },
-          "warn",
-        );
+        const diagnosis = diagnoseScenarioFailures(scenario, failures);
+
+        if (diagnosis.can_fix_with_prompt) {
+          const tunerOutcome = generateCandidatePrompt({
+            scenario,
+            actual,
+            failures,
+          });
+          scenarioResult.status = tunerOutcome.status;
+          scenarioResult.tuner = tunerOutcome;
+          await pushLog(
+            "tuner",
+            "Prompt candidate created and scenario marked prompt_fix_suggested.",
+            scenario.id,
+            {
+              candidate_title: tunerOutcome.candidate?.title,
+            },
+          );
+        } else {
+          const tunerOutcome = toDeferredTunerOutcome(diagnosis);
+          scenarioResult.status = tunerOutcome.status;
+          scenarioResult.tuner = tunerOutcome;
+          await pushLog(
+            "tuner",
+            "Scenario marked investigation_needed because the failure is outside prompt-only tuning scope.",
+            scenario.id,
+            { failing_dimensions: diagnosis.failing_dimensions },
+            "warn",
+          );
+        }
       }
 
       scenarioResult.completed_at = new Date().toISOString();

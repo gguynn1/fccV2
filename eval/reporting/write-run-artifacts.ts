@@ -23,11 +23,20 @@ function quoteForPrompt(value: string): string {
   return value.replaceAll('"""', '\\"\\"\\"');
 }
 
+const KNOWN_SCENARIO_SET_FILES: Record<string, string> = {
+  default: "eval/scenarios/default.ts",
+  "thread-dynamics": "eval/scenarios/thread-dynamics.ts",
+  "continuity-regression": "eval/scenarios/continuity-regression.ts",
+  "digest-quality": "eval/scenarios/digest-quality.ts",
+  "tone-regression": "eval/scenarios/tone-regression.ts",
+  "nudge-realism": "eval/scenarios/nudge-realism.ts",
+};
+
 function scenarioSourceFile(scenarioSet: string): string {
   if (scenarioSet.startsWith("generated-")) {
     return `eval/scenarios/generated/${scenarioSet}.ts`;
   }
-  return "eval/scenarios/default.ts";
+  return KNOWN_SCENARIO_SET_FILES[scenarioSet] ?? `eval/scenarios/${scenarioSet}.ts`;
 }
 
 function buildInsights(state: EvalRunState): {

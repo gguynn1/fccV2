@@ -23,7 +23,6 @@ const DEFAULT_CONTEXT_TRANSITION_POLICY: ContextTransitionPolicy = {
 };
 
 export interface RoutingServiceOptions {
-  threads?: Thread[];
   context_transition_policy?: ContextTransitionPolicy;
   logger?: Logger;
 }
