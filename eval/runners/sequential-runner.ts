@@ -13,6 +13,7 @@ import type {
 import { createStateService } from "../../src/02-supporting-services/03-state-service/index.js";
 import { createTopicProfileService } from "../../src/02-supporting-services/04-topic-profile-service/index.js";
 import { createRoutingService } from "../../src/02-supporting-services/05-routing-service/index.js";
+import type { ConfirmationActionType } from "../../src/02-supporting-services/08-confirmation-service/types.js";
 import { createMinimalSystemState } from "../../src/config/minimal-system-config.js";
 import { loadEnv } from "../../src/env.js";
 import {
@@ -803,11 +804,12 @@ function createWorkerReplayHarness(config: SystemConfig): {
     routing_service: createRoutingService(),
     budget_service: {
       getBudgetTracker: () => Promise.resolve(state.outbound_budget_tracker),
-      evaluateOutbound: (_topic: TopicKey, _thread: string, _entity: string) => {
-        const tracker = state.outbound_budget_tracker;
+      evaluateOutbound: (queueItem: StackQueueItem) => {
+        const entity = queueItem.concerning[0] ?? "";
         const maxPerPerson =
           config.dispatch?.outbound_budget?.max_unprompted_per_person_per_day ?? 5;
-        const entityCount = tracker.by_person[_entity] ?? 0;
+        const personBudget = state.outbound_budget_tracker.by_person[entity];
+        const entityCount = personBudget?.unprompted_sent ?? 0;
         if (entityCount >= maxPerPerson) {
           return Promise.resolve({
             priority: DispatchPriority.Batched,
@@ -819,25 +821,41 @@ function createWorkerReplayHarness(config: SystemConfig): {
           reason: "budget: within limits",
         });
       },
-      recordDispatch: (_topic: TopicKey, _thread: string, _entity: string) => {
-        state.outbound_budget_tracker.by_person[_entity] =
-          (state.outbound_budget_tracker.by_person[_entity] ?? 0) + 1;
-        state.outbound_budget_tracker.by_thread[_thread] =
-          (state.outbound_budget_tracker.by_thread[_thread] ?? 0) + 1;
+      recordDispatch: (queueItem: StackQueueItem) => {
+        const entity = queueItem.concerning[0] ?? "";
+        const thread = queueItem.target_thread;
+        if (!state.outbound_budget_tracker.by_person[entity]) {
+          state.outbound_budget_tracker.by_person[entity] = {
+            unprompted_sent: 0,
+            max: config.dispatch?.outbound_budget?.max_unprompted_per_person_per_day ?? 5,
+            messages: [],
+          };
+        }
+        state.outbound_budget_tracker.by_person[entity].unprompted_sent += 1;
+        if (!state.outbound_budget_tracker.by_thread[thread]) {
+          state.outbound_budget_tracker.by_thread[thread] = {
+            last_hour_count: 0,
+            max_per_hour: config.dispatch?.outbound_budget?.max_messages_per_thread_per_hour ?? 2,
+            last_sent_at: null,
+          };
+        }
+        state.outbound_budget_tracker.by_thread[thread].last_hour_count += 1;
+        state.outbound_budget_tracker.by_thread[thread].last_sent_at = new Date();
         return Promise.resolve(undefined);
       },
     },
     escalation_service: {
       getStatus: () => Promise.resolve(state.escalation_status),
-      evaluate: (_topic: TopicKey) => {
-        const topicConfig = config.topics[_topic];
-        const level = topicConfig?.escalation;
-        if (level === EscalationLevel.High || level === EscalationLevel.Medium) {
-          const activeForTopic = state.escalation_status.active.filter(
-            (e) => (e as Record<string, unknown>).topic === _topic,
-          );
-          if (activeForTopic.length > 0) {
-            return Promise.resolve({ should_escalate: true, step: activeForTopic.length });
+      evaluate: (queueItem: StackQueueItem) => {
+        const topic = queueItem.topic;
+        if (topic) {
+          const topicConfig = config.topics[topic];
+          const level = topicConfig?.escalation;
+          if (level === EscalationLevel.High || level === EscalationLevel.Medium) {
+            const activeForTopic = state.escalation_status.active.filter((e) => e.topic === topic);
+            if (activeForTopic.length > 0) {
+              return Promise.resolve({ should_escalate: true, current: activeForTopic[0] });
+            }
           }
         }
         return Promise.resolve({ should_escalate: false });
@@ -846,10 +864,10 @@ function createWorkerReplayHarness(config: SystemConfig): {
     },
     confirmation_service: {
       getState: () => Promise.resolve(state.confirmations),
-      requiresConfirmation: (_actionType: string) => {
+      requiresConfirmation: (type: ConfirmationActionType) => {
         const gates = config.confirmation_gates;
         if (!gates) return false;
-        return gates.always_require_approval?.includes(_actionType) ?? false;
+        return gates.always_require_approval?.includes(type) ?? false;
       },
       openConfirmation: () =>
         Promise.reject(new Error("runtime replay confirmation open is not supported")),
