@@ -92,7 +92,7 @@ export class CalDavService {
     const state = await this.stateService.getSystemState();
     return {
       events: state.calendar.events.map((event) => this.toCalDavEvent(event)),
-      ctag: String(state.metadata.snapshot_time.getTime()),
+      ctag: String(Date.now()),
     };
   }
 

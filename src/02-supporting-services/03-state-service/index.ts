@@ -109,20 +109,10 @@ function serializeForStorage(value: unknown): string {
 
 function createMinimalSystemConfig(): SystemConfig {
   return {
-    metadata: {
-      snapshot_time: new Date(),
-      description: "Minimal default configuration",
-    },
     system: {
       timezone: "America/Chicago",
       locale: "en-US",
-      version: "1.0.0",
       is_onboarded: false,
-    },
-    assistant: {
-      messaging_identity: "",
-      name: null,
-      description: "Family Command Center assistant",
     },
     entities: [],
     threads: [],
@@ -207,13 +197,10 @@ function extractQueueItemId(queueItem: StackQueueItem): string {
   return `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function createDefaultStateSnapshot(now: Date): Promise<SystemState> {
+async function createDefaultStateSnapshot(_now: Date): Promise<SystemState> {
   const seedState = await loadSeedState();
   const cloned = structuredClone(seedState);
 
-  // Keep type-safe topic defaults while zeroing operational queues/history for empty bootstrap.
-  cloned.metadata.snapshot_time = now;
-  cloned.metadata.description = "Default empty state snapshot initialized by State Service.";
   cloned.queue.pending = [];
   cloned.queue.recently_dispatched = [];
   cloned.confirmations.pending = [];

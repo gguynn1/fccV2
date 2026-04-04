@@ -379,10 +379,6 @@ export enum StateSnapshotMode {
 }
 
 export interface SystemState {
-  metadata: {
-    snapshot_time: Date;
-    description: string;
-  };
   queue: QueueState;
   outbound_budget_tracker: OutboundBudgetTracker;
   escalation_status: EscalationStatus;

@@ -3,8 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api";
 
 export interface ConfigPayload {
-  system: { timezone: string; locale: string; version: string; is_onboarded: boolean };
-  assistant: { messaging_identity: string; name: string | null; description: string };
+  system: { timezone: string; locale: string; is_onboarded: boolean };
   threads: Array<{
     id: string;
     type: string;

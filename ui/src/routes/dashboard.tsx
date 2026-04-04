@@ -62,7 +62,7 @@ export function DashboardRoute() {
     return <p className="text-sm text-muted-foreground">Loading dashboard…</p>;
   }
 
-  const { queue, escalations, confirmations, dispatches, budget, config, system } = data;
+  const { queue, escalations, confirmations, dispatches, budget, system } = data;
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
@@ -174,7 +174,7 @@ export function DashboardRoute() {
               Assistant Identifier
             </p>
             <p className="break-all rounded-md border bg-muted/30 px-3 py-2 font-mono text-xs">
-              {config.assistant.messaging_identity}
+              {system.messaging_identity}
             </p>
           </div>
           <p className="break-all rounded-md border bg-muted/30 px-3 py-2 font-mono text-xs">

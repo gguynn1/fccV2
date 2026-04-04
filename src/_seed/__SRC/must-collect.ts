@@ -3,15 +3,7 @@ import { EntityType, Permission, type SystemConfig } from "../../index.js";
 export const seedSystem: SystemConfig["system"] = {
   timezone: "America/Denver",
   locale: "en-US",
-  version: "0.1.0",
   is_onboarded: true,
-};
-
-export const seedAssistant: SystemConfig["assistant"] = {
-  messaging_identity: "+15551000000",
-  name: null,
-  description:
-    "Family Command Center assistant. No name. One messaging identity. Identified as a contact in each family member's phone.",
 };
 
 export const seedEntities: SystemConfig["entities"] = [

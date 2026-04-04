@@ -28,20 +28,10 @@ export interface ScenarioTesting {
 }
 
 export interface SystemConfig {
-  metadata: {
-    snapshot_time: Date;
-    description: string;
-  };
   system: {
     timezone: string;
     locale: string;
-    version: string;
     is_onboarded: boolean;
-  };
-  assistant: {
-    messaging_identity: string;
-    name: string | null;
-    description: string;
   };
   entities: Entity[];
   threads: Thread[];

@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -22,6 +24,9 @@ import {
   refreshEvalScenarioSets,
   startEvalRun,
 } from "./eval-runs.js";
+
+const require = createRequire(import.meta.url);
+const { version: APP_VERSION } = require("../../package.json") as { version: string };
 
 const threadSchema = z.object({
   id: z.string().min(1),
@@ -97,13 +102,7 @@ const configPayloadSchema = z.object({
   system: z.object({
     timezone: z.string().min(1),
     locale: z.string().min(1),
-    version: z.string().min(1),
     is_onboarded: z.boolean(),
-  }),
-  assistant: z.object({
-    messaging_identity: z.string().min(1),
-    name: z.string().nullable(),
-    description: z.string().min(1),
   }),
   threads: z.array(threadSchema),
   daily_rhythm: dailyRhythmSchema,
@@ -150,6 +149,7 @@ export interface AdminRoutesOptions {
   queue_service: BullQueueService;
   state_service: SqliteStateService;
   caldav_port: number;
+  messaging_identity: string;
   emulation_store: EmulationStore;
 }
 
@@ -217,6 +217,8 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
 
   fastify.get("/system", () => {
     return {
+      version: APP_VERSION,
+      messaging_identity: options.messaging_identity,
       caldav: {
         port: options.caldav_port,
         path: "/caldav",
@@ -229,7 +231,6 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     const config = await options.state_service.getSystemConfig();
     return {
       system: config.system,
-      assistant: config.assistant,
       threads: config.threads,
       daily_rhythm: config.daily_rhythm,
     };
@@ -239,7 +240,6 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     const payload = configPayloadSchema.parse(request.body);
     const nextConfig = structuredClone(await options.state_service.getSystemConfig());
     nextConfig.system = payload.system;
-    nextConfig.assistant = payload.assistant;
     nextConfig.threads = payload.threads;
     nextConfig.daily_rhythm = payload.daily_rhythm;
     await saveConfig(options.state_service, nextConfig);
@@ -247,7 +247,6 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
       ok: true,
       config: {
         system: nextConfig.system,
-        assistant: nextConfig.assistant,
         threads: nextConfig.threads,
         daily_rhythm: nextConfig.daily_rhythm,
       },

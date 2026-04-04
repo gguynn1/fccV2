@@ -229,6 +229,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
     queue_service: queueService,
     state_service: stateService,
     caldav_port: caldavPort,
+    messaging_identity: env.TWILIO_MESSAGING_IDENTITY,
     emulation_store: emulationStore,
   });
 
