@@ -24,6 +24,8 @@ function formatValue(v: unknown): string {
   if (v === null || v === undefined) return "—";
   if (typeof v === "boolean") return v ? "yes" : "no";
   if (typeof v === "number") return v.toLocaleString();
+  if (typeof v === "bigint") return v.toString();
+  if (typeof v === "symbol") return v.toString();
   if (typeof v === "string") {
     const asDate = new Date(v);
     if (v.length > 10 && !isNaN(asDate.getTime()) && v.includes("T")) {
@@ -33,11 +35,17 @@ function formatValue(v: unknown): string {
   }
   if (Array.isArray(v)) return `[${v.length} items]`;
   if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
+  return "—";
 }
 
 function itemCount(arr: unknown[] | undefined): number {
   return arr?.length ?? 0;
+}
+
+function toRowKey(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "bigint") return value.toString();
+  return "";
 }
 
 interface CollapsibleSectionProps {
@@ -60,10 +68,7 @@ function CollapsibleSection({
   const [open, setOpen] = useState(defaultOpen);
   return (
     <Card>
-      <CardHeader
-        className="cursor-pointer select-none"
-        onClick={() => setOpen((prev) => !prev)}
-      >
+      <CardHeader className="cursor-pointer select-none" onClick={() => setOpen((prev) => !prev)}>
         <CardTitle className="flex items-center gap-2 text-base">
           <span className={cn("text-xs transition-transform", open && "rotate-90")}>▶</span>
           {title}
@@ -180,27 +185,79 @@ export function StateRoute() {
 
   const sections = [
     { key: "calendar", label: "Calendar", populated: !isEmpty(data.calendar.events) },
-    { key: "chores", label: "Chores", populated: !isEmpty(data.chores.active) || !isEmpty(data.chores.completed_recent) },
-    { key: "finances", label: "Finances", populated: !isEmpty(data.finances.bills) || !isEmpty(data.finances.expenses_recent) || !isEmpty(data.finances.savings_goals) },
-    { key: "grocery", label: "Grocery", populated: !isEmpty(data.grocery.list) || !isEmpty(data.grocery.recently_purchased) },
+    {
+      key: "chores",
+      label: "Chores",
+      populated: !isEmpty(data.chores.active) || !isEmpty(data.chores.completed_recent),
+    },
+    {
+      key: "finances",
+      label: "Finances",
+      populated:
+        !isEmpty(data.finances.bills) ||
+        !isEmpty(data.finances.expenses_recent) ||
+        !isEmpty(data.finances.savings_goals),
+    },
+    {
+      key: "grocery",
+      label: "Grocery",
+      populated: !isEmpty(data.grocery.list) || !isEmpty(data.grocery.recently_purchased),
+    },
     { key: "health", label: "Health", populated: !isEmpty(data.health.profiles) },
     { key: "pets", label: "Pets", populated: !isEmpty(data.pets.profiles) },
-    { key: "school", label: "School", populated: !isEmpty(data.school.students) || !isEmpty(data.school.communications) },
+    {
+      key: "school",
+      label: "School",
+      populated: !isEmpty(data.school.students) || !isEmpty(data.school.communications),
+    },
     { key: "travel", label: "Travel", populated: !isEmpty(data.travel.trips) },
     { key: "vendors", label: "Vendors", populated: !isEmpty(data.vendors.records) },
-    { key: "business", label: "Business", populated: !isEmpty(data.business.profiles) || !isEmpty(data.business.leads) },
-    { key: "relationship", label: "Relationship", populated: data.relationship.nudge_history.length > 0 || !!data.relationship.last_nudge.content },
-    { key: "family_status", label: "Family Status", populated: !isEmpty(data.family_status.current) },
-    { key: "meals", label: "Meals", populated: !isEmpty(data.meals.planned) || !isEmpty(data.meals.dietary_notes) },
-    { key: "maintenance", label: "Maintenance", populated: !isEmpty(data.maintenance.assets) || !isEmpty(data.maintenance.items) },
-    { key: "budget_tracker", label: "Budget Tracker", populated: Object.keys(data.outbound_budget_tracker.by_person).length > 0 || Object.keys(data.outbound_budget_tracker.by_thread).length > 0 },
-    { key: "data_ingest", label: "Data Ingest", populated: data.data_ingest_state.email_monitor.total_processed > 0 || data.data_ingest_state.calendar_sync.total_processed > 0 || data.data_ingest_state.forwarded_messages.total_processed > 0 },
+    {
+      key: "business",
+      label: "Business",
+      populated: !isEmpty(data.business.profiles) || !isEmpty(data.business.leads),
+    },
+    {
+      key: "relationship",
+      label: "Relationship",
+      populated:
+        data.relationship.nudge_history.length > 0 || !!data.relationship.last_nudge.content,
+    },
+    {
+      key: "family_status",
+      label: "Family Status",
+      populated: !isEmpty(data.family_status.current),
+    },
+    {
+      key: "meals",
+      label: "Meals",
+      populated: !isEmpty(data.meals.planned) || !isEmpty(data.meals.dietary_notes),
+    },
+    {
+      key: "maintenance",
+      label: "Maintenance",
+      populated: !isEmpty(data.maintenance.assets) || !isEmpty(data.maintenance.items),
+    },
+    {
+      key: "budget_tracker",
+      label: "Budget Tracker",
+      populated:
+        Object.keys(data.outbound_budget_tracker.by_person).length > 0 ||
+        Object.keys(data.outbound_budget_tracker.by_thread).length > 0,
+    },
+    {
+      key: "data_ingest",
+      label: "Data Ingest",
+      populated:
+        data.data_ingest_state.email_monitor.total_processed > 0 ||
+        data.data_ingest_state.calendar_sync.total_processed > 0 ||
+        data.data_ingest_state.forwarded_messages.total_processed > 0,
+    },
     { key: "digests", label: "Digests", populated: !isEmpty(data.digests.history) },
     { key: "threads", label: "Thread History", populated: Object.keys(data.threads).length > 0 },
   ] as const;
 
-  const visibleSections =
-    filter === "all" ? sections : sections.filter((s) => s.populated);
+  const visibleSections = filter === "all" ? sections : sections.filter((s) => s.populated);
 
   const populatedCount = sections.filter((s) => s.populated).length;
   const isMutating = mutateDomainState.isPending;
@@ -241,9 +298,7 @@ export function StateRoute() {
       <div className="flex items-end justify-between">
         <div>
           <h2 className="text-lg font-semibold">Domain State</h2>
-          <p className="text-sm text-muted-foreground">
-            Persisted topic and operational state.
-          </p>
+          <p className="text-sm text-muted-foreground">Persisted topic and operational state.</p>
         </div>
         <div className="flex gap-1">
           <Button
@@ -282,9 +337,20 @@ export function StateRoute() {
               >
                 <GenericTable
                   rows={data.calendar.events}
-                  columns={["id", "title", "date_start", "date_end", "location", "status", "topic", "concerning", "responsible", "created_by"]}
+                  columns={[
+                    "id",
+                    "title",
+                    "date_start",
+                    "date_end",
+                    "location",
+                    "status",
+                    "topic",
+                    "concerning",
+                    "responsible",
+                    "created_by",
+                  ]}
                   emptyMessage="No calendar events."
-                  onClearRow={(row) => clearRow("calendar", "events", String(row.id ?? ""))}
+                  onClearRow={(row) => clearRow("calendar", "events", toRowKey(row.id))}
                   isBusy={isMutating}
                 />
               </CollapsibleSection>
@@ -319,8 +385,16 @@ export function StateRoute() {
                     </div>
                     <GenericTable
                       rows={data.chores.active}
-                      columns={["id", "task", "assigned_to", "assigned_by", "due", "status", "escalation_step"]}
-                      onClearRow={(row) => clearRow("chores", "active", String(row.id ?? ""))}
+                      columns={[
+                        "id",
+                        "task",
+                        "assigned_to",
+                        "assigned_by",
+                        "due",
+                        "status",
+                        "escalation_step",
+                      ]}
+                      onClearRow={(row) => clearRow("chores", "active", toRowKey(row.id))}
                       isBusy={isMutating}
                     />
                   </div>
@@ -328,7 +402,9 @@ export function StateRoute() {
                 {data.chores.completed_recent.length > 0 && (
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs font-medium text-muted-foreground">Recently Completed</p>
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Recently Completed
+                      </p>
                       <Button
                         variant="outline"
                         size="sm"
@@ -341,9 +417,7 @@ export function StateRoute() {
                     <GenericTable
                       rows={data.chores.completed_recent}
                       columns={["id", "task", "assigned_to", "completed_at", "completed_via"]}
-                      onClearRow={(row) =>
-                        clearRow("chores", "completed_recent", String(row.id ?? ""))
-                      }
+                      onClearRow={(row) => clearRow("chores", "completed_recent", toRowKey(row.id))}
                       isBusy={isMutating}
                     />
                   </div>
@@ -372,13 +446,23 @@ export function StateRoute() {
                     <p className="mb-2 text-xs font-medium text-muted-foreground">Bills</p>
                     <GenericTable
                       rows={data.finances.bills}
-                      columns={["id", "name", "amount", "due_date", "status", "recurring", "reminder_sent"]}
+                      columns={[
+                        "id",
+                        "name",
+                        "amount",
+                        "due_date",
+                        "status",
+                        "recurring",
+                        "reminder_sent",
+                      ]}
                     />
                   </div>
                 )}
                 {data.finances.expenses_recent.length > 0 && (
                   <div className="mb-4">
-                    <p className="mb-2 text-xs font-medium text-muted-foreground">Recent Expenses</p>
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">
+                      Recent Expenses
+                    </p>
                     <GenericTable
                       rows={data.finances.expenses_recent}
                       columns={["id", "description", "amount", "date", "logged_by", "confirmed"]}
@@ -390,7 +474,15 @@ export function StateRoute() {
                     <p className="mb-2 text-xs font-medium text-muted-foreground">Savings Goals</p>
                     <GenericTable
                       rows={data.finances.savings_goals}
-                      columns={["id", "name", "target", "current", "percent", "deadline", "pace_status"]}
+                      columns={[
+                        "id",
+                        "name",
+                        "target",
+                        "current",
+                        "percent",
+                        "deadline",
+                        "pace_status",
+                      ]}
                     />
                   </div>
                 )}
@@ -431,8 +523,16 @@ export function StateRoute() {
                     </div>
                     <GenericTable
                       rows={data.grocery.list}
-                      columns={["id", "item", "section", "added_by", "added_at", "purchased", "source_topic"]}
-                      onClearRow={(row) => clearRow("grocery", "list", String(row.id ?? ""))}
+                      columns={[
+                        "id",
+                        "item",
+                        "section",
+                        "added_by",
+                        "added_at",
+                        "purchased",
+                        "source_topic",
+                      ]}
+                      onClearRow={(row) => clearRow("grocery", "list", toRowKey(row.id))}
                       isBusy={isMutating}
                     />
                   </div>
@@ -440,7 +540,9 @@ export function StateRoute() {
                 {data.grocery.recently_purchased.length > 0 && (
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs font-medium text-muted-foreground">Recently Purchased</p>
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Recently Purchased
+                      </p>
                       <Button
                         variant="outline"
                         size="sm"
@@ -453,7 +555,9 @@ export function StateRoute() {
                     <GenericTable
                       rows={data.grocery.recently_purchased}
                       columns={["item", "purchased_by", "purchased_at"]}
-                      onClearRow={(row) => clearRow("grocery", "recently_purchased", String(row.item ?? ""), "item")}
+                      onClearRow={(row) =>
+                        clearRow("grocery", "recently_purchased", toRowKey(row.item), "item")
+                      }
                       rowKeyField="item"
                       isBusy={isMutating}
                     />
@@ -476,7 +580,14 @@ export function StateRoute() {
               >
                 <GenericTable
                   rows={data.health.profiles}
-                  columns={["entity", "medications", "allergies", "providers", "upcoming_appointments", "notes"]}
+                  columns={[
+                    "entity",
+                    "medications",
+                    "allergies",
+                    "providers",
+                    "upcoming_appointments",
+                    "notes",
+                  ]}
                   emptyMessage="No health profiles."
                 />
               </CollapsibleSection>
@@ -493,9 +604,18 @@ export function StateRoute() {
               >
                 <GenericTable
                   rows={data.pets.profiles}
-                  columns={["entity", "species", "responsible_adult", "vet", "last_vet_visit", "medications", "upcoming", "notes"]}
+                  columns={[
+                    "entity",
+                    "species",
+                    "responsible_adult",
+                    "vet",
+                    "last_vet_visit",
+                    "medications",
+                    "upcoming",
+                    "notes",
+                  ]}
                   emptyMessage="No pet profiles."
-                  onClearRow={(row) => clearRow("pets", "profiles", String(row.entity ?? ""), "entity")}
+                  onClearRow={(row) => clearRow("pets", "profiles", toRowKey(row.entity), "entity")}
                   rowKeyField="entity"
                   isBusy={isMutating}
                 />
@@ -507,9 +627,7 @@ export function StateRoute() {
               <CollapsibleSection
                 key={section.key}
                 title="School"
-                count={
-                  itemCount(data.school.students) + itemCount(data.school.communications)
-                }
+                count={itemCount(data.school.students) + itemCount(data.school.communications)}
                 defaultOpen={section.populated}
                 headerActions={categoryAction("school")}
               >
@@ -527,7 +645,15 @@ export function StateRoute() {
                     <p className="mb-2 text-xs font-medium text-muted-foreground">Communications</p>
                     <GenericTable
                       rows={data.school.communications}
-                      columns={["id", "student_entity", "from", "received_at", "summary", "action_needed", "source"]}
+                      columns={[
+                        "id",
+                        "student_entity",
+                        "from",
+                        "received_at",
+                        "summary",
+                        "action_needed",
+                        "source",
+                      ]}
                     />
                   </div>
                 )}
@@ -565,7 +691,16 @@ export function StateRoute() {
               >
                 <GenericTable
                   rows={data.vendors.records}
-                  columns={["id", "name", "type", "contact", "managed_by", "jobs", "follow_up_pending", "follow_up_stage"]}
+                  columns={[
+                    "id",
+                    "name",
+                    "type",
+                    "contact",
+                    "managed_by",
+                    "jobs",
+                    "follow_up_pending",
+                    "follow_up_stage",
+                  ]}
                   emptyMessage="No vendors."
                 />
               </CollapsibleSection>
@@ -576,9 +711,7 @@ export function StateRoute() {
               <CollapsibleSection
                 key={section.key}
                 title="Business"
-                count={
-                  itemCount(data.business.profiles) + itemCount(data.business.leads)
-                }
+                count={itemCount(data.business.profiles) + itemCount(data.business.leads)}
                 defaultOpen={section.populated}
                 headerActions={categoryAction("business")}
               >
@@ -587,7 +720,12 @@ export function StateRoute() {
                     <p className="mb-2 text-xs font-medium text-muted-foreground">Profiles</p>
                     <GenericTable
                       rows={data.business.profiles}
-                      columns={["entity", "business_type", "business_name", "follow_up_quiet_period_days"]}
+                      columns={[
+                        "entity",
+                        "business_type",
+                        "business_name",
+                        "follow_up_quiet_period_days",
+                      ]}
                     />
                   </div>
                 )}
@@ -596,7 +734,18 @@ export function StateRoute() {
                     <p className="mb-2 text-xs font-medium text-muted-foreground">Leads</p>
                     <GenericTable
                       rows={data.business.leads}
-                      columns={["id", "owner", "client_name", "inquiry_date", "event_type", "event_date", "status", "pipeline_stage", "booking_status", "last_contact"]}
+                      columns={[
+                        "id",
+                        "owner",
+                        "client_name",
+                        "inquiry_date",
+                        "event_type",
+                        "event_date",
+                        "status",
+                        "pipeline_stage",
+                        "booking_status",
+                        "last_contact",
+                      ]}
                     />
                   </div>
                 )}
@@ -624,7 +773,9 @@ export function StateRoute() {
                     </div>
                     <div>
                       <span className="text-muted-foreground">Thread: </span>
-                      <span className="font-mono">{data.relationship.last_nudge.thread || "—"}</span>
+                      <span className="font-mono">
+                        {data.relationship.last_nudge.thread || "—"}
+                      </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Response: </span>
@@ -664,7 +815,14 @@ export function StateRoute() {
               >
                 <GenericTable
                   rows={data.family_status.current}
-                  columns={["entity", "status", "eta", "location_snapshot", "updated_at", "expires_at"]}
+                  columns={[
+                    "entity",
+                    "status",
+                    "eta",
+                    "location_snapshot",
+                    "updated_at",
+                    "expires_at",
+                  ]}
                   emptyMessage="No status entries."
                 />
               </CollapsibleSection>
@@ -700,7 +858,7 @@ export function StateRoute() {
                     <GenericTable
                       rows={data.meals.planned}
                       columns={["id", "date", "meal_type", "description", "planned_by", "status"]}
-                      onClearRow={(row) => clearRow("meals", "planned", String(row.id ?? ""))}
+                      onClearRow={(row) => clearRow("meals", "planned", toRowKey(row.id))}
                       isBusy={isMutating}
                     />
                   </div>
@@ -722,7 +880,7 @@ export function StateRoute() {
                       rows={data.meals.dietary_notes}
                       columns={["entity", "note", "scope", "added_at"]}
                       onClearRow={(row) =>
-                        clearRow("meals", "dietary_notes", String(row.entity ?? ""), "entity")
+                        clearRow("meals", "dietary_notes", toRowKey(row.entity), "entity")
                       }
                       rowKeyField="entity"
                       isBusy={isMutating}
@@ -740,9 +898,7 @@ export function StateRoute() {
               <CollapsibleSection
                 key={section.key}
                 title="Maintenance"
-                count={
-                  itemCount(data.maintenance.assets) + itemCount(data.maintenance.items)
-                }
+                count={itemCount(data.maintenance.assets) + itemCount(data.maintenance.items)}
                 defaultOpen={section.populated}
                 headerActions={categoryAction("maintenance")}
               >
@@ -760,7 +916,16 @@ export function StateRoute() {
                     <p className="mb-2 text-xs font-medium text-muted-foreground">Items</p>
                     <GenericTable
                       rows={data.maintenance.items}
-                      columns={["id", "asset_id", "task", "interval", "last_performed", "next_due", "responsible", "status"]}
+                      columns={[
+                        "id",
+                        "asset_id",
+                        "task",
+                        "interval",
+                        "last_performed",
+                        "next_due",
+                        "responsible",
+                        "status",
+                      ]}
                     />
                   </div>
                 )}

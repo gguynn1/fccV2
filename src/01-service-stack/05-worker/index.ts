@@ -229,11 +229,7 @@ function extractDateHint(content: string, fallback: Date): Date | null {
       const minute = monthNameMatch[5] ? Number(monthNameMatch[5]) : 0;
       const meridiem = monthNameMatch[6]?.toLowerCase();
       const hour24 =
-        meridiem === "pm"
-          ? (hourRaw % 12) + 12
-          : meridiem === "am"
-            ? hourRaw % 12
-            : hourRaw;
+        meridiem === "pm" ? (hourRaw % 12) + 12 : meridiem === "am" ? hourRaw % 12 : hourRaw;
       const parsed = new Date(year, month, day, hour24, minute, 0, 0);
       return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
@@ -271,13 +267,14 @@ function splitListItems(content: string): string[] {
       part
         .trim()
         .replace(
-          /^(?:please\s+)?(?:add|get|buy|grab|pick up|put)\s+(?:me\s+)?(?:some\s+)?/iu,
+          /^(?:please\s+)?(?:add|get|buy|grab|pick up|put|remove|delete|drop|take off|cross off)\s+(?:me\s+)?(?:some\s+)?/iu,
           "",
         )
         .replace(
-          /\s+(?:to|onto|on)\s+(?:the\s+)?(?:grocery|shopping)\s+(?:list|cart)\.?$/iu,
+          /\s+(?:to|onto|on|from|off)\s+(?:the\s+)?(?:grocery|shopping)?\s*(?:list|cart)\.?$/iu,
           "",
         )
+        .replace(/^(?:the\s+)?/iu, "")
         .trim(),
     )
     .filter((part) => part.length > 0)
@@ -326,10 +323,10 @@ function isWithinEditDistance(candidate: string, target: string, maxDistance: nu
   const matrix = Array.from({ length: rows }, () => Array<number>(columns).fill(0));
 
   for (let row = 0; row < rows; row += 1) {
-    matrix[row]![0] = row;
+    matrix[row][0] = row;
   }
   for (let column = 0; column < columns; column += 1) {
-    matrix[0]![column] = column;
+    matrix[0][column] = column;
   }
 
   for (let row = 1; row < rows; row += 1) {
@@ -337,11 +334,11 @@ function isWithinEditDistance(candidate: string, target: string, maxDistance: nu
     for (let column = 1; column < columns; column += 1) {
       const substitutionCost = candidate[row - 1] === target[column - 1] ? 0 : 1;
       const value = Math.min(
-        matrix[row - 1]![column]! + 1,
-        matrix[row]![column - 1]! + 1,
-        matrix[row - 1]![column - 1]! + substitutionCost,
+        matrix[row - 1][column] + 1,
+        matrix[row][column - 1] + 1,
+        matrix[row - 1][column - 1] + substitutionCost,
       );
-      matrix[row]![column] = value;
+      matrix[row][column] = value;
       if (value < rowBest) {
         rowBest = value;
       }
@@ -351,7 +348,7 @@ function isWithinEditDistance(candidate: string, target: string, maxDistance: nu
     }
   }
 
-  return matrix[rows - 1]![columns - 1]! <= maxDistance;
+  return matrix[rows - 1][columns - 1] <= maxDistance;
 }
 
 function getEntityIdByType(entityType: EntityType): string | null {
@@ -873,10 +870,15 @@ export class Worker {
     const content = summarizeContent(queueItem.content);
     const dateHint = extractDateHint(content, queueItem.created_at);
     const inferredReference = this.inferClarificationReference(queueItem, threadHistory);
-    const referenceId = queueItem.clarification_of ?? inferredReference ?? extractQueueItemId(queueItem);
+    const referenceId =
+      queueItem.clarification_of ?? inferredReference ?? extractQueueItemId(queueItem);
     const hasReference = queueItem.clarification_of !== undefined || inferredReference !== null;
     const actor = identity.source_entity_id;
-    const humanConcerning = this.resolveConcerningForAction(content, classification.concerning, actor);
+    const humanConcerning = this.resolveConcerningForAction(
+      content,
+      classification.concerning,
+      actor,
+    );
     const adultConcerning = this.resolveConcerningForAction(
       content,
       classification.concerning,
@@ -1444,7 +1446,9 @@ export class Worker {
         break;
       }
       case "add_items": {
-        const existing = new Set(state.grocery.list.map((entry) => entry.item.toLowerCase().trim()));
+        const existing = new Set(
+          state.grocery.list.map((entry) => entry.item.toLowerCase().trim()),
+        );
         for (const [index, candidate] of action.items.entries()) {
           const itemName = candidate.item.trim();
           if (itemName.length === 0) {
@@ -1633,7 +1637,9 @@ export class Worker {
           updated_at: now,
           expires_at: action.expires_at,
         };
-        const idx = state.family_status.current.findIndex((entry) => entry.entity === action.entity);
+        const idx = state.family_status.current.findIndex(
+          (entry) => entry.entity === action.entity,
+        );
         if (idx >= 0) {
           state.family_status.current[idx] = next;
         } else {
@@ -1689,8 +1695,29 @@ export class Worker {
 
   private async composeStateBackedMessage(action: TopicAction): Promise<string | null> {
     const state = await this.stateService.getSystemState();
+    const entityLabel = (entityId: string): string => {
+      const configured = runtimeSystemConfig.entities.find((entry) => entry.id === entityId);
+      return configured?.name ?? entityId;
+    };
     switch (action.type) {
       case "query_events": {
+        if (state.calendar.events.length === 0) return "No calendar events right now.";
+        return `Calendar:\n${state.calendar.events
+          .slice(0, 8)
+          .map((entry, i) => {
+            const when =
+              entry.date_start instanceof Date
+                ? ` (${entry.date_start.toLocaleString()})`
+                : entry.date instanceof Date
+                  ? ` (${entry.date.toLocaleDateString()})`
+                  : "";
+            return `${i + 1}. ${entry.title}${when}`;
+          })
+          .join("\n")}`;
+      }
+      case "create_event":
+      case "cancel_event":
+      case "reschedule_event": {
         if (state.calendar.events.length === 0) return "No calendar events right now.";
         return `Calendar:\n${state.calendar.events
           .slice(0, 8)
@@ -1712,7 +1739,22 @@ export class Worker {
           .map((entry, i) => `${i + 1}. ${entry.task}`)
           .join("\n")}`;
       }
+      case "assign_chore":
+      case "complete_chore":
+      case "cancel_chore": {
+        if (state.chores.active.length === 0) return "No active chores right now.";
+        return `Active chores:\n${state.chores.active
+          .slice(0, 8)
+          .map((entry, i) => `${i + 1}. ${entry.task}`)
+          .join("\n")}`;
+      }
       case "query_finances": {
+        const recentTotal = state.finances.expenses_recent
+          .slice(0, 10)
+          .reduce((sum, expense) => sum + expense.amount, 0);
+        return `Finance snapshot: ${state.finances.bills.length} bills, ${state.finances.expenses_recent.length} recent expenses ($${recentTotal.toFixed(2)} recent total), ${state.finances.savings_goals.length} savings goals.`;
+      }
+      case "log_expense": {
         const recentTotal = state.finances.expenses_recent
           .slice(0, 10)
           .reduce((sum, expense) => sum + expense.amount, 0);
@@ -1720,7 +1762,18 @@ export class Worker {
       }
       case "query_list":
         return this.composeGroceryListMessage(action.section);
+      case "add_items":
+      case "remove_items":
+        return this.composeGroceryListMessage();
       case "query_health": {
+        const profiles = action.entity
+          ? state.health.profiles.filter((entry) => entry.entity === action.entity)
+          : state.health.profiles;
+        if (profiles.length === 0) return "No health records found.";
+        return `Health: ${profiles.length} profile(s), ${profiles.reduce((n, p) => n + p.upcoming_appointments.length, 0)} upcoming appointment(s).`;
+      }
+      case "add_appointment":
+      case "log_visit": {
         const profiles = action.entity
           ? state.health.profiles.filter((entry) => entry.entity === action.entity)
           : state.health.profiles;
@@ -1732,14 +1785,44 @@ export class Worker {
           ? state.pets.profiles.filter((entry) => entry.entity === action.entity)
           : state.pets.profiles;
         if (profiles.length === 0) return "No pet records found.";
-        return `Pets: ${profiles.map((entry) => entry.entity).join(", ")}.`;
+        const lines = profiles.slice(0, 4).map((entry) => {
+          const latestCare = entry.care_log_recent[0];
+          const latestText =
+            latestCare && latestCare.activity
+              ? ` latest: ${String(latestCare.activity)}`
+              : " no recent care logged";
+          const upcomingCount = entry.upcoming.length;
+          const upcomingText = upcomingCount > 0 ? `, ${upcomingCount} upcoming item(s)` : "";
+          return `- ${entityLabel(entry.entity)}:${latestText}${upcomingText}.`;
+        });
+        return `Pet status:\n${lines.join("\n")}`;
+      }
+      case "log_care": {
+        const profile = state.pets.profiles.find((entry) => entry.entity === action.entity);
+        const recentCount = profile?.care_log_recent.length ?? 0;
+        return `Logged for ${entityLabel(action.entity)}: ${action.activity}.${recentCount > 0 ? ` (${recentCount} recent care log entr${recentCount === 1 ? "y" : "ies"})` : ""}`;
       }
       case "query_school": {
         const assignments = state.school.students.flatMap((student) => student.assignments);
         if (assignments.length === 0) return "No school assignments right now.";
         return `School assignments: ${assignments.length} active item(s).`;
       }
+      case "add_assignment": {
+        const assignments = state.school.students.flatMap((student) => student.assignments);
+        if (assignments.length === 0) return "No school assignments right now.";
+        return `School assignments:\n${assignments
+          .slice(0, 8)
+          .map((assignment, i) => `${i + 1}. ${assignment.title}`)
+          .join("\n")}`;
+      }
       case "query_trips": {
+        if (state.travel.trips.length === 0) return "No trips planned right now.";
+        return `Trips:\n${state.travel.trips
+          .slice(0, 8)
+          .map((trip, i) => `${i + 1}. ${trip.name} (${trip.status})`)
+          .join("\n")}`;
+      }
+      case "create_trip": {
         if (state.travel.trips.length === 0) return "No trips planned right now.";
         return `Trips:\n${state.travel.trips
           .slice(0, 8)
@@ -1753,15 +1836,36 @@ export class Worker {
           .map((vendor, i) => `${i + 1}. ${vendor.name}`)
           .join("\n")}`;
       }
+      case "add_vendor": {
+        if (state.vendors.records.length === 0) return "No vendors on file yet.";
+        return `Vendors:\n${state.vendors.records
+          .slice(0, 8)
+          .map((vendor, i) => `${i + 1}. ${vendor.name}`)
+          .join("\n")}`;
+      }
       case "query_leads": {
         if (state.business.leads.length === 0) return "No leads right now.";
         return `Leads: ${state.business.leads.length} total.`;
       }
+      case "add_lead": {
+        if (state.business.leads.length === 0) return "No leads right now.";
+        return `Leads:\n${state.business.leads
+          .slice(0, 8)
+          .map((lead, i) => `${i + 1}. ${lead.client_name}`)
+          .join("\n")}`;
+      }
       case "query_nudge_history": {
-        if (state.relationship.nudge_history.length === 0) return "No relationship nudges in history.";
+        if (state.relationship.nudge_history.length === 0)
+          return "No relationship nudges in history.";
         return `Nudge history: ${state.relationship.nudge_history.length} item(s).`;
       }
       case "query_status": {
+        if (state.family_status.current.length === 0) return "No current family status entries.";
+        return `Family status:\n${state.family_status.current
+          .map((entry, i) => `${i + 1}. ${entry.entity}: ${entry.status}`)
+          .join("\n")}`;
+      }
+      case "update_status": {
         if (state.family_status.current.length === 0) return "No current family status entries.";
         return `Family status:\n${state.family_status.current
           .map((entry, i) => `${i + 1}. ${entry.entity}: ${entry.status}`)
@@ -1774,9 +1878,23 @@ export class Worker {
           .map((plan, i) => `${i + 1}. ${plan.description}`)
           .join("\n")}`;
       }
+      case "plan_meal": {
+        if (state.meals.planned.length === 0) return "No meal plans right now.";
+        return `Meal plans:\n${state.meals.planned
+          .slice(0, 8)
+          .map((plan, i) => `${i + 1}. ${plan.description}`)
+          .join("\n")}`;
+      }
       case "query_maintenance": {
         if (state.maintenance.items.length === 0) return "No maintenance items right now.";
         return `Maintenance: ${state.maintenance.items.length} tracked item(s).`;
+      }
+      case "add_asset": {
+        if (state.maintenance.assets.length === 0) return "No maintenance assets right now.";
+        return `Maintenance assets:\n${state.maintenance.assets
+          .slice(0, 8)
+          .map((asset, i) => `${i + 1}. ${asset.name}`)
+          .join("\n")}`;
       }
       default:
         return null;

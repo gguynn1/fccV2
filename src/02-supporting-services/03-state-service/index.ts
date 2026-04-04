@@ -178,7 +178,10 @@ function toStoredDispatchRecord(
       id: queueItemId,
       topic: queueItem.topic ?? TopicKey.FamilyStatus,
       target_thread: action.queue_item.target_thread,
-      content: typeof queueItem.content === "string" ? queueItem.content : JSON.stringify(queueItem.content),
+      content:
+        typeof queueItem.content === "string"
+          ? queueItem.content
+          : JSON.stringify(queueItem.content),
       dispatched_at: dispatchedAt,
       priority: queueItem.priority ?? DispatchPriority.Silent,
     };
@@ -421,7 +424,12 @@ export class SqliteStateService implements StateService {
       }
 
       if (action.decision === "store") {
-        const record = toStoredDispatchRecord(queueItemId, queue_item, action, new Date(actionRecordedAt));
+        const record = toStoredDispatchRecord(
+          queueItemId,
+          queue_item,
+          action,
+          new Date(actionRecordedAt),
+        );
         this.db
           .prepare(
             `
@@ -440,7 +448,12 @@ export class SqliteStateService implements StateService {
       }
 
       if (action.decision === "dispatch") {
-        const record = toStoredDispatchRecord(queueItemId, queue_item, action, new Date(actionRecordedAt));
+        const record = toStoredDispatchRecord(
+          queueItemId,
+          queue_item,
+          action,
+          new Date(actionRecordedAt),
+        );
         this.db
           .prepare(
             `
@@ -500,7 +513,9 @@ export class SqliteStateService implements StateService {
 
   private readQueueRecentlyDispatchedFromTable(): SystemState["queue"]["recently_dispatched"] {
     const rows = this.db
-      .prepare("SELECT id, payload, dispatched_at FROM queue_recently_dispatched ORDER BY dispatched_at DESC")
+      .prepare(
+        "SELECT id, payload, dispatched_at FROM queue_recently_dispatched ORDER BY dispatched_at DESC",
+      )
       .all() as { id: string; payload: string; dispatched_at: string }[];
     return rows.flatMap((row) => {
       const parsed = reviveDatesFromJson<StoredDispatchRecord | ActionRouterResult>(row.payload);

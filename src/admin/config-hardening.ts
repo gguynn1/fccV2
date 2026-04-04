@@ -1,7 +1,7 @@
 import { type PendingQueueItem } from "../01-service-stack/04-queue/types.js";
+import { ThreadType, type Thread } from "../02-supporting-services/05-routing-service/types.js";
 import type { SystemConfig, SystemState } from "../index.js";
 import { EntityType } from "../types.js";
-import { ThreadType, type Thread } from "../02-supporting-services/05-routing-service/types.js";
 
 const DEFAULT_ADULT_MORNING_DIGEST = "07:00";
 const DEFAULT_CHILD_MORNING_DIGEST = "07:30";
@@ -47,7 +47,7 @@ export interface HardenConfigEditOptions {
   source: ConfigEditSource;
 }
 
-function defaultMorningDigestForEntityType(type: string): string {
+function defaultMorningDigestForEntityType(type: EntityType): string {
   return type === EntityType.Child ? DEFAULT_CHILD_MORNING_DIGEST : DEFAULT_ADULT_MORNING_DIGEST;
 }
 
@@ -202,9 +202,7 @@ function assertConfigInvariants(config: SystemConfig, source: ConfigEditSource):
     .filter((entity) => entity.type !== EntityType.Pet && entity.messaging_identity !== null)
     .map((entity) => entity.messaging_identity!);
   if (new Set(messagingIdentities).size !== messagingIdentities.length) {
-    throw new AdminConfigInvariantError(
-      "Two or more entities share the same messaging identity.",
-    );
+    throw new AdminConfigInvariantError("Two or more entities share the same messaging identity.");
   }
 
   if (people.length === 0) {
@@ -260,7 +258,9 @@ function assertConfigInvariants(config: SystemConfig, source: ConfigEditSource):
       throw new AdminConfigInvariantError(`Missing private thread for ${person.id}.`);
     }
     if (thread.participants.length !== 1 || thread.participants[0] !== person.id) {
-      throw new AdminConfigInvariantError(`Private thread ${expectedId} must contain only ${person.id}.`);
+      throw new AdminConfigInvariantError(
+        `Private thread ${expectedId} must contain only ${person.id}.`,
+      );
     }
   }
 
@@ -280,10 +280,14 @@ function assertConfigInvariants(config: SystemConfig, source: ConfigEditSource):
   for (const thread of config.threads) {
     for (const participant of thread.participants) {
       if (!peopleIds.has(participant)) {
-        throw new AdminConfigInvariantError(`Thread ${thread.id} references unknown participant ${participant}.`);
+        throw new AdminConfigInvariantError(
+          `Thread ${thread.id} references unknown participant ${participant}.`,
+        );
       }
       if (petIds.has(participant)) {
-        throw new AdminConfigInvariantError(`Thread ${thread.id} cannot include pet ${participant}.`);
+        throw new AdminConfigInvariantError(
+          `Thread ${thread.id} cannot include pet ${participant}.`,
+        );
       }
     }
   }
@@ -359,7 +363,9 @@ function reconcileTopicState(state: SystemState, config: SystemConfig): number {
   removed += originalCalendarCount - state.calendar.events.length;
 
   const originalHealthProfiles = state.health.profiles.length;
-  state.health.profiles = state.health.profiles.filter((profile) => validEntityIds.has(profile.entity));
+  state.health.profiles = state.health.profiles.filter((profile) =>
+    validEntityIds.has(profile.entity),
+  );
   removed += originalHealthProfiles - state.health.profiles.length;
 
   const originalPetProfiles = state.pets.profiles.length;
@@ -394,7 +400,9 @@ function reconcileTopicState(state: SystemState, config: SystemConfig): number {
   removed += originalTrips - state.travel.trips.length;
 
   const originalVendorRecords = state.vendors.records.length;
-  state.vendors.records = state.vendors.records.filter((record) => validEntityIds.has(record.managed_by));
+  state.vendors.records = state.vendors.records.filter((record) =>
+    validEntityIds.has(record.managed_by),
+  );
   removed += originalVendorRecords - state.vendors.records.length;
 
   const originalBusinessProfiles = state.business.profiles.length;

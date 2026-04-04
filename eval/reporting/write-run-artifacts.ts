@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { basename, join, relative } from "node:path";
 
+import { TopicKey } from "../../src/index.js";
 import type { EvalRunState } from "../types.js";
 
 export interface WriteRunArtifactsOptions {
@@ -27,6 +28,52 @@ function scenarioSourceFile(scenarioSet: string): string {
     return `eval/scenarios/generated/${scenarioSet}.ts`;
   }
   return "eval/scenarios/default.ts";
+}
+
+function buildInsights(state: EvalRunState): {
+  topicCoverageLine: string;
+  missingTopicsLine: string;
+  categoryCoverageLine: string;
+  topFailureFieldsLine: string;
+  fixabilityLine: string;
+} {
+  const allTopics = new Set<string>(Object.values(TopicKey));
+  const expectedTopics = new Set<string>();
+  const categoryCounts = new Map<string, number>();
+  const failureFieldCounts = new Map<string, number>();
+  let promptFixableFailures = 0;
+  let structuralFailures = 0;
+
+  for (const scenario of state.scenarios) {
+    expectedTopics.add(String(scenario.expected.topic));
+    categoryCounts.set(scenario.category, (categoryCounts.get(scenario.category) ?? 0) + 1);
+    for (const failure of scenario.failures) {
+      failureFieldCounts.set(failure.field, (failureFieldCounts.get(failure.field) ?? 0) + 1);
+      if (failure.prompt_fixable) {
+        promptFixableFailures += 1;
+      } else {
+        structuralFailures += 1;
+      }
+    }
+  }
+
+  const missingTopics = [...allTopics].filter((topic) => !expectedTopics.has(topic));
+  const topFailureFields = [...failureFieldCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([field, count]) => `${field} (${count})`);
+
+  return {
+    topicCoverageLine: `${expectedTopics.size}/${allTopics.size} topics represented in scenario expectations.`,
+    missingTopicsLine:
+      missingTopics.length > 0 ? missingTopics.join(", ") : "None. Full topic coverage in this run.",
+    categoryCoverageLine: [...categoryCounts.entries()]
+      .map(([category, count]) => `${category}: ${count}`)
+      .join(" | "),
+    topFailureFieldsLine:
+      topFailureFields.length > 0 ? topFailureFields.join(", ") : "No failing fields in this run.",
+    fixabilityLine: `Prompt-fixable failures: ${promptFixableFailures}; structural failures: ${structuralFailures}.`,
+  };
 }
 
 function toLikelyFiles(scenario: EvalRunState["scenarios"][number], scenarioSet: string): string[] {
@@ -107,6 +154,7 @@ ${formatLogLines(state, scenario.id)}
 - Scenario source: \`${sourceFile}\``;
 
   const rerunCommand = `npm run eval:run -- --scenario-set ${state.scenario_set} --run-id ${state.id}`;
+  const insights = buildInsights(state);
 
   if (allPassed) {
     return `# Prompt For Cursor Or Claude Code
@@ -121,6 +169,11 @@ ${artifactBlock}
 Run summary:
 - total: ${state.summary.total}
 - passed: ${state.summary.passed}
+
+Coverage insights:
+- ${insights.topicCoverageLine}
+- missing topics: ${insights.missingTopicsLine}
+- categories: ${insights.categoryCoverageLine}
 
 All scenarios passed. Review the scenario source file (\`${sourceFile}\`) for:
 - edge cases that could be added
@@ -167,6 +220,13 @@ Run summary:
 - failed: ${state.summary.failed}
 - regressed: ${state.summary.regressed}
 
+Coverage insights:
+- ${insights.topicCoverageLine}
+- missing topics: ${insights.missingTopicsLine}
+- categories: ${insights.categoryCoverageLine}
+- top failing dimensions: ${insights.topFailureFieldsLine}
+- ${insights.fixabilityLine}
+
 Your task:
 1. Read the artifact files listed above.
 2. Read the failing scenarios listed below.
@@ -187,6 +247,7 @@ ${quoteForPrompt(scenarioInstructions)}
 }
 
 function buildMarkdown(state: EvalRunState): string {
+  const insights = buildInsights(state);
   const scenarioSections = state.scenarios
     .map((scenario) => {
       const suggestionLine = scenario.tuner?.candidate
@@ -251,6 +312,14 @@ ${formatLogLines(state, scenario.id)}
 - Investigation Needed: ${state.summary.investigation_needed}
 - Failed: ${state.summary.failed}
 - Regressed: ${state.summary.regressed}
+
+## Coverage Insights
+
+- Topic coverage: ${insights.topicCoverageLine}
+- Missing topics: ${insights.missingTopicsLine}
+- Category distribution: ${insights.categoryCoverageLine}
+- Top failing dimensions: ${insights.topFailureFieldsLine}
+- ${insights.fixabilityLine}
 
 ## Pasteable Prompt
 

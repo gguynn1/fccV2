@@ -454,10 +454,12 @@ export class TwilioTransportLayer {
   }
 
   private refreshMapsIfStale(): void {
-    if (this.lastSeenConfigVersion === runtimeSystemConfigVersion) {
+    const configVersion =
+      typeof runtimeSystemConfigVersion === "number" ? runtimeSystemConfigVersion : -1;
+    if (this.lastSeenConfigVersion === configVersion) {
       return;
     }
-    this.lastSeenConfigVersion = runtimeSystemConfigVersion;
+    this.lastSeenConfigVersion = configVersion;
 
     this.entityIdByIdentity.clear();
     this.participantIdentityById.clear();

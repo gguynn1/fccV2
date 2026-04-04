@@ -166,7 +166,8 @@ export function ThreadsRoute() {
               <Badge variant="secondary">Editable</Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              Select at least two adults to keep the couple thread. Leave fewer than two selected to remove it.
+              Select at least two adults to keep the couple thread. Leave fewer than two selected to
+              remove it.
             </p>
             <div className="flex flex-wrap gap-2">
               {adultEntityIds.map((entityId) => {

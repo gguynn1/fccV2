@@ -1,5 +1,5 @@
-import type { AdminMutationResponseBase } from "@/hooks/admin-mutations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { AdminMutationResponseBase } from "@/hooks/admin-mutations";
 
 export interface ReconciliationSummaryProps {
   result: AdminMutationResponseBase | undefined;
@@ -55,7 +55,9 @@ export function ReconciliationSummary({
           <div className="grid gap-2 sm:grid-cols-2">
             {entries.map(([label, count]) => (
               <div key={label} className="rounded-md border border-border px-3 py-2">
-                <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
+                <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                  {label}
+                </div>
                 <div className="mt-1 text-lg font-semibold text-foreground">{count}</div>
               </div>
             ))}

@@ -12,9 +12,8 @@ import type { PendingQueueItem } from "../01-service-stack/04-queue/types.js";
 import { CollisionPrecedence } from "../01-service-stack/06-action-router/types.js";
 import { type SqliteStateService } from "../02-supporting-services/03-state-service/index.js";
 import { ThreadType } from "../02-supporting-services/05-routing-service/types.js";
-import { EscalationReassignmentPolicy } from "../02-supporting-services/07-escalation-service/types.js";
-import { ConfirmationActionType } from "../02-supporting-services/08-confirmation-service/types.js";
 import { applyRuntimeSystemConfig } from "../config/runtime-system-config.js";
+import { EntityType, QueueItemSource } from "../types.js";
 import {
   AdminConfigInvariantError,
   hardenConfigEdit,
@@ -22,13 +21,6 @@ import {
   type ConfigEditSource,
   type ConfigReconciliationReport,
 } from "./config-hardening.js";
-import {
-  EntityType,
-  EscalationLevel,
-  GrocerySection,
-  QueueItemSource,
-  TopicKey,
-} from "../types.js";
 import type { EmulationStore } from "./emulation-store.js";
 import {
   generateScenarioSet,
@@ -49,32 +41,6 @@ const threadSchema = z.object({
   type: z.nativeEnum(ThreadType),
   participants: z.array(z.string().min(1)).min(1),
   description: z.string().min(1),
-});
-
-const topicConfigSchema = z.object({
-  label: z.string().min(1),
-  description: z.string().min(1),
-  routing: z.record(z.string(), z.union([z.string(), z.boolean(), z.array(z.string())])),
-  behavior: z.record(z.string(), z.string()),
-  escalation: z.nativeEnum(EscalationLevel),
-  proactive: z.record(z.string(), z.union([z.string(), z.boolean()])).optional(),
-  escalation_ladder: z.record(z.string(), z.union([z.string(), z.boolean(), z.null()])).optional(),
-  confirmation_required: z.boolean().optional(),
-  sections: z.array(z.nativeEnum(GrocerySection)).optional(),
-  cross_topic_connections: z.array(z.nativeEnum(TopicKey)).optional(),
-  confirmation_required_for_sends: z.boolean().optional(),
-  follow_up_quiet_period_days: z.number().optional(),
-  on_ignored: z.string().optional(),
-  minimum_gap_between_nudges: z.string().optional(),
-  status_expiry: z.string().optional(),
-  grocery_linking: z.boolean().optional(),
-});
-
-const escalationProfileSchema = z.object({
-  label: z.string().min(1),
-  applies_to: z.array(z.nativeEnum(TopicKey)),
-  steps: z.array(z.string()),
-  on_reassignment: z.nativeEnum(EscalationReassignmentPolicy),
 });
 
 const digestScheduleBlockSchema = z.object({
@@ -120,16 +86,6 @@ const configPayloadSchema = z.object({
     is_onboarded: z.boolean(),
   }),
   threads: z.array(threadSchema),
-});
-
-const topicsPayloadSchema = z.object({
-  topics: z.record(z.string(), topicConfigSchema),
-  escalation_profiles: z.record(z.string(), escalationProfileSchema),
-  confirmation_gates: z.object({
-    always_require_approval: z.array(z.nativeEnum(ConfirmationActionType)),
-    expiry_minutes: z.number().int().positive(),
-    on_expiry: z.string().min(1),
-  }),
 });
 
 const budgetPayloadSchema = z.object({
@@ -243,7 +199,10 @@ const DOMAIN_CATEGORY_COLLECTIONS: Record<string, string[]> = {
   digests: ["history"],
 };
 
-function clearDomainCategoryRecords(state: Awaited<ReturnType<SqliteStateService["getSystemState"]>>, category: string): number {
+function clearDomainCategoryRecords(
+  state: Awaited<ReturnType<SqliteStateService["getSystemState"]>>,
+  category: string,
+): number {
   if (category === "threads") {
     const count = Object.keys(state.threads).length;
     state.threads = {};
@@ -324,14 +283,25 @@ function clearDomainRowRecord(
     throw new Error(`State collection is not a list: ${category}.${collection}`);
   }
   const before = value.length;
+  const toComparableRowValue = (rowValue: unknown): string => {
+    if (typeof rowValue === "string") {
+      return rowValue;
+    }
+    if (typeof rowValue === "number" || typeof rowValue === "bigint") {
+      return rowValue.toString();
+    }
+    return "";
+  };
   target[collection] = value.filter((entry) => {
     if (!entry || typeof entry !== "object") {
       return true;
     }
     const record = entry as Record<string, unknown>;
-    return String(record[rowKey] ?? "") !== rowId;
+    return toComparableRowValue(record[rowKey]) !== rowId;
   });
-  const after = Array.isArray(target[collection]) ? (target[collection] as unknown[]).length : before;
+  const after = Array.isArray(target[collection])
+    ? (target[collection] as unknown[]).length
+    : before;
   return Math.max(0, before - after);
 }
 
@@ -339,6 +309,15 @@ interface AppliedAdminConfigChange {
   config: Awaited<ReturnType<SqliteStateService["getSystemConfig"]>>;
   reconciliation: ConfigReconciliationReport;
   queue_reconciliation: PendingQueueReconciliationResult;
+}
+
+function applyAdminStateAtomically(
+  stateService: SqliteStateService,
+  nextState: Awaited<ReturnType<SqliteStateService["getSystemState"]>>,
+  nextConfig: Awaited<ReturnType<SqliteStateService["getSystemConfig"]>>,
+  validThreadIds: string[],
+): void {
+  stateService.applyAdminConfigAtomically(nextState, nextConfig, validThreadIds);
 }
 
 async function applyAdminConfigChange(
@@ -363,7 +342,7 @@ async function applyAdminConfigChange(
   );
 
   const validThreadIds = hardened.config.threads.map((thread) => thread.id);
-  stateService.applyAdminConfigAtomically(hardened.state, hardened.config, validThreadIds);
+  applyAdminStateAtomically(stateService, hardened.state, hardened.config, validThreadIds);
   applyRuntimeSystemConfig(hardened.config);
 
   return {

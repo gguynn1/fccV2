@@ -48,9 +48,9 @@ export function EntitiesRoute() {
   const mutation = useUpdateEntities();
   const [newPersonName, setNewPersonName] = useState("");
   const [newPersonIdentity, setNewPersonIdentity] = useState("");
-  const [newPersonType, setNewPersonType] = useState<typeof EntityType.Adult | typeof EntityType.Child>(
-    EntityType.Adult,
-  );
+  const [newPersonType, setNewPersonType] = useState<
+    typeof EntityType.Adult | typeof EntityType.Child
+  >(EntityType.Adult);
   const [newPetName, setNewPetName] = useState("");
   const [newPetSpecies, setNewPetSpecies] = useState("");
   const [newPetRoutesTo, setNewPetRoutesTo] = useState<string[]>([]);
@@ -144,7 +144,11 @@ export function EntitiesRoute() {
   const addPerson = () => {
     const trimmedName = newPersonName.trim();
     const trimmedIdentity = newPersonIdentity.trim();
-    if (trimmedName.length === 0 || trimmedIdentity.length === 0 || existingIdentities.has(trimmedIdentity)) {
+    if (
+      trimmedName.length === 0 ||
+      trimmedIdentity.length === 0 ||
+      existingIdentities.has(trimmedIdentity)
+    ) {
       return;
     }
 
@@ -223,7 +227,9 @@ export function EntitiesRoute() {
       <ReconciliationSummary result={mutation.data} />
       {mutation.error instanceof Error && (
         <Card className="border-destructive/40">
-          <CardContent className="pt-6 text-sm text-destructive">{mutation.error.message}</CardContent>
+          <CardContent className="pt-6 text-sm text-destructive">
+            {mutation.error.message}
+          </CardContent>
         </Card>
       )}
 
@@ -241,9 +247,7 @@ export function EntitiesRoute() {
               />
               <Select
                 value={newPersonType}
-                onChange={(event) =>
-                  setNewPersonType(event.target.value as typeof newPersonType)
-                }
+                onChange={(event) => setNewPersonType(event.target.value as typeof newPersonType)}
               >
                 <option value={EntityType.Adult}>Adult</option>
                 <option value={EntityType.Child}>Child</option>
