@@ -36,6 +36,7 @@ export interface SystemConfig {
     timezone: string;
     locale: string;
     version: string;
+    is_onboarded: boolean;
   };
   assistant: {
     messaging_identity: string;

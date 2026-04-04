@@ -117,6 +117,7 @@ function createMinimalSystemConfig(): SystemConfig {
       timezone: "America/Chicago",
       locale: "en-US",
       version: "1.0.0",
+      is_onboarded: false,
     },
     assistant: {
       messaging_identity: "",

@@ -25,6 +25,7 @@ export const systemConfig: SystemConfig = {
     timezone: "America/Denver",
     locale: "en-US",
     version: "0.1.0",
+    is_onboarded: true,
   },
 
   assistant: {

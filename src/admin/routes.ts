@@ -98,6 +98,7 @@ const configPayloadSchema = z.object({
     timezone: z.string().min(1),
     locale: z.string().min(1),
     version: z.string().min(1),
+    is_onboarded: z.boolean(),
   }),
   assistant: z.object({
     messaging_identity: z.string().min(1),
