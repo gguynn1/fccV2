@@ -46,7 +46,6 @@ All project tasks run through `npm run`. Never invoke tooling directly when a sc
 | Command                     | What it does                                                                      |
 | --------------------------- | --------------------------------------------------------------------------------- |
 | `npm start`                 | Run the compiled application (`node dist/server.js`)                              |
-| `npm run start:seed`        | Run the application and populate the database from `src/_seed/`                   |
 | `npm run dev`               | Run in development with file watching and auto-restart                            |
 | `npm run build`             | Compile TypeScript (`tsc`)                                                        |
 | `npm run typecheck`         | Type-check backend and admin UI (`tsc --noEmit && npm run --prefix ui typecheck`) |
@@ -74,7 +73,7 @@ npm run lint          →  backend + admin UI lint clean?
 npm run build         →  compile backend to dist/
 npm run ui:build      →  build admin UI to ui/dist/
 npm run eval:run      →  write eval/results/*.json and *.prompt.md
-npm run start:seed    →  first boot: populate database from seed
+npm run bootstrap     →  first boot: create minimal persisted config/state
 npm start             →  subsequent boots: run with existing database
 ```
 

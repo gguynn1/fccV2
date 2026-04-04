@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { systemConfig } from "../../_seed/system-config.js";
-import { systemState } from "../../_seed/system-state.js";
+import {
+  createTestSystemState,
+  installTestSystemConfig,
+} from "../../02-supporting-services/test-fixtures.js";
 import {
   ClassifierIntent,
   DispatchPriority,
@@ -17,7 +19,7 @@ function localDate(year: number, month: number, day: number, hour: number, minut
 }
 
 function createStateService() {
-  const state = structuredClone(systemState);
+  const state = createTestSystemState();
   state.queue.pending = [
     {
       id: "held_due",
@@ -89,10 +91,11 @@ function createStateService() {
 }
 
 function createService() {
+  const config = installTestSystemConfig();
   return createSchedulerService({
     redis_url: "redis://127.0.0.1:6379",
-    timezone: systemConfig.system.timezone,
-    daily_rhythm: systemConfig.daily_rhythm,
+    timezone: config.system.timezone,
+    daily_rhythm: config.daily_rhythm,
     state_service: createStateService() as never,
   });
 }

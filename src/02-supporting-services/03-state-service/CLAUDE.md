@@ -33,9 +33,9 @@ The current state lives in a separate state store: all active and recent items a
 
 Both stores together allow the system to be booted in any state — empty, mid-day, mid-scenario, or a specific test case — with all configuration and data already in place.
 
-## Seed Data
+## First-Run Initialization
 
-The initial values for both stores live in `src/_seed/`. When the database is bootstrapped with `--seed`, these files populate every table. The running application reads from and writes to the database — never back to the seed files. The seed files change only when the schema changes, ensuring they always represent a valid, complete initial state.
+On first boot, the service writes a minimal configuration record and an empty state snapshot directly into SQLite. After that, the database is the only source of truth. Tests and eval may construct their own fixtures, but the running application never reads configuration or state from checked-in files.
 
 ## Implementation
 

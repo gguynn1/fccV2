@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { systemConfig } from "../_seed/system-config.js";
 import { RoutingRule } from "../02-supporting-services/05-routing-service/types.js";
+import { createTestSystemConfig } from "../02-supporting-services/test-fixtures.js";
 import {
   ClassifierIntent,
   DispatchPriority,
@@ -32,6 +32,7 @@ function createWorkerOptions(hooks: {
   actionRouterResult: ActionRouterResult;
   priority?: DispatchPriority;
 }): WorkerOptions {
+  const config = createTestSystemConfig();
   const actionRouter: ActionRouterContract = {
     route: (decision: WorkerDecision, _policy: CollisionPolicy) => {
       hooks.order.push("action-router");
@@ -143,7 +144,7 @@ function createWorkerOptions(hooks: {
       close: () => Promise.resolve(),
     },
     state_service: {
-      getSystemConfig: () => resolved(systemConfig),
+      getSystemConfig: () => resolved(config),
       saveSystemConfig: () => Promise.resolve(),
       getSystemState: () => resolved({} as never),
       saveSystemState: () => Promise.resolve(),

@@ -3,11 +3,10 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { systemConfig } from "../_seed/system-config.js";
 import { SamePrecedenceStrategy } from "../01-service-stack/types.js";
 import { DispatchPriority } from "../types.js";
 import { ConfirmationActionType } from "./08-confirmation-service/types.js";
-import { fixtureQueueItem, fixtureThreadHistory } from "./test-fixtures.js";
+import { createTestSystemConfig, fixtureQueueItem, fixtureThreadHistory } from "./test-fixtures.js";
 import type {
   BudgetService,
   ConfirmationService,
@@ -50,8 +49,9 @@ describe("Supporting-service contracts", () => {
   });
 
   it("keeps worker-facing service contracts stable", async () => {
+    const config = createTestSystemConfig();
     const stateService: StateService = {
-      getSystemConfig: () => Promise.resolve(systemConfig),
+      getSystemConfig: () => Promise.resolve(config),
       saveSystemConfig: () => Promise.resolve(),
       getSystemState: () => Promise.resolve({} as never),
       saveSystemState: () => Promise.resolve(),

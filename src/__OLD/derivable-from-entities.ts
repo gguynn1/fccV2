@@ -4,7 +4,7 @@ import {
   TopicKey,
   type SystemConfig,
   type SystemState,
-} from "../../index.js";
+} from "../index.js";
 
 // ── Config ──
 

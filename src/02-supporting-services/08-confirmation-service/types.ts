@@ -74,7 +74,7 @@ export interface ExpiredConfirmation extends ConfirmationRecordBase {
   reply_options: ConfirmationReplyOption[];
 }
 
-// Keep historical seed records readable while the service now writes explicit state slices.
+// Keep older persisted confirmation records readable while the service writes explicit state slices.
 export interface LegacyConfirmationRecord extends ConfirmationRecordBase {
   status?: undefined;
   result?: ConfirmationResult;

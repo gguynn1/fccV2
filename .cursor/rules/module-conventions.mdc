@@ -24,13 +24,6 @@ import { TopicKey } from "../../types.js";
 import { SystemConfig, type SystemConfig } from "./index.js";
 ```
 
-## Seed Data Files
-
-- `src/_seed/system-config.ts` — Static system definition (what governs behavior). Imports from `../index.js`.
-- `src/_seed/system-state.ts` — Initial runtime snapshot (what exists at first boot). Imports from `../index.js`.
-- Both use runtime enum values (`TopicKey.Calendar`, not `"calendar"`).
-- These are seed files — they populate the database on `--seed` and never change at runtime. See `seed-data.mdc` for full constraints.
-
 ## Enums Over String Literals
 
 All classified values use their enum. Never use raw strings where an enum exists.

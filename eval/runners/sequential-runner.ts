@@ -1,7 +1,8 @@
 import { writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 
-import { systemConfig } from "../../src/_seed/system-config.js";
+import { createStateService } from "../../src/02-supporting-services/03-state-service/index.js";
+import { loadEnv } from "../../src/env.js";
 import {
   ClassifierIntent,
   DispatchPriority,
@@ -32,6 +33,16 @@ export interface RunSequentialEvalOptions {
 
 function pause(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function loadEvalSystemConfig(repoRoot: string): Promise<SystemConfig> {
+  const env = loadEnv(process.env as Record<string, string | undefined>);
+  const stateService = createStateService(resolve(repoRoot, env.DATABASE_PATH));
+  try {
+    return await stateService.getSystemConfig();
+  } finally {
+    stateService.close();
+  }
 }
 
 function buildSummary(scenarios: EvalScenarioResult[]): EvalRunSummary {
@@ -455,6 +466,7 @@ function createRunState(
 }
 
 export async function runSequentialEval(options: RunSequentialEvalOptions): Promise<EvalRunState> {
+  const systemConfig = await loadEvalSystemConfig(options.repo_root);
   const stepDelayMs = options.step_delay_ms ?? 200;
   const workspace = await ensureEvalWorkspace(options.repo_root);
   const jsonPath = join(workspace.results_dir, `${options.run_id}.json`);

@@ -17,7 +17,7 @@
     "format:check": "prettier --check .",
     "backup:local": "./scripts/sqlite-backup.sh",
     "start": "node dist/server.js",
-    "start:seed": "tsx src/bootstrap.ts --seed",
+    "bootstrap": "tsx src/bootstrap.ts",
     "dev": "tsx watch src/server.ts",
     "dev:all": "(redis-cli ping >/dev/null 2>&1 || redis-server --daemonize yes) && (trap 'kill 0' EXIT; npm run dev & npm run ui:dev & wait)",
     "ui:dev": "npm run --prefix ui dev",

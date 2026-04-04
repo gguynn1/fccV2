@@ -1,4 +1,4 @@
-import { EntityType, Permission, type SystemConfig } from "../../index.js";
+import { EntityType, Permission, type SystemConfig } from "../index.js";
 
 export const seedSystem: SystemConfig["system"] = {
   timezone: "America/Denver",

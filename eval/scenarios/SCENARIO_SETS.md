@@ -29,7 +29,7 @@ Use real application vocabulary:
 Good scenarios are:
 
 - plausible phone-native messages a participant would actually send
-- routed to threads that exist in `src/_seed/system-config.ts`
+- routed to threads that exist in the persisted system configuration
 - aligned with topic boundaries already defined in system config
 - written with expectations that match the app's actual rules
 
@@ -44,8 +44,8 @@ Bad scenarios are:
 
 Before adding a scenario set, verify:
 
-- The `prompt_input.origin_thread` is a real thread from seeded config.
-- The `prompt_input.concerning` entities are real seeded entities.
+- The `prompt_input.origin_thread` is a real thread from persisted config.
+- The `prompt_input.concerning` entities are real persisted entities.
 - The message is realistic for the topic.
 - The expected topic and intent are defensible under the configured disambiguation rules.
 - The expected target thread is one the application would actually choose.
@@ -103,7 +103,7 @@ The Eval page's `Generate Scenario Set` action creates a scaffold in `eval/scena
 
 That scaffold:
 
-- uses valid seeded entities and threads
+- uses valid persisted entities and threads when available
 - uses realistic application messages
 - follows the `EvalScenarioDefinition` shape
 - is meant to be edited and then run directly (no manual registration)

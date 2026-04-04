@@ -20,10 +20,6 @@ Use `PARTICIPANT N` in documentation (CLAUDE.md). Use `participant_n` in code an
 
 If you encounter a new real name, flag it — do not guess the substitution.
 
-### Exception: root-level `_seed/`
-
-The root-level `_seed/` directory is gitignored and never committed. It exists for the developer to seed the system with real personal data. PID rules do not apply to files in `_seed/` at the project root. The committed defaults in `src/_seed/` remain fully anonymized.
-
 ## Platform-Neutral Language
 
 The system describes capabilities, not specific products or brands.

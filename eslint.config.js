@@ -7,7 +7,7 @@ import tseslint from "typescript-eslint";
 
 export default defineConfig(
   {
-    ignores: ["dist/**", "node_modules/**", "_seed/**", "eslint.config.js", "prettier.config.js"],
+    ignores: ["dist/**", "node_modules/**", "eslint.config.js", "prettier.config.js"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

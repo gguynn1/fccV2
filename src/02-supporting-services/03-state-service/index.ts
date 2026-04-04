@@ -4,8 +4,8 @@ import { dirname, resolve } from "node:path";
 import BetterSqlite3 from "better-sqlite3";
 import { pino, type Logger } from "pino";
 
-import { loadSeedConfig, loadSeedState } from "../../_seed/resolve.js";
 import type { ActionRouterResult, StackQueueItem } from "../../01-service-stack/types.js";
+import { createMinimalSystemConfig } from "../../config/minimal-system-config.js";
 import type { SystemConfig } from "../../index.js";
 import type { ThreadHistory } from "../05-routing-service/types.js";
 import type { StateService } from "../types.js";
@@ -107,71 +107,14 @@ function serializeForStorage(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function createMinimalSystemConfig(): SystemConfig {
+function createEmptyIngestSourceState() {
   return {
-    system: {
-      timezone: "America/Chicago",
-      locale: "en-US",
-      is_onboarded: false,
-    },
-    entities: [],
-    threads: [],
-    topics: {} as SystemConfig["topics"],
-    escalation_profiles: {} as SystemConfig["escalation_profiles"],
-    confirmation_gates: {
-      always_require_approval: [],
-      expiry_minutes: 30,
-      on_expiry: "notify_and_offer_reissue",
-    },
-    dispatch: {
-      priority_levels: {} as SystemConfig["dispatch"]["priority_levels"],
-      outbound_budget: {} as SystemConfig["dispatch"]["outbound_budget"],
-      routing_rules: {},
-      collision_avoidance: {
-        description: "Default collision policy",
-        precedence_order: [],
-        same_precedence_strategy: "batch",
-      },
-    },
-    input_recognition: {
-      text: { description: "Plain text messages" },
-      structured_choice: { description: "Structured choices", formats: [] },
-      reaction: { positive: "positive", negative: "negative" },
-      image: { description: "Image attachments", examples: {} },
-      forwarded_content: { description: "Forwarded messages" },
-      silence: {
-        high_accountability: "escalate",
-        low_accountability: "disappear",
-        never: "never_escalate",
-      },
-      topic_disambiguation: { description: "Topic disambiguation rules", rules: [] },
-      intent_disambiguation: { description: "Intent disambiguation rules", rules: [] },
-    },
-    daily_rhythm: {
-      morning_digest: { times: {} },
-      evening_checkin: { times: {} },
-      default_state: "quiet",
-      digest_eligibility: {
-        exclude_already_dispatched: true,
-        exclude_stale: true,
-        staleness_threshold_hours: 24,
-        suppress_repeats_from_previous_digest: true,
-        include_unresolved_from_yesterday: true,
-      },
-    },
-    worker: {
-      processing_sequence: [],
-      max_thread_history_messages: 15,
-      stale_after_hours: 24,
-    },
-    data_ingest: {
-      sources: [],
-      future: [],
-    },
-    scenario_testing: {
-      description: "Default scenario testing configuration",
-      parts: [],
-    },
+    active: false,
+    last_poll: null,
+    last_sync: null,
+    watermark: null,
+    processed: [],
+    total_processed: 0,
   };
 }
 
@@ -208,19 +151,91 @@ function extractQueueItemId(queueItem: StackQueueItem): string {
   return `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function createDefaultStateSnapshot(_now: Date): Promise<SystemState> {
-  const seedState = await loadSeedState();
-  const cloned = structuredClone(seedState);
-
-  cloned.queue.pending = [];
-  cloned.queue.recently_dispatched = [];
-  cloned.confirmations.pending = [];
-  cloned.confirmations.recent = [];
-  cloned.escalation_status.active = [];
-  cloned.threads = {};
-  cloned.digests.history = [];
-
-  return cloned;
+function createDefaultStateSnapshot(now: Date): SystemState {
+  return {
+    queue: {
+      pending: [],
+      recently_dispatched: [],
+    },
+    outbound_budget_tracker: {
+      date: now,
+      by_person: {},
+      by_thread: {},
+    },
+    escalation_status: {
+      active: [],
+    },
+    calendar: {
+      events: [],
+    },
+    chores: {
+      active: [],
+      completed_recent: [],
+    },
+    finances: {
+      bills: [],
+      expenses_recent: [],
+      savings_goals: [],
+    },
+    grocery: {
+      list: [],
+      recently_purchased: [],
+    },
+    health: {
+      profiles: [],
+    },
+    pets: {
+      profiles: [],
+    },
+    school: {
+      students: [],
+      communications: [],
+    },
+    travel: {
+      trips: [],
+    },
+    vendors: {
+      records: [],
+    },
+    business: {
+      profiles: [],
+      leads: [],
+    },
+    relationship: {
+      last_nudge: {
+        date: now,
+        thread: "",
+        content: "",
+        response_received: false,
+      },
+      next_nudge_eligible: now,
+      nudge_history: [],
+    },
+    family_status: {
+      current: [],
+    },
+    meals: {
+      planned: [],
+      dietary_notes: [],
+    },
+    maintenance: {
+      assets: [],
+      items: [],
+    },
+    confirmations: {
+      pending: [],
+      recent: [],
+    },
+    threads: {},
+    data_ingest_state: {
+      email_monitor: createEmptyIngestSourceState(),
+      calendar_sync: createEmptyIngestSourceState(),
+      forwarded_messages: createEmptyIngestSourceState(),
+    },
+    digests: {
+      history: [],
+    },
+  };
 }
 
 export class SqliteStateService implements StateService {
@@ -240,12 +255,14 @@ export class SqliteStateService implements StateService {
     this.db.close();
   }
 
-  public getSystemConfig(): Promise<SystemConfig> {
+  public async getSystemConfig(): Promise<SystemConfig> {
     const snapshot = this.db.prepare("SELECT payload FROM system_configs WHERE id = 1").get() as
       | { payload: string }
       | undefined;
     if (!snapshot) {
-      return Promise.resolve(createMinimalSystemConfig());
+      const config = createMinimalSystemConfig();
+      await this.saveSystemConfig(config);
+      return config;
     }
 
     return Promise.resolve(reviveDatesFromJson<SystemConfig>(snapshot.payload));
@@ -277,7 +294,9 @@ export class SqliteStateService implements StateService {
       | { payload: string }
       | undefined;
     if (!snapshot) {
-      return createDefaultStateSnapshot(new Date());
+      const state = createDefaultStateSnapshot(new Date());
+      await this.saveSystemState(state);
+      return state;
     }
 
     const state = reviveDatesFromJson<SystemState>(snapshot.payload);
@@ -309,6 +328,7 @@ export class SqliteStateService implements StateService {
           payload: serializeForStorage(nextState),
           updated_at: nowIso,
         });
+      this.syncQueuePendingToTable(nextState.queue.pending);
     });
 
     saveSnapshot(state);
@@ -433,27 +453,12 @@ export class SqliteStateService implements StateService {
     mode: StateSnapshotMode,
     scenarioState?: SystemState,
   ): Promise<StateSnapshotEnvelope> {
-    if (mode === StateSnapshotMode.Seed) {
-      const seedConfig = await loadSeedConfig();
-      const seedState = await loadSeedState();
-      await this.saveSystemConfig(seedConfig);
-      await this.saveSystemState(seedState);
-      this.syncQueuePendingToTable(seedState.queue.pending);
-      return {
-        mode,
-        loaded_at: new Date(),
-        state: seedState,
-      };
-    }
-
     if (mode === StateSnapshotMode.Scenario) {
       if (!scenarioState) {
         throw new Error("Scenario snapshot mode requires a provided state.");
       }
-      const seedConfig = await loadSeedConfig();
-      await this.saveSystemConfig(seedConfig);
+      await this.getSystemConfig();
       await this.saveSystemState(scenarioState);
-      this.syncQueuePendingToTable(scenarioState.queue.pending);
       return {
         mode,
         loaded_at: new Date(),
@@ -461,11 +466,9 @@ export class SqliteStateService implements StateService {
       };
     }
 
-    const emptyState = await createDefaultStateSnapshot(new Date());
-    const seedConfig = await loadSeedConfig();
-    await this.saveSystemConfig(seedConfig);
+    const emptyState = createDefaultStateSnapshot(new Date());
+    await this.getSystemConfig();
     await this.saveSystemState(emptyState);
-    this.syncQueuePendingToTable(emptyState.queue.pending);
     return {
       mode: StateSnapshotMode.Empty,
       loaded_at: new Date(),

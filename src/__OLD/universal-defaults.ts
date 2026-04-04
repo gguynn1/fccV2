@@ -36,7 +36,7 @@ import {
   WorkerService,
   type SystemConfig,
   type SystemState,
-} from "../../index.js";
+} from "../index.js";
 
 // ── Config ──
 

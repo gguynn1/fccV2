@@ -1,5 +1,5 @@
-import { systemConfig } from "../_seed/system-config.js";
 import type { SystemConfig } from "../index.js";
+import { createMinimalSystemConfig } from "./minimal-system-config.js";
 
 function replaceValueInPlace(target: unknown, source: unknown): unknown {
   if (Array.isArray(target) && Array.isArray(source)) {
@@ -61,7 +61,7 @@ function replaceValueInPlace(target: unknown, source: unknown): unknown {
  * Runtime config stays mutable so long-lived services can observe admin edits
  * through existing object references without being rebuilt.
  */
-export const runtimeSystemConfig: SystemConfig = structuredClone(systemConfig);
+export const runtimeSystemConfig: SystemConfig = createMinimalSystemConfig();
 
 export function applyRuntimeSystemConfig(nextConfig: SystemConfig): SystemConfig {
   replaceValueInPlace(runtimeSystemConfig, nextConfig);

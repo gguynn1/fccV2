@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { systemConfig } from "../../_seed/system-config.js";
-import { systemState } from "../../_seed/system-state.js";
 import type { StackQueueItem } from "../../01-service-stack/types.js";
+import {
+  createTestSystemState,
+  installTestSystemConfig,
+} from "../../02-supporting-services/test-fixtures.js";
 import { QueueItemSource, TopicKey } from "../../types.js";
 import type { SystemState } from "../03-state-service/types.js";
 import { createDataIngestService } from "./index.js";
@@ -12,8 +14,8 @@ function resolved<T>(value: T): Promise<T> {
 }
 
 function createStateServiceStub() {
-  const config = structuredClone(systemConfig);
-  const state: SystemState = structuredClone(systemState);
+  const config = installTestSystemConfig();
+  const state: SystemState = createTestSystemState();
   return {
     getSystemConfig: vi.fn(() => resolved(config)),
     saveSystemConfig: vi.fn(() => resolved(undefined)),

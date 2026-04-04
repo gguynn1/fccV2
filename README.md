@@ -90,7 +90,6 @@ All project tasks run through `npm run`. Never invoke tooling directly when a sc
 ```bash
 # Application
 npm start              # Run the compiled application
-npm run start:seed     # Run and populate database from src/_seed/
 npm run dev            # Run in development with file watching
 npm run dev:all        # Start Redis + backend + admin UI dev server in one terminal
 
@@ -128,10 +127,11 @@ npm run typecheck      # backend + admin UI types clean?
 npm run lint           # backend + admin UI lint clean?
 npm run build          # compile backend to dist/
 npm run ui:build       # build admin UI to ui/dist/
-npm run start:seed     # first boot — seed database, then serve backend + /admin
+npm run bootstrap      # first boot — create minimal persisted config/state
+npm start              # serve backend + /admin
 ```
 
-Subsequent boots use `npm start` — the database is already populated.
+Subsequent boots use `npm start` — the database is already initialized.
 
 ## Development Setup
 
@@ -177,10 +177,11 @@ npm run typecheck     # verify backend + admin UI types compile clean
 npm run lint          # verify backend + admin UI lint + formatting
 npm run build         # compile backend to dist/
 npm run ui:build      # build admin UI bundle to ui/dist/
-npm run start:seed    # first boot — seed database and start server
+npm run bootstrap     # first boot — create minimal persisted config/state
+npm start             # start server
 ```
 
-For subsequent runs after the database is seeded:
+For subsequent runs after the database is initialized:
 
 ```bash
 npm run dev:all       # start Redis + backend + admin UI in one terminal (recommended)
@@ -424,12 +425,11 @@ src/
 ├── 01-service-stack/       Core pipeline (Transport → Identity → Queue → Worker → Action Router)
 ├── 02-supporting-services/ Services called by the Worker or feeding the Queue
 ├── 03-connections/         Documentation only — how services interact
-├── _seed/                  Seed data for database bootstrapping (system-config.ts, system-state.ts)
 ├── admin/                  Admin API route handlers (served at /api/admin)
 ├── config/                 Runtime system configuration loader
 ├── lib/                    Shared utilities (Redis helpers, etc.)
 ├── server.ts               Fastify server entry point — wires all services, starts listeners
-├── bootstrap.ts            Database initialization and seed loading (--seed flag)
+├── bootstrap.ts            Database initialization and first-run persistence bootstrap
 ├── env.ts                  Environment variable loading and validation
 ├── types.ts                Shared vocabulary enums (TopicKey, EscalationLevel, etc.)
 └── index.ts                Barrel exports + SystemConfig interface

@@ -716,13 +716,13 @@ function ThreadsStep({
 
 export function OnboardingGuard({ children }: OnboardingGuardProps) {
   const { data, isLoading, isError } = useConfig();
-  const { data: systemData } = useSystem();
+  const { data: systemData, isLoading: isSystemLoading, isError: isSystemError } = useSystem();
   const [step, setStep] = useState(0);
   const [savedPeople, setSavedPeople] = useState<EntityPayload[]>([]);
   const [petDrafts, setPetDrafts] = useState<PetDraft[]>([]);
   const [coupleMembers, setCoupleMembers] = useState<string[]>([]);
 
-  if (isLoading) {
+  if (isLoading || (data && !data.system.is_onboarded && isSystemLoading)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <p className="text-sm text-muted-foreground">Loading...</p>
@@ -734,6 +734,14 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <p className="text-sm text-destructive">Failed to load system configuration.</p>
+      </div>
+    );
+  }
+
+  if (data && !data.system.is_onboarded && isSystemError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <p className="text-sm text-destructive">Failed to load system metadata.</p>
       </div>
     );
   }

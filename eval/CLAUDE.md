@@ -16,7 +16,7 @@ This folder contains the current eval implementation. It is a local sequential r
 ## Current Behavior
 
 - Runs are sequential only.
-- The runner uses deterministic keyword matching in `inferTopic()` to classify messages into all 14 `TopicKey` values, plus seeded config from `src/_seed/system-config.ts`.
+- The runner uses deterministic keyword matching in `inferTopic()` to classify messages into all 14 `TopicKey` values, and reads configuration from the persisted SQLite-backed state service.
 - The current statuses are `queued`, `running`, `passed`, `prompt_fix_suggested`, `investigation_needed`, `failed`, and `regressed`.
 - `prompt_fix_suggested` means the tuner decided the failure was prompt-fixable and embedded a prompt suggestion in the run artifact.
 - `investigation_needed` means the failure touches structural behavior like topic, routing, priority, or confirmation.

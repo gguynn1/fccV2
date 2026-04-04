@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { installTestSystemConfig } from "../../02-supporting-services/test-fixtures.js";
 import { ClassifierIntent, TopicKey } from "../../types.js";
 import { createRoutingService } from "./index.js";
 
 describe("RoutingService decision table", () => {
-  const service = createRoutingService();
+  const config = installTestSystemConfig();
+  const service = createRoutingService({ threads: config.threads });
 
   it("routes responses to the origin thread", async () => {
     const target = await service.resolveTargetThread({

@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { systemConfig } from "../../_seed/system-config.js";
-import { systemState } from "../../_seed/system-state.js";
 import { type SystemState } from "../../02-supporting-services/03-state-service/types.js";
 import { createTopicProfileService } from "../../02-supporting-services/04-topic-profile-service/index.js";
 import { createRoutingService } from "../../02-supporting-services/05-routing-service/index.js";
 import { type ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
 import { ConfirmationResult } from "../../02-supporting-services/08-confirmation-service/types.js";
+import {
+  createTestSystemState,
+  installTestSystemConfig,
+} from "../../02-supporting-services/test-fixtures.js";
 import { ClassifierIntent, DispatchPriority, QueueItemSource, TopicKey } from "../../types.js";
 import type {
   IdentityResolutionResult,
@@ -21,8 +23,8 @@ function resolved<T>(value: T): Promise<T> {
 }
 
 function createStateServiceStub(threadHistory?: ThreadHistory | null) {
-  const config = structuredClone(systemConfig);
-  const state: SystemState = structuredClone(systemState);
+  const config = installTestSystemConfig();
+  const state: SystemState = createTestSystemState();
   if (threadHistory) {
     state.threads.family = threadHistory;
   }
@@ -72,9 +74,11 @@ function createRuntimeStubs(
     confirmationResolution?: ConfirmationResult | null;
   } = {},
 ) {
+  const config = installTestSystemConfig();
   const transportCalls: TransportOutboundEnvelope[] = [];
   const queuedItems: StackQueueItem[] = [];
   const stateService = createStateServiceStub();
+  const state = createTestSystemState();
   const classifier = {
     classify:
       overrides.classify ??
@@ -98,9 +102,9 @@ function createRuntimeStubs(
       },
       identity_service: createIdentityStub(),
       topic_profile_service: createTopicProfileService(),
-      routing_service: createRoutingService(),
+      routing_service: createRoutingService({ threads: config.threads }),
       budget_service: {
-        getBudgetTracker: vi.fn(() => resolved(systemState.outbound_budget_tracker)),
+        getBudgetTracker: vi.fn(() => resolved(state.outbound_budget_tracker)),
         evaluateOutbound: vi.fn(() =>
           resolved({
             priority: overrides.budgetPriority ?? DispatchPriority.Immediate,
@@ -110,7 +114,7 @@ function createRuntimeStubs(
         recordDispatch: vi.fn(() => resolved(undefined)),
       },
       escalation_service: {
-        getStatus: vi.fn(() => resolved(systemState.escalation_status)),
+        getStatus: vi.fn(() => resolved(state.escalation_status)),
         evaluate: vi.fn(() =>
           resolved(
             overrides.escalationDecision ?? {
@@ -121,7 +125,7 @@ function createRuntimeStubs(
         reconcileOnStartup: vi.fn(() => resolved([])),
       },
       confirmation_service: {
-        getState: vi.fn(() => resolved(systemState.confirmations)),
+        getState: vi.fn(() => resolved(state.confirmations)),
         requiresConfirmation: vi.fn(() => false),
         openConfirmation: vi.fn(),
         resolveFromQueueItem: vi.fn(() => resolved(overrides.confirmationResolution ?? null)),

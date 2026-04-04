@@ -374,7 +374,6 @@ export const dataIngestStateRecordSchema = z.object({
 
 export enum StateSnapshotMode {
   Empty = "empty",
-  Seed = "seed",
   Scenario = "scenario",
 }
 
