@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import type { AdminMutationResponseBase } from "@/hooks/admin-mutations";
 import { adminFetch } from "@/lib/api";
 
 export interface OutboundBudgetPayload {
@@ -22,6 +23,10 @@ export interface BudgetResponse {
   };
 }
 
+export interface UpdateBudgetResponse extends AdminMutationResponseBase {
+  dispatch: BudgetResponse["dispatch"];
+}
+
 export function useBudget() {
   return useQuery({
     queryKey: ["admin", "budget"],
@@ -34,12 +39,13 @@ export function useUpdateBudget() {
 
   return useMutation({
     mutationFn: (payload: BudgetResponse) =>
-      adminFetch("/budget", {
+      adminFetch<UpdateBudgetResponse>("/budget", {
         method: "PUT",
         body: JSON.stringify(payload),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "budget"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
     },
   });
 }

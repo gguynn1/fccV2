@@ -67,18 +67,12 @@ export class BullSchedulerService {
 
   private readonly logger: Logger;
 
-  private readonly timezone: string;
-
-  private readonly dailyRhythm: DailyRhythm;
-
   public constructor(options: SchedulerServiceOptions) {
     this.queue = new Queue<ScheduledEvent>(SCHEDULER_JOB_QUEUE, {
       connection: toRedisConnection(options.redis_url),
     });
     this.stateService = options.state_service;
     this.logger = options.logger ?? DEFAULT_LOGGER;
-    this.timezone = options.timezone;
-    this.dailyRhythm = options.daily_rhythm;
   }
 
   public async start(): Promise<void> {
@@ -90,7 +84,7 @@ export class BullSchedulerService {
         id: "morning_digest_tick",
         type: ScheduledEventType.MorningDigest,
         due_at: new Date(),
-        payload: { timezone: this.timezone },
+        payload: { timezone: this.getTimezone() },
       },
       {
         repeat: {
@@ -104,7 +98,7 @@ export class BullSchedulerService {
         id: "evening_checkin_tick",
         type: ScheduledEventType.EveningCheckin,
         due_at: new Date(),
-        payload: { timezone: this.timezone },
+        payload: { timezone: this.getTimezone() },
       },
       {
         repeat: {
@@ -172,7 +166,7 @@ export class BullSchedulerService {
     window: SchedulerTickWindow,
   ): Promise<PendingQueueItem[]> {
     const state = await this.stateService.getSystemState();
-    const eligibility = this.dailyRhythm.digest_eligibility;
+    const eligibility = this.getDailyRhythm().digest_eligibility;
     const relevantEntityIds = new Set(window.entity_ids);
     const dispatchedIds = new Set(
       eligibility.exclude_already_dispatched
@@ -309,8 +303,8 @@ export class BullSchedulerService {
     ] as const) {
       const block =
         type === ScheduledEventType.MorningDigest
-          ? this.dailyRhythm.morning_digest
-          : this.dailyRhythm.evening_checkin;
+          ? this.getDailyRhythm().morning_digest
+          : this.getDailyRhythm().evening_checkin;
       for (const [entityId, time] of Object.entries(block.times)) {
         if (time === null) {
           continue;
@@ -345,8 +339,8 @@ export class BullSchedulerService {
   ): string[] {
     const block =
       type === ScheduledEventType.MorningDigest
-        ? this.dailyRhythm.morning_digest
-        : this.dailyRhythm.evening_checkin;
+        ? this.getDailyRhythm().morning_digest
+        : this.getDailyRhythm().evening_checkin;
     const clock = formatClock(referenceTime);
     return Object.entries(block.times)
       .filter(([, time]) => time === clock)
@@ -397,6 +391,14 @@ export class BullSchedulerService {
 
     const fallback = runtimeSystemConfig.entities.find((entity) => entity.type !== EntityType.Pet);
     return fallback ? [fallback.id] : [];
+  }
+
+  private getDailyRhythm(): DailyRhythm {
+    return runtimeSystemConfig.daily_rhythm;
+  }
+
+  private getTimezone(): string {
+    return runtimeSystemConfig.system.timezone;
   }
 }
 

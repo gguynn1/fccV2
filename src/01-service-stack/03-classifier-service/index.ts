@@ -14,7 +14,7 @@ import {
 } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "classifier-service" });
-const DEFAULT_MODEL = "claude-3-5-sonnet-latest";
+const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 const DEFAULT_CONTEXT_WINDOW_LIMIT = 12;
 
 export interface ClaudeClassifierOptions extends ClassifierServiceOptions {

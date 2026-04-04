@@ -1,9 +1,13 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
+import { PageModeBanner } from "@/components/page-mode-banner";
+import { ReconciliationSummary } from "@/components/reconciliation-summary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   Table,
@@ -15,16 +19,41 @@ import {
 } from "@/components/ui/table";
 import { useEntities, useUpdateEntities, type EntityPayload } from "@/hooks/use-entities";
 import { useSystem } from "@/hooks/use-system";
-import { EntityType } from "@/lib/constants";
+import { ADULT_PERMISSIONS, CHILD_PERMISSIONS, EntityType } from "@/lib/constants";
 
 function permissionLabel(p: string): string {
   return p.replace(/_/g, " ");
+}
+
+function deriveEntityId(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function uniqueEntityId(name: string, existingIds: Set<string>): string {
+  const base = deriveEntityId(name);
+  if (!existingIds.has(base)) {
+    return base;
+  }
+
+  let index = 2;
+  while (existingIds.has(`${base}_${index}`)) {
+    index += 1;
+  }
+  return `${base}_${index}`;
 }
 
 export function EntitiesRoute() {
   const { data, isLoading } = useEntities();
   const { data: systemData } = useSystem();
   const mutation = useUpdateEntities();
+  const [newPersonName, setNewPersonName] = useState("");
+  const [newPersonIdentity, setNewPersonIdentity] = useState("");
+  const [newPersonType, setNewPersonType] = useState<typeof EntityType.Adult | typeof EntityType.Child>(
+    EntityType.Adult,
+  );
+  const [newPetName, setNewPetName] = useState("");
+  const [newPetSpecies, setNewPetSpecies] = useState("");
+  const [newPetRoutesTo, setNewPetRoutesTo] = useState<string[]>([]);
 
   const saveEntity = useCallback(
     (index: number, patch: Partial<EntityPayload>) => {
@@ -88,6 +117,14 @@ export function EntitiesRoute() {
     [data, saveEntity],
   );
 
+  const removeEntity = useCallback(
+    (entityId: string) => {
+      if (!data) return;
+      mutation.mutate(data.entities.filter((entity) => entity.id !== entityId));
+    },
+    [data, mutation],
+  );
+
   if (isLoading || !data) {
     return <p className="text-sm text-muted-foreground">Loading entities…</p>;
   }
@@ -97,6 +134,79 @@ export function EntitiesRoute() {
   const people = data.entities.filter((e) => e.type !== EntityType.Pet);
   const pets = data.entities.filter((e) => e.type === EntityType.Pet);
   const personIds = people.map((p) => p.id);
+  const existingIds = new Set(data.entities.map((entity) => entity.id));
+  const existingIdentities = new Set(
+    data.entities
+      .map((entity) => entity.messaging_identity?.trim())
+      .filter((identity): identity is string => Boolean(identity)),
+  );
+
+  const addPerson = () => {
+    const trimmedName = newPersonName.trim();
+    const trimmedIdentity = newPersonIdentity.trim();
+    if (trimmedName.length === 0 || trimmedIdentity.length === 0 || existingIdentities.has(trimmedIdentity)) {
+      return;
+    }
+
+    const nextEntity: EntityPayload = {
+      id: uniqueEntityId(trimmedName, existingIds),
+      type: newPersonType,
+      name: trimmedName,
+      messaging_identity: trimmedIdentity,
+      permissions:
+        newPersonType === EntityType.Adult ? [...ADULT_PERMISSIONS] : [...CHILD_PERMISSIONS],
+      digest: {
+        morning: newPersonType === EntityType.Adult ? "07:00" : "07:30",
+        evening: newPersonType === EntityType.Adult ? "20:00" : null,
+      },
+    };
+
+    mutation.mutate([...data.entities, nextEntity], {
+      onSuccess: () => {
+        setNewPersonName("");
+        setNewPersonIdentity("");
+        setNewPersonType(EntityType.Adult);
+      },
+    });
+  };
+
+  const toggleNewPetRoute = (personId: string) => {
+    setNewPetRoutesTo((current) =>
+      current.includes(personId) ? current.filter((id) => id !== personId) : [...current, personId],
+    );
+  };
+
+  const addPet = () => {
+    const trimmedName = newPetName.trim();
+    const trimmedSpecies = newPetSpecies.trim();
+    if (trimmedName.length === 0 || trimmedSpecies.length === 0 || newPetRoutesTo.length === 0) {
+      return;
+    }
+
+    const nextEntity: EntityPayload = {
+      id: uniqueEntityId(trimmedName, existingIds),
+      type: EntityType.Pet,
+      name: trimmedName,
+      messaging_identity: null,
+      permissions: [],
+      profile: {
+        species: trimmedSpecies,
+        breed: null,
+        vet: null,
+        medications: [],
+        care_schedule: [],
+      },
+      routes_to: newPetRoutesTo,
+    };
+
+    mutation.mutate([...data.entities, nextEntity], {
+      onSuccess: () => {
+        setNewPetName("");
+        setNewPetSpecies("");
+        setNewPetRoutesTo([]);
+      },
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -105,6 +215,110 @@ export function EntitiesRoute() {
         <p className="text-sm text-muted-foreground">
           Participants, permissions, and thread assignments.
         </p>
+      </div>
+      <PageModeBanner
+        mode="editable"
+        detail="Add, remove, and edit entities inline. Required roots are enforced server-side, and dependent queue or history references are auto-cleaned."
+      />
+      <ReconciliationSummary result={mutation.data} />
+      {mutation.error instanceof Error && (
+        <Card className="border-destructive/40">
+          <CardContent className="pt-6 text-sm text-destructive">{mutation.error.message}</CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Add Person</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+              <Input
+                value={newPersonName}
+                onChange={(event) => setNewPersonName(event.target.value)}
+                placeholder="Name"
+              />
+              <Select
+                value={newPersonType}
+                onChange={(event) =>
+                  setNewPersonType(event.target.value as typeof newPersonType)
+                }
+              >
+                <option value={EntityType.Adult}>Adult</option>
+                <option value={EntityType.Child}>Child</option>
+              </Select>
+            </div>
+            <Input
+              value={newPersonIdentity}
+              onChange={(event) => setNewPersonIdentity(event.target.value)}
+              placeholder="Messaging identity"
+            />
+            <Button
+              type="button"
+              onClick={addPerson}
+              disabled={
+                mutation.isPending ||
+                newPersonName.trim().length === 0 ||
+                newPersonIdentity.trim().length === 0 ||
+                existingIdentities.has(newPersonIdentity.trim())
+              }
+            >
+              Add Person
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Add Pet</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input
+                value={newPetName}
+                onChange={(event) => setNewPetName(event.target.value)}
+                placeholder="Pet name"
+              />
+              <Input
+                value={newPetSpecies}
+                onChange={(event) => setNewPetSpecies(event.target.value)}
+                placeholder="Species"
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Routes To</p>
+              <div className="flex flex-wrap gap-1">
+                {people.map((person) => {
+                  const selected = newPetRoutesTo.includes(person.id);
+                  return (
+                    <Button
+                      key={person.id}
+                      type="button"
+                      size="sm"
+                      variant={selected ? "default" : "outline"}
+                      onClick={() => toggleNewPetRoute(person.id)}
+                    >
+                      {person.name}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+            <Button
+              type="button"
+              onClick={addPet}
+              disabled={
+                mutation.isPending ||
+                newPetName.trim().length === 0 ||
+                newPetSpecies.trim().length === 0 ||
+                newPetRoutesTo.length === 0
+              }
+            >
+              Add Pet
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -120,6 +334,7 @@ export function EntitiesRoute() {
                 <TableHead>Type</TableHead>
                 <TableHead>Messaging Identity *</TableHead>
                 <TableHead>Threads</TableHead>
+                <TableHead className="text-right">Remove</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -158,6 +373,17 @@ export function EntitiesRoute() {
                           </Badge>
                         ))}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeEntity(entity.id)}
+                        disabled={mutation.isPending}
+                      >
+                        Remove
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -333,6 +559,7 @@ export function EntitiesRoute() {
                       <TableCell key={p} className="text-center">
                         <Switch
                           checked={has}
+                          disabled={entity.type === EntityType.Pet}
                           onCheckedChange={(checked) => togglePermission(idx, p, checked)}
                         />
                       </TableCell>

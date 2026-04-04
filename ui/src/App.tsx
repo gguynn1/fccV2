@@ -12,6 +12,7 @@ import { EntitiesRoute } from "@/routes/entities";
 import { EvalRoute } from "@/routes/eval";
 import { QueueRoute } from "@/routes/queue";
 import { SchedulerRoute } from "@/routes/scheduler";
+import { StateRoute } from "@/routes/state";
 import { ThreadsRoute } from "@/routes/threads";
 import { TopicsRoute } from "@/routes/topics";
 
@@ -40,6 +41,7 @@ export function App() {
               <Route path="/scheduler" element={<SchedulerRoute />} />
               <Route path="/queue" element={<QueueRoute />} />
               <Route path="/activity" element={<ActivityRoute />} />
+              <Route path="/state" element={<StateRoute />} />
               <Route path="/eval" element={<EvalRoute />} />
               <Route path="/emulation" element={<EmulationRoute />} />
             </Routes>

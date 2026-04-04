@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
+import { PageModeBanner } from "@/components/page-mode-banner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -116,6 +117,10 @@ export function SchedulerRoute() {
           Digest windows, timing, and eligibility rules.
         </p>
       </div>
+      <PageModeBanner
+        mode="editable"
+        detail="Scheduler edits apply live. Changes here are synchronized back to per-entity digest settings."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <DigestBlock

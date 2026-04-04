@@ -43,23 +43,17 @@ function toResponsibleAdultIdForPet(entityId: string): string | null {
 }
 
 export class StaticRoutingService implements RoutingService {
-  private readonly threads: Thread[];
-
-  private readonly threadById: Map<string, Thread>;
-
   private readonly contextPolicy: ContextTransitionPolicy;
 
   private readonly logger: Logger;
 
   public constructor(options?: RoutingServiceOptions) {
-    this.threads = options?.threads ?? runtimeSystemConfig.threads;
-    this.threadById = new Map(this.threads.map((thread) => [thread.id, thread]));
     this.contextPolicy = options?.context_transition_policy ?? DEFAULT_CONTEXT_TRANSITION_POLICY;
     this.logger = options?.logger ?? DEFAULT_LOGGER;
   }
 
   public getThreadDefinitions(): Promise<Thread[]> {
-    return Promise.resolve(this.threads);
+    return Promise.resolve(this.getThreads());
   }
 
   public resolveTargetThread(request: RoutingRequest): Promise<string> {
@@ -105,8 +99,10 @@ export class StaticRoutingService implements RoutingService {
   }
 
   private buildResponseTarget(originThread: string): ThreadTarget {
-    const fallbackThread = this.threads[0]?.id ?? originThread;
-    const targetThread = this.threadById.has(originThread) ? originThread : fallbackThread;
+    const threads = this.getThreads();
+    const threadById = new Map(threads.map((thread) => [thread.id, thread]));
+    const fallbackThread = threads[0]?.id ?? originThread;
+    const targetThread = threadById.has(originThread) ? originThread : fallbackThread;
     return {
       thread_id: targetThread,
       rule_applied: RoutingRule.ResponseInPlace,
@@ -121,13 +117,14 @@ export class StaticRoutingService implements RoutingService {
       return privateIfSingle;
     }
 
-    const candidates = this.threads
+    const threads = this.getThreads();
+    const candidates = threads
       .filter((thread) => thread.type === ThreadType.Shared)
       .filter((thread) =>
         normalizedConcerning.every((entity) => thread.participants.includes(entity)),
       )
       .sort((a, b) => a.participants.length - b.participants.length);
-    const selected = candidates[0] ?? this.threads.find((thread) => thread.id === "family");
+    const selected = candidates[0] ?? threads.find((thread) => thread.id === "family");
     if (!selected) {
       throw new Error("No routing thread available for proactive message.");
     }
@@ -160,7 +157,7 @@ export class StaticRoutingService implements RoutingService {
     }
 
     const privateThreadId = `${only}_private`;
-    const existing = this.threadById.get(privateThreadId);
+    const existing = this.getThreads().find((thread) => thread.id === privateThreadId);
     if (existing && existing.type === ThreadType.Private) {
       return {
         thread_id: existing.id,
@@ -170,6 +167,10 @@ export class StaticRoutingService implements RoutingService {
     }
 
     return null;
+  }
+
+  private getThreads(): Thread[] {
+    return runtimeSystemConfig.threads;
   }
 }
 

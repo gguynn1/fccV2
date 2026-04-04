@@ -101,21 +101,45 @@ export class StaticTopicProfileService {
   }
 
   public composeMessage(decision: WorkerDecision): Promise<string> {
-    const profile = this.getProfile(decision.classification.topic);
-    const content =
-      typeof decision.queue_item.content === "string"
-        ? decision.queue_item.content
-        : JSON.stringify(decision.queue_item.content);
-    const framing = [
-      `Tone: ${profile.tone}.`,
-      `Format: ${profile.format}.`,
-      `Initiative: ${profile.initiative_style}.`,
-      `Response shape: ${profile.response_format}.`,
-    ];
-    if (profile.framework_grounding) {
-      framing.push(`Grounding: ${profile.framework_grounding}.`);
+    const topic = decision.classification.topic;
+    const intent = decision.classification.intent;
+    const content = this.readContentText(decision.queue_item.content);
+
+    if (topic === TopicKey.Grocery) {
+      if (intent === ClassifierIntent.Query) {
+        return Promise.resolve("Here is your grocery list right now.");
+      }
+      if (intent === ClassifierIntent.Cancellation) {
+        return Promise.resolve("Okay, I removed that from the grocery list.");
+      }
+      return Promise.resolve(`Added to the grocery list: ${content}`);
     }
-    return Promise.resolve(`${framing.join(" ")} Content: ${content}`);
+
+    if (intent === ClassifierIntent.Query) {
+      return Promise.resolve("Got it. I will check and share an update.");
+    }
+    if (intent === ClassifierIntent.Cancellation) {
+      return Promise.resolve("Okay, canceled.");
+    }
+    if (intent === ClassifierIntent.Completion) {
+      return Promise.resolve("Great, marked complete.");
+    }
+    if (intent === ClassifierIntent.Confirmation) {
+      return Promise.resolve("Understood.");
+    }
+    return Promise.resolve("Got it. I will take care of that.");
+  }
+
+  private readContentText(content: StackQueueItem["content"]): string {
+    if (typeof content === "string") {
+      return content.trim();
+    }
+    if (typeof content === "object" && content !== null) {
+      if ("summary" in content && typeof content.summary === "string") {
+        return content.summary.trim();
+      }
+    }
+    return "your request";
   }
 
   private toTopicFromThread(threadHistory: ThreadHistory | null): TopicKey {

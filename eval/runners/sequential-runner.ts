@@ -186,6 +186,7 @@ function inferIntent(message: string): ClassifierIntent {
     normalized.includes("reschedule") ||
     normalized.includes(" is due ") ||
     normalized.includes(" is confirmed ") ||
+    normalized.includes(" is ready ") ||
     normalized.startsWith("replace ")
   ) {
     return ClassifierIntent.Update;

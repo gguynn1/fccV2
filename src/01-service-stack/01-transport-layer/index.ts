@@ -7,7 +7,10 @@ import { pino, type Logger } from "pino";
 import twilio from "twilio";
 
 import { ThreadType } from "../../02-supporting-services/05-routing-service/types.js";
-import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
+import {
+  runtimeSystemConfig,
+  runtimeSystemConfigVersion,
+} from "../../config/runtime-system-config.js";
 import { toRedisConnection } from "../../lib/redis.js";
 import { QueueItemSource } from "../../types.js";
 import type { QueueConsumerOptions } from "../04-queue/types.js";
@@ -66,6 +69,8 @@ export class TwilioTransportLayer {
 
   private readonly privateThreadByParticipantId: Map<string, string>;
 
+  private lastSeenConfigVersion: number;
+
   private readonly outboundQueue: Queue<TransportOutboundMessage>;
 
   private readonly outboundWorker: Worker<TransportOutboundMessage>;
@@ -84,6 +89,7 @@ export class TwilioTransportLayer {
     this.entityIdByIdentity = new Map();
     this.participantIdentityById = new Map();
     this.privateThreadByParticipantId = new Map();
+    this.lastSeenConfigVersion = -1;
     this.outboundQueue = new Queue<TransportOutboundMessage>(DEFAULT_OUTBOUND_QUEUE_NAME, {
       connection: toRedisConnection(options.redis_url),
     });
@@ -96,7 +102,7 @@ export class TwilioTransportLayer {
         connection: toRedisConnection(options.redis_url),
       },
     );
-    this.initializeThreadParticipantMaps();
+    this.refreshMapsIfStale();
   }
 
   public registerRoutes(fastify: FastifyInstance, queue: TransportLayerQueue): void {
@@ -186,6 +192,7 @@ export class TwilioTransportLayer {
   }
 
   private isKnownParticipant(from: string | undefined): boolean {
+    this.refreshMapsIfStale();
     return typeof from === "string" && this.entityIdByIdentity.has(from);
   }
 
@@ -211,6 +218,7 @@ export class TwilioTransportLayer {
   }
 
   private async normalizeInboundPayload(payload: FormPayload): Promise<TransportInboundInput> {
+    this.refreshMapsIfStale();
     const parsed = twilioInboundPayloadSchema.parse(payload);
     const body = (payload.Body ?? "").trim();
     const participantId = this.entityIdByIdentity.get(parsed.From);
@@ -374,6 +382,7 @@ export class TwilioTransportLayer {
   }
 
   private parseDeliveryStatus(payload: FormPayload, request: FastifyRequest): DeliveryStatusUpdate {
+    this.refreshMapsIfStale();
     const parsed = twilioStatusPayloadSchema.parse(payload);
     const status = this.toDeliveryStatus(parsed.MessageStatus);
     const threadFromQuery = this.readQueryValue(request, "thread_id");
@@ -415,6 +424,7 @@ export class TwilioTransportLayer {
   }
 
   private async sendOutboundDirect(message: TransportOutboundMessage): Promise<void> {
+    this.refreshMapsIfStale();
     const participantIds = this.resolveParticipantsForThread(message.target_thread);
     const callbackBase = this.publicBaseUrl ?? `http://localhost:${process.env.PORT ?? "3000"}`;
 
@@ -443,7 +453,15 @@ export class TwilioTransportLayer {
     return thread.participants;
   }
 
-  private initializeThreadParticipantMaps(): void {
+  private refreshMapsIfStale(): void {
+    if (this.lastSeenConfigVersion === runtimeSystemConfigVersion) {
+      return;
+    }
+    this.lastSeenConfigVersion = runtimeSystemConfigVersion;
+
+    this.entityIdByIdentity.clear();
+    this.participantIdentityById.clear();
+    this.privateThreadByParticipantId.clear();
     for (const entity of runtimeSystemConfig.entities) {
       if (entity.messaging_identity !== null) {
         this.entityIdByIdentity.set(entity.messaging_identity, entity.id);

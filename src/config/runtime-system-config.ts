@@ -63,7 +63,15 @@ function replaceValueInPlace(target: unknown, source: unknown): unknown {
  */
 export const runtimeSystemConfig: SystemConfig = createMinimalSystemConfig();
 
+/**
+ * Monotonically increasing counter bumped by every applyRuntimeSystemConfig call.
+ * Services that cache derived data (e.g. transport participant maps) compare
+ * against this to rebuild only when config actually changes.
+ */
+export let runtimeSystemConfigVersion = 0;
+
 export function applyRuntimeSystemConfig(nextConfig: SystemConfig): SystemConfig {
   replaceValueInPlace(runtimeSystemConfig, nextConfig);
+  runtimeSystemConfigVersion += 1;
   return runtimeSystemConfig;
 }

@@ -2,15 +2,15 @@ import { ClassifierIntent, DispatchPriority, TopicKey } from "../../../src/index
 import type { EvalScenarioDefinition } from "../../types.js";
 
 // Generated from the Eval page. Edit this file; it is loaded automatically from eval/scenarios/generated/.
-export const generatedScenarioSet20260404t045227zName = "generated-scenario-set-20260404t045227z";
+export const generatedScenarioSet20260404t054528zName = "generated-scenario-set-20260404t054528z";
 
-export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefinition[] = [
+export const generatedScenarioSet20260404t054528zScenarios: EvalScenarioDefinition[] = [
   {
-    id: "generated-scenario-set-20260404t045227z-calendar-query",
+    id: "generated-scenario-set-20260404t054528z-calendar-query",
     title: "Calendar query stays in the family thread",
     category: "classification",
     prompt_input: {
-      message: "Do we have anything scheduled Sunday afternoon?",
+      message: "What's on the calendar Saturday?",
       concerning: ["participant_1", "participant_2"],
       origin_thread: "family",
     },
@@ -20,18 +20,18 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
       target_thread: "family",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["schedule", "sunday"],
+      tone_markers: ["schedule", "saturday"],
       format_markers: ["summary"],
     },
     notes:
       "Generated scaffold. Verify that the message and markers still match the intended behavior.",
   },
   {
-    id: "generated-scenario-set-20260404t045227z-grocery-add",
+    id: "generated-scenario-set-20260404t054528z-grocery-add",
     title: "Grocery additions remain list-focused in the family thread",
     category: "routing",
     prompt_input: {
-      message: "Add eggs and yogurt to the list",
+      message: "Add cereal and bananas to the grocery list",
       concerning: ["participant_1", "participant_2", "participant_3"],
       origin_thread: "family",
     },
@@ -46,11 +46,11 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-finance-confirmation",
+    id: "generated-scenario-set-20260404t054528z-finance-confirmation",
     title: "Financial actions ask for confirmation in the couple thread",
     category: "confirmation",
     prompt_input: {
-      message: "Pay the electric bill tomorrow",
+      message: "Pay the water bill on Monday morning",
       concerning: ["participant_1", "participant_2"],
       origin_thread: "couple",
     },
@@ -65,11 +65,11 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-business-draft",
+    id: "generated-scenario-set-20260404t054528z-business-draft",
     title: "Business drafts stay in the owner's private thread",
     category: "composition",
     prompt_input: {
-      message: "Draft a warm reply to the client about pricing",
+      message: "Draft a reply to the new portrait inquiry and keep it warm",
       concerning: ["participant_2"],
       origin_thread: "participant_2_private",
     },
@@ -84,11 +84,11 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-vendor-update",
+    id: "generated-scenario-set-20260404t054528z-vendor-update",
     title: "Vendor scheduling remains a vendor update",
     category: "pipeline",
     prompt_input: {
-      message: "The electrician can come Thursday afternoon",
+      message: "The electrician can come Wednesday afternoon",
       concerning: ["participant_1"],
       origin_thread: "participant_1_private",
     },
@@ -98,16 +98,16 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
       target_thread: "participant_1_private",
       priority: DispatchPriority.Batched,
       confirmation_required: false,
-      tone_markers: ["vendor", "thursday"],
+      tone_markers: ["vendor", "wednesday"],
       format_markers: ["record"],
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-school-query",
+    id: "generated-scenario-set-20260404t054528z-school-query",
     title: "School queries route to the child's private thread",
     category: "classification",
     prompt_input: {
-      message: "What homework is due this week from school?",
+      message: "When is the next school field trip?",
       concerning: ["participant_3"],
       origin_thread: "family",
     },
@@ -117,54 +117,54 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
       target_thread: "participant_3_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["school", "homework"],
+      tone_markers: ["school", "field trip"],
       format_markers: ["summary"],
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-health-update",
+    id: "generated-scenario-set-20260404t054528z-health-update",
     title: "Health updates stay in the participant's private thread",
     category: "routing",
     prompt_input: {
-      message: "Prescription refill is ready at the doctor",
+      message: "The doctor checkup is confirmed for Monday morning",
       concerning: ["participant_1"],
       origin_thread: "participant_1_private",
     },
     expected: {
       topic: TopicKey.Health,
-      intent: ClassifierIntent.Request,
+      intent: ClassifierIntent.Update,
       target_thread: "participant_1_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["prescription", "doctor"],
+      tone_markers: ["appointment", "checkup"],
       format_markers: ["record"],
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-meals-request",
+    id: "generated-scenario-set-20260404t054528z-meals-request",
     title: "Meal planning stays in the family thread",
     category: "composition",
     prompt_input: {
-      message: "What should we eat for dinner tonight?",
+      message: "Plan a meal for Saturday dinner",
       concerning: ["participant_1", "participant_2"],
       origin_thread: "family",
     },
     expected: {
       topic: TopicKey.Meals,
-      intent: ClassifierIntent.Query,
+      intent: ClassifierIntent.Request,
       target_thread: "family",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["dinner", "meal"],
+      tone_markers: ["meal", "dinner"],
       format_markers: ["list"],
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-chores-request",
+    id: "generated-scenario-set-20260404t054528z-chores-request",
     title: "Chore assignments route to the assignee's thread",
     category: "pipeline",
     prompt_input: {
-      message: "Clean your room and tidy up before Friday",
+      message: "Take out the trash before Thursday morning",
       concerning: ["participant_3"],
       origin_thread: "family",
     },
@@ -174,26 +174,26 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
       target_thread: "participant_3_private",
       priority: DispatchPriority.Batched,
       confirmation_required: false,
-      tone_markers: ["chore", "clean"],
+      tone_markers: ["chore", "trash"],
       format_markers: ["task"],
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-maintenance-update",
+    id: "generated-scenario-set-20260404t054528z-maintenance-update",
     title: "Maintenance records stay in the owner's private thread",
     category: "routing",
     prompt_input: {
-      message: "Schedule the gutter cleaning for Saturday",
+      message: "Replace the furnace air filter this weekend",
       concerning: ["participant_1"],
       origin_thread: "participant_1_private",
     },
     expected: {
       topic: TopicKey.Maintenance,
-      intent: ClassifierIntent.Request,
+      intent: ClassifierIntent.Update,
       target_thread: "participant_1_private",
       priority: DispatchPriority.Batched,
       confirmation_required: false,
-      tone_markers: ["maintenance", "gutter"],
+      tone_markers: ["maintenance", "air filter"],
       format_markers: ["record"],
     },
   },

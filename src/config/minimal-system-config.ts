@@ -298,8 +298,11 @@ const defaultTopics: SystemConfig["topics"] = {
 const defaultDispatch: SystemConfig["dispatch"] = {
   priority_levels: {
     immediate: {
-      description: "Time-sensitive. Send now regardless of batching.",
+      description:
+        "Near real-time. Participant-initiated inbound requests and time-sensitive items send now.",
       examples: [
+        "participant asks to add apples to grocery list",
+        "participant asks what's on the calendar",
         "pickup in 30 min",
         "bill due today",
         "calendar conflict detected",
@@ -307,7 +310,8 @@ const defaultDispatch: SystemConfig["dispatch"] = {
       ],
     },
     batched: {
-      description: "Important but not urgent. Hold for next digest or quiet window.",
+      description:
+        "Important but not urgent. Primarily proactive/system-generated outbound held for digest or quiet window.",
       examples: [
         "chore reminder for later today",
         "savings update",
@@ -325,7 +329,7 @@ const defaultDispatch: SystemConfig["dispatch"] = {
     max_messages_per_thread_per_hour: 2,
     batch_window_minutes: 30,
     description:
-      "If multiple batched items are pending for the same person or thread within the batch window, combine them into one message.",
+      "If multiple batched proactive items are pending for the same person or thread within the batch window, combine them into one message. Participant-initiated inbound requests should remain near real-time.",
   },
   routing_rules: {
     rule_1:

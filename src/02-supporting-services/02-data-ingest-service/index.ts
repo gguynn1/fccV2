@@ -31,6 +31,7 @@ const DEFAULT_LOGGER = pino({ name: "data-ingest-service" });
 const DEFAULT_RELEVANCE_WINDOW_MINUTES = 120;
 const DEFAULT_IMAP_RECONNECT_DELAY_MS = 15_000;
 const DEFAULT_HISTORY_LIMIT = 50;
+const DEFAULT_EXTRACTION_MODEL = "claude-sonnet-4-20250514";
 
 export interface InboxMessage {
   message_id: string;
@@ -48,6 +49,7 @@ export interface DataIngestServiceOptions {
   classifier?: Pick<ClassifierServiceContract, "classify">;
   queue_service?: { enqueue(item: StackQueueItem): Promise<void> };
   anthropic_api_key?: string;
+  extraction_model?: string;
   config?: DataIngestConfig;
   logger?: Logger;
   relevance_window_minutes?: number;
@@ -158,6 +160,8 @@ export class DataIngestService implements DataIngestServiceContract {
 
   private readonly anthropic?: Anthropic;
 
+  private readonly extractionModel: string;
+
   private readonly logger: Logger;
 
   private readonly config: DataIngestConfig;
@@ -175,6 +179,7 @@ export class DataIngestService implements DataIngestServiceContract {
     this.anthropic = options.anthropic_api_key
       ? new Anthropic({ apiKey: options.anthropic_api_key })
       : undefined;
+    this.extractionModel = options.extraction_model ?? DEFAULT_EXTRACTION_MODEL;
     this.logger = options.logger ?? DEFAULT_LOGGER;
     this.config = options.config ?? runtimeSystemConfig.data_ingest;
     this.relevanceWindowMinutes =
@@ -376,7 +381,7 @@ export class DataIngestService implements DataIngestServiceContract {
       }
 
       const response = await this.anthropic.messages.create({
-        model: "claude-3-5-sonnet-latest",
+        model: this.extractionModel,
         max_tokens: 350,
         temperature: 0,
         messages: [

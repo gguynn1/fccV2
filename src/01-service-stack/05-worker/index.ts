@@ -1,16 +1,28 @@
 import { pino, type Logger } from "pino";
 
+import { CalendarEventStatus } from "../../02-supporting-services/04-topic-profile-service/04.01-calendar/types.js";
+import { ChoreStatus } from "../../02-supporting-services/04-topic-profile-service/04.02-chores/types.js";
 import { HealthProviderType } from "../../02-supporting-services/04-topic-profile-service/04.05-health/types.js";
 import { PetCareCategory } from "../../02-supporting-services/04-topic-profile-service/04.06-pets/types.js";
-import { SchoolInputSource } from "../../02-supporting-services/04-topic-profile-service/04.07-school/types.js";
+import {
+  AssignmentStatus,
+  SchoolInputSource,
+} from "../../02-supporting-services/04-topic-profile-service/04.07-school/types.js";
 import {
   TravelInputSource,
   TripStatus,
 } from "../../02-supporting-services/04-topic-profile-service/04.08-travel/types.js";
-import { BusinessLeadStatus } from "../../02-supporting-services/04-topic-profile-service/04.10-business/types.js";
+import {
+  BookingStatus,
+  BusinessLeadStatus,
+  BusinessPipelineStage,
+} from "../../02-supporting-services/04-topic-profile-service/04.10-business/types.js";
 import { NudgeType } from "../../02-supporting-services/04-topic-profile-service/04.11-relationship/types.js";
 import { extractGroceryItemsFromMealDescription } from "../../02-supporting-services/04-topic-profile-service/04.13-meals/profile.js";
-import { MealType } from "../../02-supporting-services/04-topic-profile-service/04.13-meals/types.js";
+import {
+  MealPlanStatus,
+  MealType,
+} from "../../02-supporting-services/04-topic-profile-service/04.13-meals/types.js";
 import {
   MaintenanceAssetType,
   MaintenanceStatus,
@@ -38,6 +50,9 @@ import {
   ClarificationReason,
   ClassifierIntent,
   DispatchPriority,
+  EntityType,
+  GrocerySection,
+  InputMethod,
   QueueItemSource,
   TopicKey,
 } from "../../types.js";
@@ -74,6 +89,19 @@ const DEFAULT_MAX_THREAD_HISTORY_MESSAGES = 15;
 const DEFAULT_STALE_AFTER_HOURS = 24;
 const DEFAULT_URGENT_RELEVANCE_MINUTES = 120;
 const HISTORY_LIMIT = 40;
+const CLARIFICATION_PROMPTS = [
+  "Which event should I cancel?",
+  "What should I move it to?",
+  "What date and time should I put on the calendar?",
+  "Which chore did you complete?",
+  "Which chore should I cancel?",
+  "What amount should I log?",
+  "What should I add to the list?",
+  "When is the appointment?",
+  "When is it due?",
+  "What dates should I use for the trip?",
+  "Who should this be for?",
+];
 
 interface WorkerIdentityService {
   resolve(item: StackQueueItem): Promise<IdentityResolutionResult>;
@@ -135,10 +163,80 @@ function toCollisionPolicy(): CollisionPolicy {
 }
 
 function extractDateHint(content: string, fallback: Date): Date | null {
+  const normalized = content.trim();
   const isoMatch = content.match(/\b(20\d{2}-\d{2}-\d{2})\b/u);
   if (isoMatch?.[1]) {
     const parsed = new Date(`${isoMatch[1]}T12:00:00.000Z`);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const mdTimeMatch = normalized.match(
+    /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?:\s+at)?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/iu,
+  );
+  if (mdTimeMatch) {
+    const month = Number(mdTimeMatch[1]);
+    const day = Number(mdTimeMatch[2]);
+    const yearRaw = mdTimeMatch[3];
+    const year = yearRaw
+      ? yearRaw.length === 2
+        ? 2000 + Number(yearRaw)
+        : Number(yearRaw)
+      : fallback.getFullYear();
+    const hour12 = Number(mdTimeMatch[4]);
+    const minute = mdTimeMatch[5] ? Number(mdTimeMatch[5]) : 0;
+    const meridiem = mdTimeMatch[6]?.toLowerCase();
+    const hour24 =
+      meridiem === "pm" ? (hour12 % 12) + 12 : meridiem === "am" ? hour12 % 12 : hour12;
+    const parsed = new Date(year, month - 1, day, hour24, minute, 0, 0);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const mdMatch = normalized.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/u);
+  if (mdMatch) {
+    const month = Number(mdMatch[1]);
+    const day = Number(mdMatch[2]);
+    const yearRaw = mdMatch[3];
+    const year = yearRaw
+      ? yearRaw.length === 2
+        ? 2000 + Number(yearRaw)
+        : Number(yearRaw)
+      : fallback.getFullYear();
+    const parsed = new Date(year, month - 1, day, 12, 0, 0, 0);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const monthNameMatch = normalized.match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,\s*(\d{4}))?(?:\s+at)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/iu,
+  );
+  if (monthNameMatch) {
+    const monthToken = monthNameMatch[1]?.toLowerCase().slice(0, 3);
+    const monthMap: Record<string, number> = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11,
+    };
+    const month = monthToken ? monthMap[monthToken] : undefined;
+    if (month !== undefined) {
+      const day = Number(monthNameMatch[2]);
+      const year = monthNameMatch[3] ? Number(monthNameMatch[3]) : fallback.getFullYear();
+      const hourRaw = monthNameMatch[4] ? Number(monthNameMatch[4]) : 12;
+      const minute = monthNameMatch[5] ? Number(monthNameMatch[5]) : 0;
+      const meridiem = monthNameMatch[6]?.toLowerCase();
+      const hour24 =
+        meridiem === "pm"
+          ? (hourRaw % 12) + 12
+          : meridiem === "am"
+            ? hourRaw % 12
+            : hourRaw;
+      const parsed = new Date(year, month, day, hour24, minute, 0, 0);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
   }
   if (/\btomorrow\b/iu.test(content)) {
     return new Date(fallback.getTime() + 24 * 60 * 60 * 1000);
@@ -152,18 +250,36 @@ function extractDateHint(content: string, fallback: Date): Date | null {
 }
 
 function extractAmount(content: string): number | null {
-  const match = content.match(/\$?(\d+(?:\.\d{1,2})?)/u);
-  if (!match?.[1]) {
+  const cleaned = content.replace(/,/gu, "");
+  const withCurrency = cleaned.match(
+    /\$?\s*(\d+(?:\.\d{1,2})?)(?:\s*(k|m))?(?:\s*(?:dollars?|bucks?|usd))?/iu,
+  );
+  if (!withCurrency?.[1]) {
     return null;
   }
-  const parsed = Number(match[1]);
+  const base = Number(withCurrency[1]);
+  const suffix = withCurrency[2]?.toLowerCase();
+  const multiplier = suffix === "k" ? 1_000 : suffix === "m" ? 1_000_000 : 1;
+  const parsed = base * multiplier;
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 function splitListItems(content: string): string[] {
   return content
     .split(/,| and |\n/iu)
-    .map((part) => part.trim())
+    .map((part) =>
+      part
+        .trim()
+        .replace(
+          /^(?:please\s+)?(?:add|get|buy|grab|pick up|put)\s+(?:me\s+)?(?:some\s+)?/iu,
+          "",
+        )
+        .replace(
+          /\s+(?:to|onto|on)\s+(?:the\s+)?(?:grocery|shopping)\s+(?:list|cart)\.?$/iu,
+          "",
+        )
+        .trim(),
+    )
     .filter((part) => part.length > 0)
     .slice(0, 6);
 }
@@ -182,6 +298,73 @@ function buildClarification(
     original_queue_item_id: extractQueueItemId(queueItem),
     context,
   };
+}
+
+function normalizeEntityToken(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/giu, "");
+}
+
+function tokenizeNormalizedWords(content: string): string[] {
+  const tokens = content
+    .toLowerCase()
+    .split(/[^a-z0-9]+/giu)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+  return Array.from(new Set(tokens));
+}
+
+function isWithinEditDistance(candidate: string, target: string, maxDistance: number): boolean {
+  if (candidate === target) {
+    return true;
+  }
+  if (Math.abs(candidate.length - target.length) > maxDistance) {
+    return false;
+  }
+
+  const rows = candidate.length + 1;
+  const columns = target.length + 1;
+  const matrix = Array.from({ length: rows }, () => Array<number>(columns).fill(0));
+
+  for (let row = 0; row < rows; row += 1) {
+    matrix[row]![0] = row;
+  }
+  for (let column = 0; column < columns; column += 1) {
+    matrix[0]![column] = column;
+  }
+
+  for (let row = 1; row < rows; row += 1) {
+    let rowBest = Number.POSITIVE_INFINITY;
+    for (let column = 1; column < columns; column += 1) {
+      const substitutionCost = candidate[row - 1] === target[column - 1] ? 0 : 1;
+      const value = Math.min(
+        matrix[row - 1]![column]! + 1,
+        matrix[row]![column - 1]! + 1,
+        matrix[row - 1]![column - 1]! + substitutionCost,
+      );
+      matrix[row]![column] = value;
+      if (value < rowBest) {
+        rowBest = value;
+      }
+    }
+    if (rowBest > maxDistance) {
+      return false;
+    }
+  }
+
+  return matrix[rows - 1]![columns - 1]! <= maxDistance;
+}
+
+function getEntityIdByType(entityType: EntityType): string | null {
+  return runtimeSystemConfig.entities.find((entity) => entity.type === entityType)?.id ?? null;
+}
+
+function getDefaultHumanEntityId(): string {
+  return (
+    getEntityIdByType(EntityType.Adult) ??
+    getEntityIdByType(EntityType.Child) ??
+    runtimeSystemConfig.entities[0]?.id ??
+    "participant_1"
+  );
 }
 
 export class Worker {
@@ -351,7 +534,10 @@ export class Worker {
         WorkerAction.DetermineActionType,
         undefined,
         `${classification.topic}/${classification.intent}`,
-        () => Promise.resolve(this.resolveAction(classifiedQueueItem, classification, identity)),
+        () =>
+          Promise.resolve(
+            this.resolveAction(classifiedQueueItem, classification, identity, cappedHistory),
+          ),
         (output) => ({
           output_summary: output.is_response ? "response" : "proactive",
           metadata: { typed_action: output.typed_action },
@@ -380,12 +566,15 @@ export class Worker {
       };
     }
 
+    const effectiveIsResponse =
+      determined.is_response || this.isParticipantInitiatedSource(classifiedQueueItem.source);
+
     const provisionalTargetThread = await this.routingService.resolveTargetThread({
       topic: classification.topic,
       intent: classification.intent,
       concerning: classification.concerning,
       origin_thread: classifiedQueueItem.target_thread,
-      is_response: determined.is_response,
+      is_response: effectiveIsResponse,
     });
 
     const budget = await this.traceStep(
@@ -478,6 +667,8 @@ export class Worker {
       };
     }
 
+    await this.applyStateMutation(classifiedQueueItem, determined.typed_action);
+
     const profileResult = await this.traceStep(
       traceSteps,
       7,
@@ -496,7 +687,11 @@ export class Worker {
           identity,
           action: placeholderAction,
         };
-        const composed = await this.topicProfileService.composeMessage(decision);
+        let composed = await this.topicProfileService.composeMessage(decision);
+        const stateBackedMessage = await this.composeStateBackedMessage(determined.typed_action);
+        if (stateBackedMessage) {
+          composed = stateBackedMessage;
+        }
         await this.enqueueCrossTopicEvents(
           classifiedQueueItem,
           classification,
@@ -527,7 +722,7 @@ export class Worker {
           intent: classification.intent,
           concerning: classification.concerning,
           origin_thread: classifiedQueueItem.target_thread,
-          is_response: determined.is_response,
+          is_response: effectiveIsResponse,
         });
         const routedTargetThread =
           escalation.should_escalate && escalation.next_target_thread
@@ -597,15 +792,109 @@ export class Worker {
     };
   }
 
+  private getFirstEntityIdByType(entityType: EntityType): string | null {
+    return getEntityIdByType(entityType);
+  }
+
+  private extractMentionedEntities(
+    content: string,
+    options: { includePets?: boolean; onlyTypes?: EntityType[] } = {},
+  ): string[] {
+    const includePets = options.includePets ?? false;
+    const allowedTypes = options.onlyTypes ?? null;
+    const normalizedWords = tokenizeNormalizedWords(content);
+    const normalizedContent = normalizeEntityToken(content);
+    const matches = new Set<string>();
+
+    for (const entity of runtimeSystemConfig.entities) {
+      if (!includePets && entity.type === EntityType.Pet) {
+        continue;
+      }
+      if (allowedTypes && !allowedTypes.includes(entity.type)) {
+        continue;
+      }
+
+      const aliases = [entity.id, entity.name];
+      const aliasTokens = aliases
+        .flatMap((alias) => alias.split(/[_\s-]+/u))
+        .map((alias) => normalizeEntityToken(alias))
+        .filter((alias) => alias.length >= 3);
+
+      const isMatch = aliasTokens.some((alias) => {
+        if (normalizedWords.includes(alias)) {
+          return true;
+        }
+        if (alias.length >= 5 && normalizedContent.includes(alias)) {
+          return true;
+        }
+        const maxDistance = alias.length >= 7 ? 2 : 1;
+        return normalizedWords.some(
+          (word) => word.length >= 4 && isWithinEditDistance(word, alias, maxDistance),
+        );
+      });
+
+      if (isMatch) {
+        matches.add(entity.id);
+      }
+    }
+
+    return Array.from(matches);
+  }
+
+  private resolveConcerningForAction(
+    content: string,
+    classifiedConcerning: string[],
+    fallbackEntityId: string,
+    options: { includePets?: boolean; onlyTypes?: EntityType[] } = {},
+  ): string[] {
+    const mentioned = this.extractMentionedEntities(content, options);
+    if (mentioned.length > 0) {
+      return mentioned;
+    }
+    if (classifiedConcerning.length > 0) {
+      return classifiedConcerning;
+    }
+    return [fallbackEntityId];
+  }
+
   private resolveAction(
     queueItem: StackQueueItem,
     classification: StackClassificationResult,
     identity: IdentityResolutionResult,
+    threadHistory: {
+      recent_messages: Array<{
+        id: string;
+        from: string;
+        content: string;
+        state_ref?: string;
+      }>;
+    } | null,
   ): DeterminedAction {
     const content = summarizeContent(queueItem.content);
     const dateHint = extractDateHint(content, queueItem.created_at);
-    const referenceId = queueItem.clarification_of ?? extractQueueItemId(queueItem);
+    const inferredReference = this.inferClarificationReference(queueItem, threadHistory);
+    const referenceId = queueItem.clarification_of ?? inferredReference ?? extractQueueItemId(queueItem);
+    const hasReference = queueItem.clarification_of !== undefined || inferredReference !== null;
     const actor = identity.source_entity_id;
+    const humanConcerning = this.resolveConcerningForAction(content, classification.concerning, actor);
+    const adultConcerning = this.resolveConcerningForAction(
+      content,
+      classification.concerning,
+      actor,
+      { onlyTypes: [EntityType.Adult] },
+    );
+    const childConcerning = this.resolveConcerningForAction(
+      content,
+      classification.concerning,
+      this.getFirstEntityIdByType(EntityType.Child) ?? actor,
+      { onlyTypes: [EntityType.Child] },
+    );
+    const petConcerning = this.resolveConcerningForAction(
+      content,
+      classification.concerning,
+      this.getFirstEntityIdByType(EntityType.Pet) ?? actor,
+      { includePets: true, onlyTypes: [EntityType.Pet] },
+    );
 
     switch (classification.topic) {
       case TopicKey.Calendar: {
@@ -613,7 +902,7 @@ export class Worker {
           return { is_response: true, typed_action: { type: "query_events" } };
         }
         if (classification.intent === ClassifierIntent.Cancellation) {
-          if (!queueItem.clarification_of) {
+          if (!hasReference) {
             throw new ClarificationSignal(
               buildClarification(
                 queueItem,
@@ -628,7 +917,7 @@ export class Worker {
           };
         }
         if (classification.intent === ClassifierIntent.Update) {
-          if (!queueItem.clarification_of || !dateHint) {
+          if (!hasReference || !dateHint) {
             throw new ClarificationSignal(
               buildClarification(
                 queueItem,
@@ -657,7 +946,7 @@ export class Worker {
             type: "create_event",
             title: content.slice(0, 80),
             date_start: dateHint,
-            concerning: classification.concerning,
+            concerning: humanConcerning,
           },
         };
       }
@@ -666,7 +955,7 @@ export class Worker {
           return { is_response: true, typed_action: { type: "query_chores" } };
         }
         if (classification.intent === ClassifierIntent.Completion) {
-          if (!queueItem.clarification_of) {
+          if (!hasReference) {
             throw new ClarificationSignal(
               buildClarification(
                 queueItem,
@@ -681,7 +970,7 @@ export class Worker {
           };
         }
         if (classification.intent === ClassifierIntent.Cancellation) {
-          if (!queueItem.clarification_of) {
+          if (!hasReference) {
             throw new ClarificationSignal(
               buildClarification(
                 queueItem,
@@ -700,7 +989,7 @@ export class Worker {
           typed_action: {
             type: "assign_chore",
             task: content.slice(0, 120),
-            assigned_to: classification.concerning[0] ?? actor,
+            assigned_to: humanConcerning[0] ?? actor,
             due: dateHint ?? new Date(queueItem.created_at.getTime() + 24 * 60 * 60 * 1000),
           },
         };
@@ -759,7 +1048,7 @@ export class Worker {
         if (classification.intent === ClassifierIntent.Query) {
           return {
             is_response: true,
-            typed_action: { type: "query_health", entity: classification.concerning[0] },
+            typed_action: { type: "query_health", entity: humanConcerning[0] },
           };
         }
         if (classification.intent === ClassifierIntent.Completion) {
@@ -767,7 +1056,7 @@ export class Worker {
             is_response: true,
             typed_action: {
               type: "log_visit",
-              entity: classification.concerning[0] ?? actor,
+              entity: humanConcerning[0] ?? actor,
               provider_type: this.inferHealthProvider(content),
               notes: content,
             },
@@ -786,7 +1075,7 @@ export class Worker {
           is_response: true,
           typed_action: {
             type: "add_appointment",
-            entity: classification.concerning[0] ?? actor,
+            entity: humanConcerning[0] ?? actor,
             provider_type: this.inferHealthProvider(content),
             date: dateHint,
           },
@@ -796,14 +1085,14 @@ export class Worker {
         if (classification.intent === ClassifierIntent.Query) {
           return {
             is_response: true,
-            typed_action: { type: "query_pets", entity: classification.concerning[0] },
+            typed_action: { type: "query_pets", entity: petConcerning[0] },
           };
         }
         return {
           is_response: false,
           typed_action: {
             type: "log_care",
-            entity: classification.concerning[0] ?? "pet_1",
+            entity: petConcerning[0],
             activity: content.slice(0, 120),
             by: actor,
             category: PetCareCategory.GeneralCare,
@@ -814,7 +1103,7 @@ export class Worker {
         if (classification.intent === ClassifierIntent.Query) {
           return {
             is_response: true,
-            typed_action: { type: "query_school", entity: classification.concerning[0] },
+            typed_action: { type: "query_school", entity: childConcerning[0] },
           };
         }
         if (!dateHint) {
@@ -830,8 +1119,8 @@ export class Worker {
           is_response: true,
           typed_action: {
             type: "add_assignment",
-            entity: classification.concerning[0] ?? "participant_3",
-            parent_entity: "participant_1",
+            entity: childConcerning[0],
+            parent_entity: actor,
             title: content.slice(0, 120),
             due_date: dateHint,
             source:
@@ -866,7 +1155,7 @@ export class Worker {
               start: dateHint,
               end: new Date(dateHint.getTime() + 24 * 60 * 60 * 1000),
             },
-            travelers: classification.concerning,
+            travelers: humanConcerning,
             source:
               queueItem.source === QueueItemSource.EmailMonitor
                 ? TravelInputSource.EmailParsing
@@ -885,7 +1174,7 @@ export class Worker {
             name: content.slice(0, 60),
             vendor_type: "general_service",
             contact: "unknown",
-            managed_by: classification.concerning[0] ?? actor,
+            managed_by: adultConcerning[0] ?? actor,
           },
         };
       }
@@ -895,7 +1184,7 @@ export class Worker {
             is_response: true,
             typed_action: {
               type: "query_leads",
-              owner: classification.concerning[0],
+              owner: adultConcerning[0],
               status: BusinessLeadStatus.New,
             },
           };
@@ -904,7 +1193,7 @@ export class Worker {
           is_response: false,
           typed_action: {
             type: "add_lead",
-            owner: classification.concerning[0] ?? actor,
+            owner: adultConcerning[0] ?? actor,
             client_name: content.slice(0, 80),
           },
         };
@@ -928,14 +1217,14 @@ export class Worker {
         if (classification.intent === ClassifierIntent.Query) {
           return {
             is_response: true,
-            typed_action: { type: "query_status", entity: classification.concerning[0] },
+            typed_action: { type: "query_status", entity: humanConcerning[0] },
           };
         }
         return {
           is_response: true,
           typed_action: {
             type: "update_status",
-            entity: classification.concerning[0] ?? actor,
+            entity: humanConcerning[0] ?? actor,
             status: content.slice(0, 120),
             expires_at: new Date(queueItem.created_at.getTime() + 6 * 60 * 60 * 1000),
           },
@@ -1010,6 +1299,490 @@ export class Worker {
     return HealthProviderType.Primary;
   }
 
+  private inferClarificationReference(
+    queueItem: StackQueueItem,
+    threadHistory: {
+      recent_messages: Array<{
+        id: string;
+        from: string;
+        content: string;
+        state_ref?: string;
+      }>;
+    } | null,
+  ): string | null {
+    if (queueItem.clarification_of) {
+      return queueItem.clarification_of;
+    }
+    if (!threadHistory || threadHistory.recent_messages.length < 2) {
+      return null;
+    }
+
+    const recent = threadHistory.recent_messages;
+    let lastAssistantIndex = -1;
+    for (let index = recent.length - 1; index >= 0; index -= 1) {
+      if (recent[index]?.from === "assistant") {
+        lastAssistantIndex = index;
+        break;
+      }
+    }
+    if (lastAssistantIndex < 0) {
+      return null;
+    }
+
+    const assistantMessage = recent[lastAssistantIndex];
+    const assistantContent = assistantMessage?.content?.trim().toLowerCase() ?? "";
+    const isClarificationPrompt = CLARIFICATION_PROMPTS.some(
+      (prompt) => assistantContent === prompt.toLowerCase(),
+    );
+    if (!isClarificationPrompt) {
+      return null;
+    }
+
+    for (let index = lastAssistantIndex - 1; index >= 0; index -= 1) {
+      const message = recent[index];
+      if (message?.from !== "participant") {
+        continue;
+      }
+      return message.state_ref ?? message.id ?? null;
+    }
+
+    return null;
+  }
+
+  private async applyStateMutation(queueItem: StackQueueItem, action: TopicAction): Promise<void> {
+    const state = await this.stateService.getSystemState();
+    const now = this.now();
+    const actor = queueItem.concerning[0] ?? getDefaultHumanEntityId();
+    let mutated = false;
+
+    switch (action.type) {
+      case "create_event": {
+        state.calendar.events.push({
+          id: `cal_${now.getTime()}`,
+          title: action.title,
+          date_start: action.date_start,
+          date_end: action.date_end,
+          location: action.location,
+          status: CalendarEventStatus.Upcoming,
+          topic: TopicKey.Calendar,
+          concerning: action.concerning,
+          created_by: actor,
+          created_at: now,
+        });
+        mutated = true;
+        break;
+      }
+      case "reschedule_event": {
+        const event = state.calendar.events.find((entry) => entry.id === action.event_id);
+        if (event) {
+          event.date_start = action.new_start;
+          event.date_end = action.new_end ?? event.date_end;
+          event.status = CalendarEventStatus.Rescheduled;
+          mutated = true;
+        }
+        break;
+      }
+      case "cancel_event": {
+        const event = state.calendar.events.find((entry) => entry.id === action.event_id);
+        if (event) {
+          event.status = CalendarEventStatus.Cancelled;
+          mutated = true;
+        }
+        break;
+      }
+      case "assign_chore": {
+        state.chores.active.push({
+          id: `chore_${now.getTime()}`,
+          task: action.task,
+          assigned_to: action.assigned_to,
+          assigned_by: actor,
+          assigned_in_thread: queueItem.target_thread,
+          due: action.due,
+          status: ChoreStatus.Pending,
+          escalation_step: 0,
+        });
+        mutated = true;
+        break;
+      }
+      case "complete_chore": {
+        const idx = state.chores.active.findIndex((entry) => entry.id === action.chore_id);
+        if (idx >= 0) {
+          const [active] = state.chores.active.splice(idx, 1);
+          if (active) {
+            state.chores.completed_recent.unshift({
+              id: active.id,
+              task: active.task,
+              assigned_to: active.assigned_to,
+              completed_at: now,
+              completed_via: InputMethod.Text,
+              response: summarizeContent(queueItem.content),
+            });
+            mutated = true;
+          }
+        }
+        break;
+      }
+      case "cancel_chore": {
+        const idx = state.chores.active.findIndex((entry) => entry.id === action.chore_id);
+        if (idx >= 0) {
+          state.chores.active.splice(idx, 1);
+          mutated = true;
+        }
+        break;
+      }
+      case "log_expense": {
+        state.finances.expenses_recent.unshift({
+          id: `exp_${now.getTime()}`,
+          description: action.description,
+          amount: action.amount,
+          date: now,
+          logged_by: action.logged_by,
+          logged_via: InputMethod.Text,
+          confirmed: true,
+        });
+        mutated = true;
+        break;
+      }
+      case "add_items": {
+        const existing = new Set(state.grocery.list.map((entry) => entry.item.toLowerCase().trim()));
+        for (const [index, candidate] of action.items.entries()) {
+          const itemName = candidate.item.trim();
+          if (itemName.length === 0) {
+            continue;
+          }
+          const normalized = itemName.toLowerCase();
+          if (existing.has(normalized)) {
+            continue;
+          }
+          state.grocery.list.push({
+            id: `g_${now.getTime()}_${index}`,
+            item: itemName,
+            section: candidate.section ?? GrocerySection.Other,
+            added_by: actor,
+            added_at: now,
+          });
+          existing.add(normalized);
+          mutated = true;
+        }
+        break;
+      }
+      case "remove_items": {
+        const removals = new Set(action.item_ids.map((item) => item.toLowerCase().trim()));
+        if (removals.size > 0) {
+          const before = state.grocery.list.length;
+          state.grocery.list = state.grocery.list.filter(
+            (entry) => !removals.has(entry.item.toLowerCase().trim()),
+          );
+          mutated = state.grocery.list.length !== before;
+        }
+        break;
+      }
+      case "add_appointment": {
+        let profile = state.health.profiles.find((entry) => entry.entity === action.entity);
+        if (!profile) {
+          profile = {
+            entity: action.entity,
+            medications: [],
+            allergies: [],
+            providers: [],
+            upcoming_appointments: [],
+            notes: [],
+          };
+          state.health.profiles.push(profile);
+        }
+        profile.upcoming_appointments.push({
+          id: `health_${now.getTime()}`,
+          entity: action.entity,
+          provider_type: action.provider_type,
+          date: action.date,
+          location: action.location,
+        });
+        mutated = true;
+        break;
+      }
+      case "log_visit": {
+        let profile = state.health.profiles.find((entry) => entry.entity === action.entity);
+        if (!profile) {
+          profile = {
+            entity: action.entity,
+            medications: [],
+            allergies: [],
+            providers: [],
+            upcoming_appointments: [],
+            notes: [],
+          };
+          state.health.profiles.push(profile);
+        }
+        profile.notes.push(action.notes);
+        mutated = true;
+        break;
+      }
+      case "log_care": {
+        let profile = state.pets.profiles.find((entry) => entry.entity === action.entity);
+        if (!profile) {
+          profile = {
+            entity: action.entity,
+            species: "pet",
+            vet: null,
+            last_vet_visit: now,
+            medications: [],
+            care_log_recent: [],
+            upcoming: [],
+            notes: [],
+          };
+          state.pets.profiles.push(profile);
+        }
+        profile.care_log_recent.unshift({
+          category: action.category ?? PetCareCategory.GeneralCare,
+          activity: action.activity,
+          by: action.by,
+          at: now,
+          notes: action.notes,
+        });
+        mutated = true;
+        break;
+      }
+      case "add_assignment": {
+        let student = state.school.students.find((entry) => entry.entity === action.entity);
+        if (!student) {
+          student = {
+            entity: action.entity,
+            parent_entity: action.parent_entity,
+            assignments: [],
+            completed_recent: [],
+          };
+          state.school.students.push(student);
+        }
+        student.assignments.push({
+          id: `school_${now.getTime()}`,
+          title: action.title,
+          student_entity: action.entity,
+          parent_entity: action.parent_entity,
+          due_date: action.due_date,
+          status: AssignmentStatus.NotStarted,
+          source: action.source,
+          parent_notified: false,
+        });
+        mutated = true;
+        break;
+      }
+      case "create_trip": {
+        state.travel.trips.push({
+          id: `trip_${now.getTime()}`,
+          name: action.name,
+          dates: action.dates,
+          travelers: action.travelers,
+          status: TripStatus.Planning,
+          source: action.source,
+          checklist: [],
+          notes: [],
+          budget_link: null,
+        });
+        mutated = true;
+        break;
+      }
+      case "add_vendor": {
+        state.vendors.records.push({
+          id: `vendor_${now.getTime()}`,
+          name: action.name,
+          type: action.vendor_type,
+          jobs: [],
+          contact: action.contact,
+          managed_by: action.managed_by,
+          follow_up_pending: false,
+        });
+        mutated = true;
+        break;
+      }
+      case "add_lead": {
+        state.business.leads.push({
+          id: `lead_${now.getTime()}`,
+          owner: action.owner,
+          contact: action.contact,
+          client_name: action.client_name,
+          inquiry_date: now,
+          event_type: action.event_type,
+          event_date: action.event_date ?? null,
+          event_details: action.event_details,
+          status: BusinessLeadStatus.New,
+          pipeline_stage: BusinessPipelineStage.Inquiry,
+          booking_status: BookingStatus.NotBooked,
+          last_contact: now,
+          draft_reply: null,
+          notes: [],
+        });
+        mutated = true;
+        break;
+      }
+      case "respond_to_nudge": {
+        state.relationship.last_nudge.response_received = action.acknowledged;
+        state.relationship.nudge_history.unshift({
+          date: now,
+          type: NudgeType.ConnectionPrompt,
+          responded: action.acknowledged,
+        });
+        mutated = true;
+        break;
+      }
+      case "update_status": {
+        const next = {
+          entity: action.entity,
+          status: action.status,
+          eta: action.eta ?? null,
+          location_snapshot: action.location_snapshot ?? null,
+          updated_at: now,
+          expires_at: action.expires_at,
+        };
+        const idx = state.family_status.current.findIndex((entry) => entry.entity === action.entity);
+        if (idx >= 0) {
+          state.family_status.current[idx] = next;
+        } else {
+          state.family_status.current.push(next);
+        }
+        mutated = true;
+        break;
+      }
+      case "plan_meal": {
+        state.meals.planned.push({
+          id: `meal_${now.getTime()}`,
+          date: action.date,
+          meal_type: action.meal_type,
+          description: action.description,
+          planned_by: action.planned_by,
+          status: MealPlanStatus.Planned,
+        });
+        mutated = true;
+        break;
+      }
+      case "add_asset": {
+        state.maintenance.assets.push({
+          id: `asset_${now.getTime()}`,
+          type: action.asset_type,
+          name: action.name,
+          details: action.details,
+        });
+        mutated = true;
+        break;
+      }
+      default:
+        break;
+    }
+
+    if (mutated) {
+      await this.stateService.saveSystemState(state);
+    }
+  }
+
+  private async composeGroceryListMessage(section?: GrocerySection): Promise<string> {
+    const state = await this.stateService.getSystemState();
+    const entries = state.grocery.list.filter((entry) =>
+      section ? entry.section === section : true,
+    );
+    if (entries.length === 0) {
+      return section ? `No grocery items in ${section} right now.` : "Your grocery list is empty.";
+    }
+
+    const lines = entries.map((entry, index) => `${index + 1}. ${entry.item}`);
+    const prefix = section ? `Grocery list (${section}):` : "Grocery list:";
+    return `${prefix}\n${lines.join("\n")}`;
+  }
+
+  private async composeStateBackedMessage(action: TopicAction): Promise<string | null> {
+    const state = await this.stateService.getSystemState();
+    switch (action.type) {
+      case "query_events": {
+        if (state.calendar.events.length === 0) return "No calendar events right now.";
+        return `Calendar:\n${state.calendar.events
+          .slice(0, 8)
+          .map((entry, i) => {
+            const when =
+              entry.date_start instanceof Date
+                ? ` (${entry.date_start.toLocaleString()})`
+                : entry.date instanceof Date
+                  ? ` (${entry.date.toLocaleDateString()})`
+                  : "";
+            return `${i + 1}. ${entry.title}${when}`;
+          })
+          .join("\n")}`;
+      }
+      case "query_chores": {
+        if (state.chores.active.length === 0) return "No active chores right now.";
+        return `Active chores:\n${state.chores.active
+          .slice(0, 8)
+          .map((entry, i) => `${i + 1}. ${entry.task}`)
+          .join("\n")}`;
+      }
+      case "query_finances": {
+        const recentTotal = state.finances.expenses_recent
+          .slice(0, 10)
+          .reduce((sum, expense) => sum + expense.amount, 0);
+        return `Finance snapshot: ${state.finances.bills.length} bills, ${state.finances.expenses_recent.length} recent expenses ($${recentTotal.toFixed(2)} recent total), ${state.finances.savings_goals.length} savings goals.`;
+      }
+      case "query_list":
+        return this.composeGroceryListMessage(action.section);
+      case "query_health": {
+        const profiles = action.entity
+          ? state.health.profiles.filter((entry) => entry.entity === action.entity)
+          : state.health.profiles;
+        if (profiles.length === 0) return "No health records found.";
+        return `Health: ${profiles.length} profile(s), ${profiles.reduce((n, p) => n + p.upcoming_appointments.length, 0)} upcoming appointment(s).`;
+      }
+      case "query_pets": {
+        const profiles = action.entity
+          ? state.pets.profiles.filter((entry) => entry.entity === action.entity)
+          : state.pets.profiles;
+        if (profiles.length === 0) return "No pet records found.";
+        return `Pets: ${profiles.map((entry) => entry.entity).join(", ")}.`;
+      }
+      case "query_school": {
+        const assignments = state.school.students.flatMap((student) => student.assignments);
+        if (assignments.length === 0) return "No school assignments right now.";
+        return `School assignments: ${assignments.length} active item(s).`;
+      }
+      case "query_trips": {
+        if (state.travel.trips.length === 0) return "No trips planned right now.";
+        return `Trips:\n${state.travel.trips
+          .slice(0, 8)
+          .map((trip, i) => `${i + 1}. ${trip.name} (${trip.status})`)
+          .join("\n")}`;
+      }
+      case "query_vendors": {
+        if (state.vendors.records.length === 0) return "No vendors on file yet.";
+        return `Vendors:\n${state.vendors.records
+          .slice(0, 8)
+          .map((vendor, i) => `${i + 1}. ${vendor.name}`)
+          .join("\n")}`;
+      }
+      case "query_leads": {
+        if (state.business.leads.length === 0) return "No leads right now.";
+        return `Leads: ${state.business.leads.length} total.`;
+      }
+      case "query_nudge_history": {
+        if (state.relationship.nudge_history.length === 0) return "No relationship nudges in history.";
+        return `Nudge history: ${state.relationship.nudge_history.length} item(s).`;
+      }
+      case "query_status": {
+        if (state.family_status.current.length === 0) return "No current family status entries.";
+        return `Family status:\n${state.family_status.current
+          .map((entry, i) => `${i + 1}. ${entry.entity}: ${entry.status}`)
+          .join("\n")}`;
+      }
+      case "query_plans": {
+        if (state.meals.planned.length === 0) return "No meal plans right now.";
+        return `Meal plans:\n${state.meals.planned
+          .slice(0, 8)
+          .map((plan, i) => `${i + 1}. ${plan.description}`)
+          .join("\n")}`;
+      }
+      case "query_maintenance": {
+        if (state.maintenance.items.length === 0) return "No maintenance items right now.";
+        return `Maintenance: ${state.maintenance.items.length} tracked item(s).`;
+      }
+      default:
+        return null;
+    }
+  }
+
   private async handleConfirmation(
     queueItem: StackQueueItem,
     action: TopicAction,
@@ -1040,7 +1813,7 @@ export class Worker {
     const confirmation = await this.confirmationService.openConfirmation({
       type: confirmationType,
       action: action.type,
-      requested_by: queueItem.concerning[0] ?? "participant_1",
+      requested_by: queueItem.concerning[0] ?? getDefaultHumanEntityId(),
       requested_in_thread: targetThread,
       expires_at: new Date(
         queueItem.created_at.getTime() + this.config.clarification_timeout_minutes * 60_000,
@@ -1095,6 +1868,9 @@ export class Worker {
     profile: TopicProfile,
     determined: DeterminedAction,
   ): Promise<void> {
+    if (queueItem.source === QueueItemSource.CrossTopic) {
+      return;
+    }
     if (classification.intent === ClassifierIntent.Query) {
       return;
     }
@@ -1140,7 +1916,9 @@ export class Worker {
       return items.length > 0 ? items.join(", ") : null;
     }
 
-    return `${sourceTopic} -> ${targetTopic}: ${determined.typed_action.type}`;
+    // Only emit explicit cross-topic payloads. Generic placeholders create noisy
+    // follow-up clarifications in downstream topics without actionable context.
+    return null;
   }
 
   private resolveRoutingDecision(request: {
@@ -1165,6 +1943,15 @@ export class Worker {
 
   private shouldCreateFollowUpTarget(intent: ClassifierIntent): boolean {
     return ![ClassifierIntent.Query, ClassifierIntent.Confirmation].includes(intent);
+  }
+
+  private isParticipantInitiatedSource(source: QueueItemSource): boolean {
+    return (
+      source === QueueItemSource.HumanMessage ||
+      source === QueueItemSource.Reaction ||
+      source === QueueItemSource.ForwardedMessage ||
+      source === QueueItemSource.ImageAttachment
+    );
   }
 
   private async routeToAction(
@@ -1423,10 +2210,10 @@ export function createWorker(options: WorkerOptions): Worker {
 }
 
 export function createWorkerIdentityService(): WorkerIdentityService {
-  const identity = createIdentityService();
   return {
     resolve(item: StackQueueItem): Promise<IdentityResolutionResult> {
-      const firstEntity = item.concerning[0] ?? "participant_1";
+      const identity = createIdentityService();
+      const firstEntity = item.concerning[0] ?? getDefaultHumanEntityId();
       const entity = identity.getEntity(firstEntity);
       return Promise.resolve({
         source_entity_id: firstEntity,

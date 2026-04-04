@@ -5,7 +5,7 @@ import { pino, type Logger } from "pino";
 import type { CollisionPolicy, StackQueueItem } from "../../01-service-stack/types.js";
 import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import { toRedisConnection } from "../../lib/redis.js";
-import { DispatchPriority } from "../../types.js";
+import { DispatchPriority, QueueItemSource } from "../../types.js";
 import type { BudgetDecision, BudgetService, StateService } from "../types.js";
 import type { OutboundBudgetTracker } from "./types.js";
 
@@ -39,12 +39,6 @@ export class RedisBudgetService implements BudgetService {
 
   private readonly databasePath?: string;
 
-  private readonly maxPerPersonPerDay: number;
-
-  private readonly maxPerThreadPerHour: number;
-
-  private readonly batchWindowMinutes: number;
-
   private readonly reconstructionLookbackHours: number;
 
   private hasCheckedReconstruction = false;
@@ -55,9 +49,6 @@ export class RedisBudgetService implements BudgetService {
     });
     this.stateService = options.state_service;
     this.databasePath = options.database_path;
-    this.maxPerPersonPerDay = options.max_unprompted_per_person_per_day ?? 5;
-    this.maxPerThreadPerHour = options.max_messages_per_thread_per_hour ?? 2;
-    this.batchWindowMinutes = options.batch_window_minutes ?? 30;
     this.reconstructionLookbackHours = options.reconstruction_lookback_hours ?? 24;
     this.logger = options.logger ?? DEFAULT_LOGGER;
   }
@@ -71,7 +62,7 @@ export class RedisBudgetService implements BudgetService {
       const count = this.asNumber(await client.get(this.personDailyKey(participantId, now)));
       byPerson[participantId] = {
         unprompted_sent: count,
-        max: this.maxPerPersonPerDay,
+        max: this.getOutboundBudget().max_unprompted_per_person_per_day,
         messages: [],
       };
     }
@@ -81,7 +72,7 @@ export class RedisBudgetService implements BudgetService {
       const count = this.asNumber(await client.get(this.threadHourlyKey(thread.id, now)));
       byThread[thread.id] = {
         last_hour_count: count,
-        max_per_hour: this.maxPerThreadPerHour,
+        max_per_hour: this.getOutboundBudget().max_messages_per_thread_per_hour,
         last_sent_at: null,
       };
     }
@@ -120,15 +111,18 @@ export class RedisBudgetService implements BudgetService {
       this.collectCollisionIds(queue_item, target_thread),
     ]);
 
-    const isThreadAtLimit = this.asNumber(threadCount) >= this.maxPerThreadPerHour;
-    const isPersonAtLimit = personCounts.some((count) => count >= this.maxPerPersonPerDay);
+    const budget = this.getOutboundBudget();
+    const isThreadAtLimit = this.asNumber(threadCount) >= budget.max_messages_per_thread_per_hour;
+    const isPersonAtLimit = personCounts.some(
+      (count) => count >= budget.max_unprompted_per_person_per_day,
+    );
     if (
       (isThreadAtLimit || isPersonAtLimit || collisionIds.length > 0) &&
       priority !== DispatchPriority.Immediate
     ) {
       return {
         priority: DispatchPriority.Batched,
-        hold_until: new Date(now.getTime() + this.batchWindowMinutes * 60_000),
+        hold_until: new Date(now.getTime() + budget.batch_window_minutes * 60_000),
         included_queue_item_ids: collisionIds,
         reason: "Collision or budget limit detected; item moved into batch window.",
       };
@@ -196,6 +190,10 @@ export class RedisBudgetService implements BudgetService {
       .map((entity) => entity.id);
   }
 
+  private getOutboundBudget() {
+    return runtimeSystemConfig.dispatch.outbound_budget;
+  }
+
   private resolvePriority(queue_item: StackQueueItem): DispatchPriority {
     const maybePriority = queue_item.priority;
     if (maybePriority === DispatchPriority.Immediate) {
@@ -203,6 +201,14 @@ export class RedisBudgetService implements BudgetService {
     }
     if (maybePriority === DispatchPriority.Silent) {
       return DispatchPriority.Silent;
+    }
+    if (
+      queue_item.source === QueueItemSource.HumanMessage ||
+      queue_item.source === QueueItemSource.Reaction ||
+      queue_item.source === QueueItemSource.ForwardedMessage ||
+      queue_item.source === QueueItemSource.ImageAttachment
+    ) {
+      return DispatchPriority.Immediate;
     }
     return DispatchPriority.Batched;
   }
@@ -242,8 +248,8 @@ export class RedisBudgetService implements BudgetService {
       this.threadHourlyKey(thread.id, now),
     );
     const [personValues, threadValues] = await Promise.all([
-      client.mget(participantKeys),
-      client.mget(threadKeys),
+      participantKeys.length === 0 ? [] : client.mget(participantKeys),
+      threadKeys.length === 0 ? [] : client.mget(threadKeys),
     ]);
     const personEntries = this.asNullableStringArray(personValues);
     const threadEntries = this.asNullableStringArray(threadValues);

@@ -277,6 +277,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
 
   const classifierService = createClassifierService({
     anthropic_api_key: env.ANTHROPIC_API_KEY,
+    model: env.ANTHROPIC_MODEL,
     state_service: stateService,
     context_window_limit: runtimeSystemConfig.worker.max_thread_history_messages ?? 15,
     logger,
@@ -305,6 +306,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
     classifier: classifierService,
     queue_service: queueService,
     anthropic_api_key: env.ANTHROPIC_API_KEY,
+    extraction_model: env.ANTHROPIC_EXTRACTION_MODEL ?? env.ANTHROPIC_MODEL,
     logger,
     imap: {
       host: env.IMAP_HOST,
@@ -364,7 +366,6 @@ async function createRuntime(): Promise<RuntimeHandles> {
       await workerService.process(item);
     },
   );
-  await worker.pause(true);
 
   const imapClient = await dataIngestService.startMonitoring();
 
@@ -448,8 +449,7 @@ function registerShutdown(runtime: RuntimeHandles): void {
 async function main(): Promise<void> {
   const runtime = await createRuntime();
   registerShutdown(runtime);
-  // Worker registration starts the run loop, so boot only needs to lift the startup pause.
-  runtime.worker.resume();
+  // Worker registration starts the run loop.
   logger.info("BullMQ worker started.");
   logger.info("All runtime services initialized.");
 }

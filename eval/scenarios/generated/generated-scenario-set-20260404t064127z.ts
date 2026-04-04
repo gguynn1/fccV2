@@ -2,11 +2,11 @@ import { ClassifierIntent, DispatchPriority, TopicKey } from "../../../src/index
 import type { EvalScenarioDefinition } from "../../types.js";
 
 // Generated from the Eval page. Edit this file; it is loaded automatically from eval/scenarios/generated/.
-export const generatedScenarioSet20260404t045227zName = "generated-scenario-set-20260404t045227z";
+export const generatedScenarioSet20260404t064127zName = "generated-scenario-set-20260404t064127z";
 
-export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefinition[] = [
+export const generatedScenarioSet20260404t064127zScenarios: EvalScenarioDefinition[] = [
   {
-    id: "generated-scenario-set-20260404t045227z-calendar-query",
+    id: "generated-scenario-set-20260404t064127z-calendar-query",
     title: "Calendar query stays in the family thread",
     category: "classification",
     prompt_input: {
@@ -27,7 +27,7 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
       "Generated scaffold. Verify that the message and markers still match the intended behavior.",
   },
   {
-    id: "generated-scenario-set-20260404t045227z-grocery-add",
+    id: "generated-scenario-set-20260404t064127z-grocery-add",
     title: "Grocery additions remain list-focused in the family thread",
     category: "routing",
     prompt_input: {
@@ -46,7 +46,7 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-finance-confirmation",
+    id: "generated-scenario-set-20260404t064127z-finance-confirmation",
     title: "Financial actions ask for confirmation in the couple thread",
     category: "confirmation",
     prompt_input: {
@@ -65,7 +65,7 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-business-draft",
+    id: "generated-scenario-set-20260404t064127z-business-draft",
     title: "Business drafts stay in the owner's private thread",
     category: "composition",
     prompt_input: {
@@ -84,7 +84,7 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-vendor-update",
+    id: "generated-scenario-set-20260404t064127z-vendor-update",
     title: "Vendor scheduling remains a vendor update",
     category: "pipeline",
     prompt_input: {
@@ -103,7 +103,7 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-school-query",
+    id: "generated-scenario-set-20260404t064127z-school-query",
     title: "School queries route to the child's private thread",
     category: "classification",
     prompt_input: {
@@ -122,7 +122,7 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-health-update",
+    id: "generated-scenario-set-20260404t064127z-health-update",
     title: "Health updates stay in the participant's private thread",
     category: "routing",
     prompt_input: {
@@ -132,7 +132,7 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
     expected: {
       topic: TopicKey.Health,
-      intent: ClassifierIntent.Request,
+      intent: ClassifierIntent.Update,
       target_thread: "participant_1_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
@@ -141,7 +141,7 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-meals-request",
+    id: "generated-scenario-set-20260404t064127z-meals-request",
     title: "Meal planning stays in the family thread",
     category: "composition",
     prompt_input: {
@@ -160,7 +160,7 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-chores-request",
+    id: "generated-scenario-set-20260404t064127z-chores-request",
     title: "Chore assignments route to the assignee's thread",
     category: "pipeline",
     prompt_input: {
@@ -179,7 +179,7 @@ export const generatedScenarioSet20260404t045227zScenarios: EvalScenarioDefiniti
     },
   },
   {
-    id: "generated-scenario-set-20260404t045227z-maintenance-update",
+    id: "generated-scenario-set-20260404t064127z-maintenance-update",
     title: "Maintenance records stay in the owner's private thread",
     category: "routing",
     prompt_input: {

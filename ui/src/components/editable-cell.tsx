@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export interface EditableCellProps {
@@ -50,13 +51,18 @@ export function EditableCell({
 
   if (!editing) {
     return (
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={() => setEditing(true)}
-        className={`cursor-pointer rounded px-1 py-0.5 text-left text-sm hover:bg-secondary ${className ?? ""}`}
+        className={`h-auto min-h-8 w-full justify-between border-dashed px-2 py-1 text-left text-sm font-normal ${className ?? ""}`}
       >
-        {value || <span className="text-muted-foreground italic">empty</span>}
-      </button>
+        <span>{value || <span className="text-muted-foreground italic">empty</span>}</span>
+        <span className="ml-3 shrink-0 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+          Edit
+        </span>
+      </Button>
     );
   }
 

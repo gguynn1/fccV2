@@ -1,42 +1,19 @@
-import { useCallback } from "react";
-
-import { EditableCell } from "@/components/editable-cell";
+import { PageModeBanner } from "@/components/page-mode-banner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import {
-  useTopics,
-  useUpdateTopics,
-  type TopicConfigPayload,
-  type TopicsResponse,
-} from "@/hooks/use-topics";
-
-const ESCALATION_LEVELS = ["high", "medium", "low", "none"] as const;
-const CONFIRMATION_ACTIONS = ["sending_on_behalf", "financial_action", "system_change"] as const;
+import { useTopics, type TopicConfigPayload } from "@/hooks/use-topics";
 
 export interface TopicCardProps {
   config: TopicConfigPayload;
-  onUpdate: (patch: Partial<TopicConfigPayload>) => void;
 }
 
-function TopicCard({ config, onUpdate }: TopicCardProps) {
-  const isEnabled = config.behavior?.enabled !== "false";
-
+function TopicCard({ config }: TopicCardProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{config.label}</CardTitle>
-          <Switch
-            checked={isEnabled}
-            onCheckedChange={(checked) =>
-              onUpdate({
-                behavior: { ...config.behavior, enabled: checked ? "true" : "false" },
-              })
-            }
-          />
+          <Badge variant="outline">Read only</Badge>
         </div>
         <p className="text-xs text-muted-foreground">{config.description}</p>
       </CardHeader>
@@ -44,54 +21,18 @@ function TopicCard({ config, onUpdate }: TopicCardProps) {
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
             <p className="text-xs text-muted-foreground">Tone</p>
-            <EditableCell
-              value={config.behavior?.tone ?? ""}
-              onSave={(tone) => onUpdate({ behavior: { ...config.behavior, tone } })}
-            />
+            <p>{config.behavior?.tone ?? "Configured in code"}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Format</p>
-            <EditableCell
-              value={config.behavior?.format ?? ""}
-              onSave={(format) => onUpdate({ behavior: { ...config.behavior, format } })}
-            />
+            <p>{config.behavior?.format ?? "Configured in code"}</p>
           </div>
         </div>
 
         <div>
           <p className="text-xs text-muted-foreground mb-1">Escalation</p>
-          <Select
-            value={config.escalation}
-            onChange={(e) => onUpdate({ escalation: e.target.value })}
-            className="h-8 text-xs"
-          >
-            {ESCALATION_LEVELS.map((level) => (
-              <option key={level} value={level}>
-                {level}
-              </option>
-            ))}
-          </Select>
+          <p>{config.escalation}</p>
         </div>
-
-        {config.confirmation_required !== undefined && (
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">Confirmation Required</p>
-            <Switch
-              checked={config.confirmation_required}
-              onCheckedChange={(checked) => onUpdate({ confirmation_required: checked })}
-            />
-          </div>
-        )}
-
-        {config.confirmation_required_for_sends !== undefined && (
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">Confirm Sends</p>
-            <Switch
-              checked={config.confirmation_required_for_sends}
-              onCheckedChange={(checked) => onUpdate({ confirmation_required_for_sends: checked })}
-            />
-          </div>
-        )}
 
         {config.cross_topic_connections && config.cross_topic_connections.length > 0 && (
           <div>
@@ -112,44 +53,6 @@ function TopicCard({ config, onUpdate }: TopicCardProps) {
 
 export function TopicsRoute() {
   const { data, isLoading } = useTopics();
-  const mutation = useUpdateTopics();
-
-  const updateTopic = useCallback(
-    (topicKey: string, patch: Partial<TopicConfigPayload>) => {
-      if (!data) return;
-      const current = data.topics[topicKey];
-      const nextTopics = {
-        ...data.topics,
-        [topicKey]: { ...current, ...patch },
-      };
-      const payload: TopicsResponse = {
-        ...data,
-        topics: nextTopics,
-      };
-      mutation.mutate(payload);
-    },
-    [data, mutation],
-  );
-
-  const toggleApprovalGate = useCallback(
-    (action: string) => {
-      if (!data) return;
-      const nextSet = new Set(data.confirmation_gates.always_require_approval);
-      if (nextSet.has(action)) {
-        nextSet.delete(action);
-      } else {
-        nextSet.add(action);
-      }
-      mutation.mutate({
-        ...data,
-        confirmation_gates: {
-          ...data.confirmation_gates,
-          always_require_approval: [...nextSet],
-        },
-      });
-    },
-    [data, mutation],
-  );
 
   if (isLoading || !data) {
     return <p className="text-sm text-muted-foreground">Loading topics…</p>;
@@ -165,10 +68,14 @@ export function TopicsRoute() {
           Topic profile settings, escalation controls, and confirmation gates.
         </p>
       </div>
+      <PageModeBanner
+        mode="read-only"
+        detail="These values are visible for operator reference, but runtime topic composition and confirmation-gate behavior are still code-backed rather than safely live-editable."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {topicEntries.map(([key, config]) => (
-          <TopicCard key={key} config={config} onUpdate={(patch) => updateTopic(key, patch)} />
+          <TopicCard key={key} config={config} />
         ))}
       </div>
 
@@ -181,50 +88,21 @@ export function TopicsRoute() {
             <div>
               <p className="text-xs text-muted-foreground mb-1">Always Require Approval</p>
               <div className="flex flex-wrap gap-1">
-                {CONFIRMATION_ACTIONS.map((action) => (
-                  <Button
-                    key={action}
-                    type="button"
-                    size="sm"
-                    variant={
-                      data.confirmation_gates.always_require_approval.includes(action)
-                        ? "default"
-                        : "outline"
-                    }
-                    onClick={() => toggleApprovalGate(action)}
-                  >
+                {data.confirmation_gates.always_require_approval.map((action) => (
+                  <Badge key={action} variant="secondary" className="text-xs">
                     {action.replace(/_/g, " ")}
-                  </Button>
+                  </Badge>
                 ))}
               </div>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Expiry Minutes</p>
-              <EditableCell
-                value={String(data.confirmation_gates.expiry_minutes)}
-                type="number"
-                onSave={(v) => {
-                  const n = Number.parseInt(v, 10);
-                  if (Number.isNaN(n) || n <= 0) return;
-                  mutation.mutate({
-                    ...data,
-                    confirmation_gates: { ...data.confirmation_gates, expiry_minutes: n },
-                  });
-                }}
-              />
+              <p>{data.confirmation_gates.expiry_minutes}</p>
             </div>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">On Expiry</p>
-            <EditableCell
-              value={data.confirmation_gates.on_expiry}
-              onSave={(v) => {
-                mutation.mutate({
-                  ...data,
-                  confirmation_gates: { ...data.confirmation_gates, on_expiry: v },
-                });
-              }}
-            />
+            <p>{data.confirmation_gates.on_expiry}</p>
           </div>
         </CardContent>
       </Card>

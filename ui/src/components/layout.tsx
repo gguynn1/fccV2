@@ -19,6 +19,7 @@ const navigationItems: NavigationItem[] = [
   { to: "/scheduler", label: "Scheduler" },
   { to: "/queue", label: "Queue" },
   { to: "/activity", label: "Activity" },
+  { to: "/state", label: "State" },
   { to: "/eval", label: "Eval" },
   { to: "/emulation", label: "Emulation" },
 ];

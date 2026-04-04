@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import type { AdminMutationResponseBase } from "@/hooks/admin-mutations";
 import { adminFetch } from "@/lib/api";
 
 export interface DigestScheduleBlockPayload {
@@ -25,6 +26,10 @@ export interface SchedulerResponse {
   daily_rhythm: DailyRhythmPayload;
 }
 
+export interface UpdateSchedulerResponse extends AdminMutationResponseBase {
+  daily_rhythm: DailyRhythmPayload;
+}
+
 export function useScheduler() {
   return useQuery({
     queryKey: ["admin", "scheduler"],
@@ -37,12 +42,15 @@ export function useUpdateScheduler() {
 
   return useMutation({
     mutationFn: (payload: SchedulerResponse) =>
-      adminFetch("/scheduler", {
+      adminFetch<UpdateSchedulerResponse>("/scheduler", {
         method: "PUT",
         body: JSON.stringify(payload),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "scheduler"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "config"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "entities"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
     },
   });
 }

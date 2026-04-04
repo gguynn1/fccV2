@@ -1,6 +1,8 @@
 import { useCallback } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
+import { PageModeBanner } from "@/components/page-mode-banner";
+import { ReconciliationSummary } from "@/components/reconciliation-summary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,13 +37,22 @@ export function ThreadsRoute() {
   const toggleParticipant = useCallback(
     (threadId: string, entityId: string, isMember: boolean) => {
       if (!configData) return;
-      const nextThreads = configData.threads.map((t) => {
-        if (t.id !== threadId) return t;
-        const participants = isMember
-          ? [...t.participants, entityId]
-          : t.participants.filter((p) => p !== entityId);
-        return { ...t, participants };
-      });
+      const existing = configData.threads.find((thread) => thread.id === threadId);
+      const baseThread =
+        existing ??
+        ({
+          id: threadId,
+          type: "shared",
+          participants: [],
+          description: "Couple thread. Finances, relationship, couple-level coordination.",
+        } as const);
+      const participants = isMember
+        ? [...baseThread.participants, entityId]
+        : baseThread.participants.filter((participant) => participant !== entityId);
+      const nextThread = { ...baseThread, participants };
+      const nextThreads = existing
+        ? configData.threads.map((thread) => (thread.id === threadId ? nextThread : thread))
+        : [...configData.threads, nextThread];
       updateConfig.mutate({ ...configData, threads: nextThreads });
     },
     [configData, updateConfig],
@@ -55,13 +66,30 @@ export function ThreadsRoute() {
   const adultEntityIds = entitiesData.entities
     .filter((entity) => entity.type === EntityType.Adult)
     .map((entity) => entity.id);
+  const privateThreads = configData.threads.filter((thread) => thread.type === "private");
+  const familyThread = configData.threads.find((thread) => thread.id === "family");
+  const coupleThread = configData.threads.find((thread) => thread.id === "couple");
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Threads</h2>
-        <p className="text-sm text-muted-foreground">System config and thread membership.</p>
+        <p className="text-sm text-muted-foreground">
+          System config plus the generated thread graph.
+        </p>
       </div>
+      <PageModeBanner
+        mode="editable"
+        detail="Timezone, locale, and couple membership update live. Private and family threads are generated from the current entity roster and shown read-only."
+      />
+      <ReconciliationSummary result={updateConfig.data} />
+      {updateConfig.error instanceof Error && (
+        <Card className="border-destructive/40">
+          <CardContent className="pt-6 text-sm text-destructive">
+            {updateConfig.error.message}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -87,48 +115,76 @@ export function ThreadsRoute() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Thread Configuration</CardTitle>
+          <CardTitle>Generated Threads</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Thread ID</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Participants</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {configData.threads.map((thread) => (
-                <TableRow key={thread.id}>
-                  <TableCell className="font-mono text-xs">{thread.id}</TableCell>
-                  <TableCell>
-                    <Badge variant={thread.type === "private" ? "secondary" : "outline"}>
-                      {thread.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {(thread.id === "couple" ? adultEntityIds : entityIds).map((eId) => {
-                        const isMember = thread.participants.includes(eId);
-                        return (
-                          <Button
-                            key={eId}
-                            type="button"
-                            size="sm"
-                            variant={isMember ? "default" : "outline"}
-                            onClick={() => toggleParticipant(thread.id, eId, !isMember)}
-                          >
-                            {eId}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  </TableCell>
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium">Private Threads</h3>
+              <Badge variant="outline">Read only</Badge>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Thread ID</TableHead>
+                  <TableHead>Participant</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {privateThreads.map((thread) => (
+                  <TableRow key={thread.id}>
+                    <TableCell className="font-mono text-xs">{thread.id}</TableCell>
+                    <TableCell>{thread.participants[0] ?? ""}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium">Family Thread</h3>
+              <Badge variant="outline">Read only</Badge>
+            </div>
+            <div className="rounded-md border border-border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-mono text-xs">{familyThread?.id ?? "family"}</span>
+                <div className="flex flex-wrap gap-1">
+                  {(familyThread?.participants ?? entityIds).map((entityId) => (
+                    <Badge key={entityId} variant="secondary" className="text-xs">
+                      {entityId}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium">Couple Thread</h3>
+              <Badge variant="secondary">Editable</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Select at least two adults to keep the couple thread. Leave fewer than two selected to remove it.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {adultEntityIds.map((entityId) => {
+                const isMember = coupleThread?.participants.includes(entityId) ?? false;
+                return (
+                  <Button
+                    key={entityId}
+                    type="button"
+                    size="sm"
+                    variant={isMember ? "default" : "outline"}
+                    onClick={() => toggleParticipant("couple", entityId, !isMember)}
+                  >
+                    {entityId}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

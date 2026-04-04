@@ -45,6 +45,12 @@ export interface QueueDepthSnapshot {
   dead_letter: number;
 }
 
+export interface PendingQueueReconciliationResult {
+  removed_item_ids: string[];
+  updated_item_ids: string[];
+  skipped_active_item_ids: string[];
+}
+
 export class BullQueueService {
   private readonly queue: Queue<PendingQueueItem>;
 
@@ -338,6 +344,48 @@ export class BullQueueService {
       "Dead-letter queue item discarded.",
     );
     return item;
+  }
+
+  public async reconcilePendingItems(
+    reconcile: (item: PendingQueueItem) => PendingQueueItem | null,
+  ): Promise<PendingQueueReconciliationResult> {
+    const jobs = await this.queue.getJobs(["waiting", "delayed", "active"], 0, -1, true);
+    const removed_item_ids: string[] = [];
+    const updated_item_ids: string[] = [];
+    const skipped_active_item_ids: string[] = [];
+
+    for (const job of jobs) {
+      const item = pendingQueueItemSchema.parse(job.data);
+      const next = reconcile(item);
+      const isActive = await job.isActive();
+      if (!next) {
+        if (isActive) {
+          skipped_active_item_ids.push(item.id);
+          continue;
+        }
+        await job.remove();
+        removed_item_ids.push(item.id);
+        continue;
+      }
+
+      if (JSON.stringify(next) === JSON.stringify(item)) {
+        continue;
+      }
+
+      if (isActive) {
+        skipped_active_item_ids.push(item.id);
+        continue;
+      }
+
+      await job.updateData(next);
+      updated_item_ids.push(item.id);
+    }
+
+    return {
+      removed_item_ids,
+      updated_item_ids,
+      skipped_active_item_ids,
+    };
   }
 
   private extractQueueItemId(item: StackQueueItem): string {

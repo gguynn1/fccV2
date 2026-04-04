@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
+import { PageModeBanner } from "@/components/page-mode-banner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBudget, useUpdateBudget, type BudgetResponse } from "@/hooks/use-budget";
@@ -41,6 +42,10 @@ export function BudgetRoute() {
           Outbound budget limits and collision precedence.
         </p>
       </div>
+      <PageModeBanner
+        mode="editable"
+        detail="Budget limits apply live. Collision precedence is shown for reference and is currently read-only."
+      />
 
       <Card>
         <CardHeader>

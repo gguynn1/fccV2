@@ -4,7 +4,10 @@ import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastif
 import { z } from "zod";
 
 import { entitySchema, Permission } from "../01-service-stack/02-identity-service/types.js";
-import { type BullQueueService } from "../01-service-stack/04-queue/index.js";
+import {
+  type BullQueueService,
+  type PendingQueueReconciliationResult,
+} from "../01-service-stack/04-queue/index.js";
 import type { PendingQueueItem } from "../01-service-stack/04-queue/types.js";
 import { CollisionPrecedence } from "../01-service-stack/06-action-router/types.js";
 import { type SqliteStateService } from "../02-supporting-services/03-state-service/index.js";
@@ -12,6 +15,13 @@ import { ThreadType } from "../02-supporting-services/05-routing-service/types.j
 import { EscalationReassignmentPolicy } from "../02-supporting-services/07-escalation-service/types.js";
 import { ConfirmationActionType } from "../02-supporting-services/08-confirmation-service/types.js";
 import { applyRuntimeSystemConfig } from "../config/runtime-system-config.js";
+import {
+  AdminConfigInvariantError,
+  hardenConfigEdit,
+  reconcilePendingQueueItemForConfig,
+  type ConfigEditSource,
+  type ConfigReconciliationReport,
+} from "./config-hardening.js";
 import {
   EntityType,
   EscalationLevel,
@@ -110,7 +120,6 @@ const configPayloadSchema = z.object({
     is_onboarded: z.boolean(),
   }),
   threads: z.array(threadSchema),
-  daily_rhythm: dailyRhythmSchema,
 });
 
 const topicsPayloadSchema = z.object({
@@ -148,6 +157,13 @@ const emulationSendSchema = z.object({
 const emulationMessagesQuerySchema = z.object({
   thread_id: z.string().min(1).optional(),
   since: z.string().optional(),
+});
+
+const domainStateMutationSchema = z.object({
+  category: z.string().min(1),
+  collection: z.string().min(1).optional(),
+  row_id: z.string().min(1).optional(),
+  row_key: z.string().min(1).optional(),
 });
 
 export interface AdminRoutesOptions {
@@ -209,16 +225,173 @@ function toDispatchMetadata(
   };
 }
 
-async function saveConfig(
+const DOMAIN_CATEGORY_COLLECTIONS: Record<string, string[]> = {
+  calendar: ["events"],
+  chores: ["active", "completed_recent"],
+  finances: ["bills", "expenses_recent", "savings_goals"],
+  grocery: ["list", "recently_purchased"],
+  health: ["profiles"],
+  pets: ["profiles"],
+  school: ["students", "communications"],
+  travel: ["trips"],
+  vendors: ["records"],
+  business: ["profiles", "leads"],
+  relationship: ["nudge_history"],
+  family_status: ["current"],
+  meals: ["planned", "dietary_notes"],
+  maintenance: ["assets", "items"],
+  digests: ["history"],
+};
+
+function clearDomainCategoryRecords(state: Awaited<ReturnType<SqliteStateService["getSystemState"]>>, category: string): number {
+  if (category === "threads") {
+    const count = Object.keys(state.threads).length;
+    state.threads = {};
+    return count;
+  }
+
+  const collections = DOMAIN_CATEGORY_COLLECTIONS[category];
+  if (!collections) {
+    throw new Error(`Unsupported state category: ${category}`);
+  }
+  const target = state[category as keyof typeof state] as Record<string, unknown>;
+  if (!target || typeof target !== "object") {
+    throw new Error(`State category is not mutable: ${category}`);
+  }
+
+  let cleared = 0;
+  for (const collection of collections) {
+    const value = target[collection];
+    if (Array.isArray(value)) {
+      cleared += value.length;
+      target[collection] = [];
+    }
+  }
+  return cleared;
+}
+
+function clearDomainCollectionRecords(
+  state: Awaited<ReturnType<SqliteStateService["getSystemState"]>>,
+  category: string,
+  collection: string,
+): number {
+  if (category === "threads") {
+    if (collection !== "entries") {
+      throw new Error(`Unsupported threads collection: ${collection}`);
+    }
+    const count = Object.keys(state.threads).length;
+    state.threads = {};
+    return count;
+  }
+
+  const allowedCollections = DOMAIN_CATEGORY_COLLECTIONS[category];
+  if (!allowedCollections || !allowedCollections.includes(collection)) {
+    throw new Error(`Unsupported state collection: ${category}.${collection}`);
+  }
+
+  const target = state[category as keyof typeof state] as Record<string, unknown>;
+  const value = target?.[collection];
+  if (!Array.isArray(value)) {
+    throw new Error(`State collection is not a list: ${category}.${collection}`);
+  }
+  const count = value.length;
+  target[collection] = [];
+  return count;
+}
+
+function clearDomainRowRecord(
+  state: Awaited<ReturnType<SqliteStateService["getSystemState"]>>,
+  category: string,
+  collection: string,
+  rowId: string,
+  rowKey: string,
+): number {
+  if (category === "threads") {
+    if (!(rowId in state.threads)) {
+      return 0;
+    }
+    delete state.threads[rowId];
+    return 1;
+  }
+
+  const allowedCollections = DOMAIN_CATEGORY_COLLECTIONS[category];
+  if (!allowedCollections || !allowedCollections.includes(collection)) {
+    throw new Error(`Unsupported state collection: ${category}.${collection}`);
+  }
+  const target = state[category as keyof typeof state] as Record<string, unknown>;
+  const value = target?.[collection];
+  if (!Array.isArray(value)) {
+    throw new Error(`State collection is not a list: ${category}.${collection}`);
+  }
+  const before = value.length;
+  target[collection] = value.filter((entry) => {
+    if (!entry || typeof entry !== "object") {
+      return true;
+    }
+    const record = entry as Record<string, unknown>;
+    return String(record[rowKey] ?? "") !== rowId;
+  });
+  const after = Array.isArray(target[collection]) ? (target[collection] as unknown[]).length : before;
+  return Math.max(0, before - after);
+}
+
+interface AppliedAdminConfigChange {
+  config: Awaited<ReturnType<SqliteStateService["getSystemConfig"]>>;
+  reconciliation: ConfigReconciliationReport;
+  queue_reconciliation: PendingQueueReconciliationResult;
+}
+
+async function applyAdminConfigChange(
+  queueService: BullQueueService,
   stateService: SqliteStateService,
-  nextConfig: Awaited<ReturnType<SqliteStateService["getSystemConfig"]>>,
-): Promise<void> {
-  applyRuntimeSystemConfig(nextConfig);
-  await stateService.saveSystemConfig(nextConfig);
+  source: ConfigEditSource,
+  mutate: (nextConfig: Awaited<ReturnType<SqliteStateService["getSystemConfig"]>>) => void,
+): Promise<AppliedAdminConfigChange> {
+  const currentConfig = await stateService.getSystemConfig();
+  const currentState = await stateService.getSystemState();
+  const nextConfig = structuredClone(currentConfig);
+  mutate(nextConfig);
+
+  const hardened = hardenConfigEdit({
+    current_config: currentConfig,
+    next_config: nextConfig,
+    current_state: currentState,
+    source,
+  });
+  const queueReconciliation = await queueService.reconcilePendingItems((item) =>
+    reconcilePendingQueueItemForConfig(item, hardened.config),
+  );
+
+  const validThreadIds = hardened.config.threads.map((thread) => thread.id);
+  stateService.applyAdminConfigAtomically(hardened.state, hardened.config, validThreadIds);
+  applyRuntimeSystemConfig(hardened.config);
+
+  return {
+    config: hardened.config,
+    reconciliation: hardened.report,
+    queue_reconciliation: queueReconciliation,
+  };
 }
 
 export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, options, done) => {
   fastify.addHook("onRequest", rejectTunnelAccess);
+  fastify.setErrorHandler((error, _request, reply) => {
+    if (error instanceof AdminConfigInvariantError) {
+      void reply.code(400).send({
+        error: "invalid_admin_config",
+        message: error.message,
+      });
+      return;
+    }
+    if (error instanceof z.ZodError) {
+      void reply.code(400).send({
+        error: "invalid_payload",
+        message: error.issues[0]?.message ?? "Request payload was invalid.",
+      });
+      return;
+    }
+    void reply.send(error);
+  });
 
   fastify.get("/system", () => {
     return {
@@ -239,24 +412,28 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     return {
       system: config.system,
       threads: config.threads,
-      daily_rhythm: config.daily_rhythm,
     };
   });
 
   fastify.put("/config", async (request) => {
     const payload = configPayloadSchema.parse(request.body);
-    const nextConfig = structuredClone(await options.state_service.getSystemConfig());
-    nextConfig.system = payload.system;
-    nextConfig.threads = payload.threads;
-    nextConfig.daily_rhythm = payload.daily_rhythm;
-    await saveConfig(options.state_service, nextConfig);
+    const result = await applyAdminConfigChange(
+      options.queue_service,
+      options.state_service,
+      "config",
+      (nextConfig) => {
+        nextConfig.system = payload.system;
+        nextConfig.threads = payload.threads;
+      },
+    );
     return {
       ok: true,
       config: {
-        system: nextConfig.system,
-        threads: nextConfig.threads,
-        daily_rhythm: nextConfig.daily_rhythm,
+        system: result.config.system,
+        threads: result.config.threads,
       },
+      reconciliation: result.reconciliation,
+      queue_reconciliation: result.queue_reconciliation,
     };
   });
 
@@ -265,17 +442,27 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     return {
       entities: config.entities,
       threads: config.threads,
+      daily_rhythm: config.daily_rhythm,
     };
   });
 
   fastify.put("/entities", async (request) => {
     const payload = entitiesPayloadSchema.parse(request.body);
-    const nextConfig = structuredClone(await options.state_service.getSystemConfig());
-    nextConfig.entities = payload.entities;
-    await saveConfig(options.state_service, nextConfig);
+    const result = await applyAdminConfigChange(
+      options.queue_service,
+      options.state_service,
+      "entities",
+      (nextConfig) => {
+        nextConfig.entities = payload.entities;
+      },
+    );
     return {
       ok: true,
-      entities: nextConfig.entities,
+      entities: result.config.entities,
+      threads: result.config.threads,
+      daily_rhythm: result.config.daily_rhythm,
+      reconciliation: result.reconciliation,
+      queue_reconciliation: result.queue_reconciliation,
     };
   });
 
@@ -288,20 +475,12 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     };
   });
 
-  fastify.put("/topics", async (request) => {
-    const payload = topicsPayloadSchema.parse(request.body);
-    const nextConfig = structuredClone(await options.state_service.getSystemConfig());
-    nextConfig.topics = payload.topics as unknown as typeof nextConfig.topics;
-    nextConfig.escalation_profiles =
-      payload.escalation_profiles as typeof nextConfig.escalation_profiles;
-    nextConfig.confirmation_gates = payload.confirmation_gates;
-    await saveConfig(options.state_service, nextConfig);
-    return {
-      ok: true,
-      topics: nextConfig.topics,
-      escalation_profiles: nextConfig.escalation_profiles,
-      confirmation_gates: nextConfig.confirmation_gates,
-    };
+  fastify.put("/topics", async (_request, reply) => {
+    void reply.code(405).send({
+      error: "method_not_allowed",
+      message:
+        "Topic and confirmation-gate edits are read-only until runtime consumers use persisted topic config live.",
+    });
   });
 
   fastify.get("/budget", async () => {
@@ -316,16 +495,23 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
 
   fastify.put("/budget", async (request) => {
     const payload = budgetPayloadSchema.parse(request.body);
-    const nextConfig = structuredClone(await options.state_service.getSystemConfig());
-    nextConfig.dispatch.outbound_budget = payload.dispatch.outbound_budget;
-    nextConfig.dispatch.collision_avoidance = payload.dispatch.collision_avoidance;
-    await saveConfig(options.state_service, nextConfig);
+    const result = await applyAdminConfigChange(
+      options.queue_service,
+      options.state_service,
+      "budget",
+      (nextConfig) => {
+        nextConfig.dispatch.outbound_budget = payload.dispatch.outbound_budget;
+        nextConfig.dispatch.collision_avoidance = payload.dispatch.collision_avoidance;
+      },
+    );
     return {
       ok: true,
       dispatch: {
-        outbound_budget: nextConfig.dispatch.outbound_budget,
-        collision_avoidance: nextConfig.dispatch.collision_avoidance,
+        outbound_budget: result.config.dispatch.outbound_budget,
+        collision_avoidance: result.config.dispatch.collision_avoidance,
       },
+      reconciliation: result.reconciliation,
+      queue_reconciliation: result.queue_reconciliation,
     };
   });
 
@@ -338,12 +524,19 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
 
   fastify.put("/scheduler", async (request) => {
     const payload = schedulerPayloadSchema.parse(request.body);
-    const nextConfig = structuredClone(await options.state_service.getSystemConfig());
-    nextConfig.daily_rhythm = payload.daily_rhythm;
-    await saveConfig(options.state_service, nextConfig);
+    const result = await applyAdminConfigChange(
+      options.queue_service,
+      options.state_service,
+      "scheduler",
+      (nextConfig) => {
+        nextConfig.daily_rhythm = payload.daily_rhythm;
+      },
+    );
     return {
       ok: true,
-      daily_rhythm: nextConfig.daily_rhythm,
+      daily_rhythm: result.config.daily_rhythm,
+      reconciliation: result.reconciliation,
+      queue_reconciliation: result.queue_reconciliation,
     };
   });
 
@@ -387,6 +580,66 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     return {
       recent: systemState.queue.recently_dispatched.map(toDispatchMetadata),
     };
+  });
+
+  fastify.get("/state/domain", async () => {
+    const systemState = await options.state_service.getSystemState();
+    return {
+      outbound_budget_tracker: systemState.outbound_budget_tracker,
+      calendar: systemState.calendar,
+      chores: systemState.chores,
+      finances: systemState.finances,
+      grocery: systemState.grocery,
+      health: systemState.health,
+      pets: systemState.pets,
+      school: systemState.school,
+      travel: systemState.travel,
+      vendors: systemState.vendors,
+      business: systemState.business,
+      relationship: systemState.relationship,
+      family_status: systemState.family_status,
+      meals: systemState.meals,
+      maintenance: systemState.maintenance,
+      data_ingest_state: systemState.data_ingest_state,
+      digests: systemState.digests,
+      threads: systemState.threads,
+    };
+  });
+
+  fastify.post("/state/domain/mutate", async (request, reply) => {
+    const payload = domainStateMutationSchema.parse(request.body);
+    const state = await options.state_service.getSystemState();
+
+    try {
+      let cleared = 0;
+      if (payload.row_id) {
+        if (!payload.collection) {
+          return reply.code(400).send({
+            error: "invalid_state_mutation",
+            message: "collection is required when clearing a single row.",
+          });
+        }
+        cleared = clearDomainRowRecord(
+          state,
+          payload.category,
+          payload.collection,
+          payload.row_id,
+          payload.row_key ?? "id",
+        );
+      } else if (payload.collection) {
+        cleared = clearDomainCollectionRecords(state, payload.category, payload.collection);
+      } else {
+        cleared = clearDomainCategoryRecords(state, payload.category);
+      }
+
+      await options.state_service.saveSystemState(state);
+      return { ok: true, cleared };
+    } catch (error: unknown) {
+      return reply.code(400).send({
+        error: "invalid_state_mutation",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   fastify.post("/state/queue/dlq/:id/retry", async (request) => {

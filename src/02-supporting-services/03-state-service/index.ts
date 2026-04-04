@@ -10,6 +10,7 @@ import {
   createMinimalSystemState,
 } from "../../config/minimal-system-config.js";
 import type { SystemConfig } from "../../index.js";
+import { DispatchPriority, TopicKey } from "../../types.js";
 import type { ThreadHistory } from "../05-routing-service/types.js";
 import type { StateService } from "../types.js";
 import {
@@ -45,6 +46,18 @@ interface MigrationFile {
   version: number;
   file_name: string;
   sql: string;
+}
+
+interface StoredDispatchRecord {
+  id: string;
+  topic: SystemState["queue"]["recently_dispatched"][number]["topic"];
+  target_thread: string;
+  content: string;
+  dispatched_at: Date;
+  priority: SystemState["queue"]["recently_dispatched"][number]["priority"];
+  included_in?: string;
+  response_received?: boolean;
+  escalation_step?: number;
 }
 
 function ensureDatabaseDirectory(databasePath: string): void {
@@ -143,6 +156,37 @@ function extractQueueItemId(queueItem: StackQueueItem): string {
   return `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function toStoredDispatchRecord(
+  queueItemId: string,
+  queueItem: StackQueueItem,
+  action: ActionRouterResult,
+  dispatchedAt: Date,
+): StoredDispatchRecord | null {
+  if (action.decision === "dispatch") {
+    return {
+      id: queueItemId,
+      topic: queueItem.topic ?? TopicKey.FamilyStatus,
+      target_thread: action.outbound.target_thread,
+      content: action.outbound.content,
+      dispatched_at: dispatchedAt,
+      priority: action.outbound.priority,
+    };
+  }
+
+  if (action.decision === "store") {
+    return {
+      id: queueItemId,
+      topic: queueItem.topic ?? TopicKey.FamilyStatus,
+      target_thread: action.queue_item.target_thread,
+      content: typeof queueItem.content === "string" ? queueItem.content : JSON.stringify(queueItem.content),
+      dispatched_at: dispatchedAt,
+      priority: queueItem.priority ?? DispatchPriority.Silent,
+    };
+  }
+
+  return null;
+}
+
 function createDefaultStateSnapshot(now: Date): SystemState {
   return createMinimalSystemState(now);
 }
@@ -215,6 +259,7 @@ export class SqliteStateService implements StateService {
     // SQL tables but does not update the snapshot blob. Read from the SQL tables so the
     // scheduler and other consumers always see the current pending set.
     state.queue.pending = this.readQueuePendingFromTable();
+    state.queue.recently_dispatched = this.readQueueRecentlyDispatchedFromTable();
 
     return state;
   }
@@ -238,6 +283,7 @@ export class SqliteStateService implements StateService {
           updated_at: nowIso,
         });
       this.syncQueuePendingToTable(nextState.queue.pending);
+      this.syncQueueRecentlyDispatchedToTable(nextState.queue.recently_dispatched);
     });
 
     saveSnapshot(state);
@@ -279,6 +325,64 @@ export class SqliteStateService implements StateService {
     return Promise.resolve();
   }
 
+  public pruneThreadHistories(validThreadIds: string[]): number {
+    const placeholders = validThreadIds.map(() => "?").join(", ");
+    const statement =
+      validThreadIds.length === 0
+        ? "DELETE FROM thread_histories"
+        : `DELETE FROM thread_histories WHERE thread_id NOT IN (${placeholders})`;
+    const result = this.db.prepare(statement).run(...validThreadIds);
+    return result.changes;
+  }
+
+  /**
+   * Atomically persists state, prunes stale thread histories, and persists
+   * config within a single SQLite transaction. Prevents crash-consistency
+   * gaps where state is saved but config is not (or vice versa).
+   */
+  public applyAdminConfigAtomically(
+    nextState: SystemState,
+    nextConfig: SystemConfig,
+    validThreadIds: string[],
+  ): void {
+    validateStateSlices(nextState);
+    const nowIso = new Date().toISOString();
+
+    const tx = this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO state_snapshots (id, payload, updated_at)
+           VALUES (1, @payload, @updated_at)
+           ON CONFLICT(id) DO UPDATE SET
+             payload = excluded.payload,
+             updated_at = excluded.updated_at`,
+        )
+        .run({ payload: serializeForStorage(nextState), updated_at: nowIso });
+      this.syncQueuePendingToTable(nextState.queue.pending);
+      this.syncQueueRecentlyDispatchedToTable(nextState.queue.recently_dispatched);
+
+      const placeholders = validThreadIds.map(() => "?").join(", ");
+      const pruneStatement =
+        validThreadIds.length === 0
+          ? "DELETE FROM thread_histories"
+          : `DELETE FROM thread_histories WHERE thread_id NOT IN (${placeholders})`;
+      this.db.prepare(pruneStatement).run(...validThreadIds);
+
+      this.db
+        .prepare(
+          `INSERT INTO system_configs (id, payload, updated_at)
+           VALUES (1, @payload, @updated_at)
+           ON CONFLICT(id) DO UPDATE SET
+             payload = excluded.payload,
+             updated_at = excluded.updated_at`,
+        )
+        .run({ payload: serializeForStorage(nextConfig), updated_at: nowIso });
+    });
+
+    tx();
+    this.logger.info({ at: nowIso }, "Admin config change persisted atomically.");
+  }
+
   public appendDispatchResult(
     queue_item: StackQueueItem,
     action: ActionRouterResult,
@@ -317,6 +421,7 @@ export class SqliteStateService implements StateService {
       }
 
       if (action.decision === "store") {
+        const record = toStoredDispatchRecord(queueItemId, queue_item, action, new Date(actionRecordedAt));
         this.db
           .prepare(
             `
@@ -329,12 +434,13 @@ export class SqliteStateService implements StateService {
           )
           .run({
             id: queueItemId,
-            payload: serializeForStorage(action),
+            payload: serializeForStorage(record),
             dispatched_at: actionRecordedAt,
           });
       }
 
       if (action.decision === "dispatch") {
+        const record = toStoredDispatchRecord(queueItemId, queue_item, action, new Date(actionRecordedAt));
         this.db
           .prepare(
             `
@@ -347,7 +453,7 @@ export class SqliteStateService implements StateService {
           )
           .run({
             id: queueItemId,
-            payload: serializeForStorage(action),
+            payload: serializeForStorage(record),
             dispatched_at: actionRecordedAt,
           });
       }
@@ -390,6 +496,64 @@ export class SqliteStateService implements StateService {
       .prepare("SELECT payload FROM queue_pending ORDER BY created_at ASC")
       .all() as { payload: string }[];
     return rows.map((row) => reviveDatesFromJson(row.payload));
+  }
+
+  private readQueueRecentlyDispatchedFromTable(): SystemState["queue"]["recently_dispatched"] {
+    const rows = this.db
+      .prepare("SELECT id, payload, dispatched_at FROM queue_recently_dispatched ORDER BY dispatched_at DESC")
+      .all() as { id: string; payload: string; dispatched_at: string }[];
+    return rows.flatMap((row) => {
+      const parsed = reviveDatesFromJson<StoredDispatchRecord | ActionRouterResult>(row.payload);
+      if ("decision" in parsed) {
+        if (parsed.decision === "dispatch") {
+          return [
+            {
+              id: row.id,
+              topic: TopicKey.FamilyStatus,
+              target_thread: parsed.outbound.target_thread,
+              content: parsed.outbound.content,
+              dispatched_at: new Date(row.dispatched_at),
+              priority: parsed.outbound.priority,
+            },
+          ];
+        }
+        if (parsed.decision === "store") {
+          return [
+            {
+              id: row.id,
+              topic: TopicKey.FamilyStatus,
+              target_thread: parsed.queue_item.target_thread,
+              content: "",
+              dispatched_at: new Date(row.dispatched_at),
+              priority: DispatchPriority.Silent,
+            },
+          ];
+        }
+        return [];
+      }
+      return [{ ...parsed, id: row.id, dispatched_at: new Date(row.dispatched_at) }];
+    });
+  }
+
+  private syncQueueRecentlyDispatchedToTable(
+    recentlyDispatched: SystemState["queue"]["recently_dispatched"],
+  ): void {
+    const tx = this.db.transaction(() => {
+      this.db.prepare("DELETE FROM queue_recently_dispatched").run();
+      const insert = this.db.prepare(
+        "INSERT INTO queue_recently_dispatched (id, payload, dispatched_at) VALUES (?, ?, ?)",
+      );
+      for (const item of recentlyDispatched) {
+        insert.run(
+          item.id,
+          serializeForStorage(item),
+          item.dispatched_at instanceof Date
+            ? item.dispatched_at.toISOString()
+            : String(item.dispatched_at),
+        );
+      }
+    });
+    tx();
   }
 
   private syncQueuePendingToTable(pending: SystemState["queue"]["pending"]): void {

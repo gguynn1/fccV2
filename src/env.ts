@@ -26,6 +26,8 @@ const envSchema = z.object({
   IMAP_USER: z.string().optional(),
   IMAP_PASSWORD: z.string().optional(),
   IMAP_MAILBOX: z.string().optional(),
+  ANTHROPIC_MODEL: z.string().optional(),
+  ANTHROPIC_EXTRACTION_MODEL: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
