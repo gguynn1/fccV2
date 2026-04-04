@@ -41,6 +41,7 @@ export default defineConfig(
       ...flatConfigs.recommended.rules,
       ...flatConfigs.typescript.rules,
       eqeqeq: ["error", "always", { null: "always" }],
+      "@typescript-eslint/no-deprecated": "error",
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": [
         "warn",

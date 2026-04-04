@@ -3,6 +3,8 @@ import type { EvalScenarioDefinition } from "../types.js";
 
 export const defaultScenarioSetName = "default";
 
+// This set is intentionally small. It is the worker-replay smoke suite,
+// not a broad portfolio coverage bar for every topic or trigger type.
 export const defaultScenarios: EvalScenarioDefinition[] = [
   {
     id: "calendar-query-family",
@@ -141,6 +143,46 @@ export const defaultScenarios: EvalScenarioDefinition[] = [
       confirmation_required: false,
       tone_markers: ["relationship", "history"],
       format_markers: ["history"],
+    },
+    simulation: { parity_assertion: { against_simulator: false } },
+  },
+  {
+    id: "family-status-shared-thread",
+    title: "Family status updates stay in the shared family thread",
+    category: "routing",
+    prompt_input: {
+      message: "Running late from pickup, home in 20 minutes",
+      concerning: ["participant_1"],
+      origin_thread: "family",
+    },
+    expected: {
+      topic: TopicKey.FamilyStatus,
+      intent: ClassifierIntent.Request,
+      target_thread: "family",
+      priority: DispatchPriority.Immediate,
+      confirmation_required: false,
+      tone_markers: ["status"],
+      format_markers: ["family status"],
+    },
+    simulation: { parity_assertion: { against_simulator: false } },
+  },
+  {
+    id: "chores-shared-request-stays-visible",
+    title: "Shared-thread chore requests keep the immediate reply visible in the family thread",
+    category: "routing",
+    prompt_input: {
+      message: "Take out the trash before dinner",
+      concerning: ["participant_3"],
+      origin_thread: "family",
+    },
+    expected: {
+      topic: TopicKey.Chores,
+      intent: ClassifierIntent.Request,
+      target_thread: "family",
+      priority: DispatchPriority.Immediate,
+      confirmation_required: false,
+      tone_markers: ["active chores"],
+      format_markers: ["active chores"],
     },
     simulation: { parity_assertion: { against_simulator: false } },
   },

@@ -1,65 +1,21 @@
 import { Link } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/page-header";
+import { StatusCard } from "@/components/status-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboard } from "@/hooks/use-dashboard";
-
-function StatusCard({
-  title,
-  value,
-  to,
-  variant = "default",
-  badge,
-}: {
-  title: string;
-  value: string | number;
-  to: string;
-  variant?: "default" | "success" | "warning" | "destructive";
-  badge?: string;
-}) {
-  const colorMap = {
-    default: "border-border",
-    success: "border-emerald-600/40",
-    warning: "border-amber-600/40",
-    destructive: "border-red-600/40",
-  };
-
-  return (
-    <Link to={to}>
-      <Card className={`transition-colors hover:bg-muted/30 ${colorMap[variant]}`}>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center justify-between text-sm font-medium text-muted-foreground">
-            {title}
-            {badge && (
-              <Badge
-                variant={
-                  variant === "destructive"
-                    ? "destructive"
-                    : variant === "warning"
-                      ? "warning"
-                      : "secondary"
-                }
-                className="text-xs"
-              >
-                {badge}
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-2xl font-bold">{value}</p>
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
 
 export function DashboardRoute() {
   const { data, isLoading } = useDashboard();
 
   if (isLoading || !data) {
-    return <p className="text-sm text-muted-foreground">Loading dashboard…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Dashboard" description="System health at a glance." />
+        <p className="text-sm text-muted-foreground">Loading dashboard…</p>
+      </div>
+    );
   }
 
   const { queue, escalations, confirmations, dispatches, budget_usage, budget, system } = data;
@@ -114,10 +70,7 @@ export function DashboardRoute() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Dashboard</h2>
-        <p className="text-sm text-muted-foreground">System health at a glance.</p>
-      </div>
+      <PageHeader title="Dashboard" description="System health at a glance." />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatusCard title="Queue Depth" value={queueDepth} to="/queue" variant={queueVariant} />
@@ -180,7 +133,7 @@ export function DashboardRoute() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
               Assistant Identifier
             </p>
             <p className="break-all rounded-md border bg-muted/30 px-3 py-2 font-mono text-xs">

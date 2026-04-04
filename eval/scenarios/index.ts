@@ -10,6 +10,10 @@ import {
 import { defaultScenarios, defaultScenarioSetName } from "./default.js";
 import { digestQualityName, digestQualityScenarios } from "./digest-quality.js";
 import { nudgeRealismName, nudgeRealismScenarios } from "./nudge-realism.js";
+import {
+  systemTriggeredTruthName,
+  systemTriggeredTruthScenarios,
+} from "./system-triggered-truth.js";
 import { threadDynamicsName, threadDynamicsScenarios } from "./thread-dynamics.js";
 import { toneRegressionName, toneRegressionScenarios } from "./tone-regression.js";
 
@@ -114,6 +118,11 @@ const scenarioSets: EvalScenarioSet[] = [
     name: nudgeRealismName,
     label: "Nudge Realism",
     scenarios: nudgeRealismScenarios,
+  },
+  {
+    name: systemTriggeredTruthName,
+    label: "System Triggered Truth",
+    scenarios: systemTriggeredTruthScenarios,
   },
   ...(await loadGeneratedScenarioSets()),
 ];

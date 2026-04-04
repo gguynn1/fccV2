@@ -1,3 +1,5 @@
+import { PageHeader } from "@/components/page-header";
+import { StatusCard } from "@/components/status-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,11 +11,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useDiscardDlq, useQueue, useRetryDlq } from "@/hooks/use-queue";
+import { useDiscardDlq, useQueue, useRetryDlq, type DispatchMetadata } from "@/hooks/use-queue";
 
 function formatDate(d: string | null): string {
   if (!d) return "—";
   return new Date(d).toLocaleString();
+}
+
+function buildCompletionTooltip(item: DispatchMetadata): string {
+  const lines = [
+    `Dispatch ID: ${item.id}`,
+    `Thread: ${item.target_thread}`,
+    `Topic: ${item.topic}`,
+    `Priority: ${item.priority}`,
+    `Concerning: ${item.concerning.join(", ") || "—"}`,
+    `Included in digest: ${item.included_in ?? "no"}`,
+    `Response received: ${item.response_received === null ? "unknown" : String(item.response_received)}`,
+    `Escalation step: ${item.escalation_step ?? "—"}`,
+    "",
+    "Message body is intentionally hidden on this page.",
+  ];
+  return lines.join("\n");
 }
 
 export function QueueRoute() {
@@ -22,7 +40,15 @@ export function QueueRoute() {
   const discardMutation = useDiscardDlq();
 
   if (isLoading || !data) {
-    return <p className="text-sm text-muted-foreground">Loading queue…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Queue"
+          description="Queue depth, pending items, and dead-letter controls."
+        />
+        <p className="text-sm text-muted-foreground">Loading queue…</p>
+      </div>
+    );
   }
 
   const { depth, pending_items, dead_letter_items, recent_completions } = data;
@@ -30,45 +56,21 @@ export function QueueRoute() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Queue</h2>
-        <p className="text-sm text-muted-foreground">
-          Queue depth, pending items, and dead-letter controls.
-        </p>
-      </div>
+      <PageHeader
+        title="Queue"
+        description="Queue depth, pending items, and dead-letter controls."
+      />
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Waiting</p>
-            <p className="text-2xl font-bold">{depth.waiting}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Delayed</p>
-            <p className="text-2xl font-bold">{depth.delayed}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Active</p>
-            <p className="text-2xl font-bold">{depth.active}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Dead Letter</p>
-            <p className="text-2xl font-bold">
-              {depth.dead_letter}
-              {depth.dead_letter > 0 && (
-                <Badge variant="destructive" className="ml-2 text-xs">
-                  action needed
-                </Badge>
-              )}
-            </p>
-          </CardContent>
-        </Card>
+        <StatusCard title="Waiting" value={depth.waiting} />
+        <StatusCard title="Delayed" value={depth.delayed} />
+        <StatusCard title="Active" value={depth.active} />
+        <StatusCard
+          title="Dead Letter"
+          value={depth.dead_letter}
+          variant={depth.dead_letter > 0 ? "destructive" : "default"}
+          badge={depth.dead_letter > 0 ? "action needed" : undefined}
+        />
       </div>
 
       {totalDepth > 0 && (
@@ -192,21 +194,26 @@ export function QueueRoute() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {recent_completions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recent completions.</p>
-          ) : (
-            <Table>
-              <TableHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Topic</TableHead>
+                <TableHead>Thread</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead>Dispatched</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recent_completions.length === 0 ? (
                 <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Topic</TableHead>
-                  <TableHead>Thread</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Dispatched</TableHead>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    No recent completions.
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recent_completions.map((item) => (
+              ) : (
+                recent_completions.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-xs">{item.id.slice(0, 8)}</TableCell>
                     <TableCell>{item.topic}</TableCell>
@@ -225,12 +232,20 @@ export function QueueRoute() {
                         {item.priority}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-xs">
+                      <span
+                        className="cursor-help text-muted-foreground underline decoration-dotted underline-offset-2"
+                        title={buildCompletionTooltip(item)}
+                      >
+                        view
+                      </span>
+                    </TableCell>
                     <TableCell className="text-xs">{formatDate(item.dispatched_at)}</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

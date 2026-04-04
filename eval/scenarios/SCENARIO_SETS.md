@@ -16,6 +16,21 @@ Recommended workflow:
 2. Edit the generated file until the scenarios reflect real application behavior.
 3. Run `npm run eval:run` against the new set.
 
+## Scenario Classes
+
+Not every scenario shape is equally valid under every eval fidelity.
+
+- **Worker-replay-safe single-turn scenarios**:
+  good for routing, priority, confirmation gates, private-vs-shared thread truth, and current state-backed copy
+- **Simulator-safe multi-turn scenarios**:
+  good for pronoun carry-forward, corrections, and dialogue continuity when the test depends on transcript state more than persisted runtime state
+- **Worker-replay-safe multi-turn scenarios**:
+  only appropriate when the harness preserves enough context and when the expectation is really about the participant turns, not scripted assistant reminders
+- **State-primed system-triggered scenarios**:
+  use when the thing you are proving is scheduler-, ingest-, or state-driven rather than just a participant message
+- **Negative safety/privacy scenarios**:
+  use to prove what the system must not do, such as leaking private topics into disallowed threads
+
 ## What A Valid Scenario Looks Like
 
 Every scenario should describe something that could realistically happen in this application.
@@ -34,6 +49,7 @@ Good scenarios are:
 - routed to threads that exist in the persisted system configuration
 - aligned with topic boundaries already defined in the bootstrap defaults under `src/config/minimal-system-config.ts` and the persisted runtime config
 - written with expectations that match the app's actual rules
+- explicit about which harness fidelity they are safe under
 
 Bad scenarios are:
 
@@ -57,12 +73,16 @@ Before adding a scenario set, verify:
 - `tone_markers` and `format_markers` are observable in output text, not abstract ideas.
 - When using `simulation.interpreter_fixture`, keep `action_type` valid for the fixture topic.
 - Use `simulation.parity_assertion` to enforce worker-vs-simulator parity on critical fields.
+- If this is multi-turn, ask whether later participant turns depend on preserved conversation context.
+- If this is multi-turn worker replay, verify that you are asserting the primary outbound, not an auxiliary follow-up-thread notice.
+- If the scenario assumes a scheduled reminder, digest, or passive ingest event, seed the relevant state or classify it as a system-triggered scenario instead of hardcoding assistant transcript turns.
+- Prefer negative cases that prove privacy, denial, stale suppression, quiet-hour behavior, or governor restraint when those are the real product risk.
 
 ## File Shape
 
 Scenario files export an `EvalScenarioDefinition[]`.
 
-Typical pattern:
+Typical pattern (worker-safe single-turn):
 
 ```ts
 import { ClassifierIntent, DispatchPriority, TopicKey } from "../../src/index.js";
@@ -93,6 +113,8 @@ export const myScenarios: EvalScenarioDefinition[] = [
 ];
 ```
 
+For a smoke suite, add a comment explaining scope explicitly, for example: “small worker-replay smoke set, not full topic coverage.”
+
 ## Making A Set Runnable
 
 Generated scaffolds are automatically runnable as soon as they exist in `eval/scenarios/generated/` and export:
@@ -113,4 +135,4 @@ That scaffold:
 - follows the `EvalScenarioDefinition` shape
 - is meant to be edited and then run directly (no manual registration)
 
-It is a starting point, not an automatically trusted scenario suite.
+It is a starting point, not an automatically trusted scenario suite. Generated files are broad happy-path scaffolds; they do not replace curated worker-safe, simulator-safe, or state-primed scenario design.

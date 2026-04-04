@@ -765,7 +765,7 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
       <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <div className="flex flex-col items-center gap-6">
           <div className="text-center">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Setup</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Setup</p>
             <h1 className="mt-1 text-2xl font-semibold">Family Command Center</h1>
           </div>
 

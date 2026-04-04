@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
+import { PageHeader } from "@/components/page-header";
 import { PageModeBanner } from "@/components/page-mode-banner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +30,7 @@ interface TopicCardProps {
 function TopicCard({ topicKey, config, escalationLevels, onFieldChange }: TopicCardProps) {
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{config.label}</CardTitle>
           {config.confirmation_required !== undefined && (
@@ -137,7 +138,15 @@ export function TopicsRoute() {
   );
 
   if (isLoading || !data) {
-    return <p className="text-sm text-muted-foreground">Loading topics…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Topics"
+          description="Topic profile settings, escalation controls, and confirmation gates."
+        />
+        <p className="text-sm text-muted-foreground">Loading topics…</p>
+      </div>
+    );
   }
 
   const topicEntries = Object.entries(data.topics);
@@ -145,12 +154,10 @@ export function TopicsRoute() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Topics</h2>
-        <p className="text-sm text-muted-foreground">
-          Topic profile settings, escalation controls, and confirmation gates.
-        </p>
-      </div>
+      <PageHeader
+        title="Topics"
+        description="Topic profile settings, escalation controls, and confirmation gates."
+      />
       <PageModeBanner
         mode="editable"
         detail="Topic behavior (tone, format, escalation level, confirmation gate) is live-editable. Cross-topic connections are code-managed."

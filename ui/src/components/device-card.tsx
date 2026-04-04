@@ -120,7 +120,7 @@ export function DeviceCard({ entity, threads, sessionActive }: DeviceCardProps) 
 
   return (
     <Card className="flex h-[540px] flex-col">
-      <CardHeader className="flex-none space-y-2 pb-3">
+      <CardHeader className="flex-none space-y-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-semibold">{entity.name}</CardTitle>
           <Badge variant={typeBadgeVariant} className="text-[10px] capitalize">

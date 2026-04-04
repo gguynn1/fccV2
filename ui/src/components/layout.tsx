@@ -34,7 +34,7 @@ export function Layout({ children }: LayoutProps) {
       <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:px-6">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Admin UI</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Admin UI</p>
             <h1 className="text-xl font-semibold">Family Command Center</h1>
           </div>
           <nav>

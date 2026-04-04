@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { Pagination } from "@/components/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -110,17 +111,20 @@ export function ActivityRoute() {
   const isLoading = dispatchesLoading || escalationsLoading || confirmationsLoading;
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading activity…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Activity"
+          description="Dispatch, escalation, and confirmation history."
+        />
+        <p className="text-sm text-muted-foreground">Loading activity…</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Activity</h2>
-        <p className="text-sm text-muted-foreground">
-          Dispatch, escalation, and confirmation history.
-        </p>
-      </div>
+      <PageHeader title="Activity" description="Dispatch, escalation, and confirmation history." />
 
       <Card>
         <CardContent className="pt-6">

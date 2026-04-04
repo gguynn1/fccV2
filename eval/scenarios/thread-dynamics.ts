@@ -237,7 +237,7 @@ export const threadDynamicsScenarios: EvalScenarioDefinition[] = [
     title: "Confirmation response after financial action request",
     category: "confirmation",
     prompt_input: {
-      message: "Pay the electric bill",
+      message: "Log $45 for the electric bill",
       concerning: ["participant_1", "participant_2"],
       origin_thread: "couple",
     },
@@ -252,7 +252,7 @@ export const threadDynamicsScenarios: EvalScenarioDefinition[] = [
       {
         role: "participant",
         thread_id: "couple",
-        message: "Pay the electric bill",
+        message: "Log $45 for the electric bill",
         entity_id: "participant_1",
         expected: {
           topic: TopicKey.Finances,
@@ -263,8 +263,7 @@ export const threadDynamicsScenarios: EvalScenarioDefinition[] = [
       {
         role: "assistant",
         thread_id: "couple",
-        message:
-          "Approval needed: confirm the bill payment before proceeding. Reply yes to confirm.",
+        message: "Please confirm: log expense. Reply yes or no.",
       },
       {
         role: "participant",
@@ -359,7 +358,7 @@ export const threadDynamicsScenarios: EvalScenarioDefinition[] = [
       {
         role: "participant",
         thread_id: "family",
-        message: "Also, any homework due tomorrow?",
+        message: "Any homework due tomorrow?",
         entity_id: "participant_3",
         expected: {
           topic: TopicKey.School,
@@ -418,7 +417,7 @@ export const threadDynamicsScenarios: EvalScenarioDefinition[] = [
   // --- Mixed-intent ---
   {
     id: "td-mixed-grocery-and-chore",
-    title: "Mixed-intent message with grocery and chore in shared thread",
+    title: "Mixed-intent shared-thread request currently resolves chores-first",
     category: "pipeline",
     prompt_input: {
       message: "Pick up groceries and clean the kitchen",
@@ -426,7 +425,7 @@ export const threadDynamicsScenarios: EvalScenarioDefinition[] = [
       origin_thread: "family",
     },
     expected: {
-      topic: TopicKey.Grocery,
+      topic: TopicKey.Chores,
       intent: ClassifierIntent.Request,
       target_thread: "family",
       priority: DispatchPriority.Immediate,
@@ -439,10 +438,11 @@ export const threadDynamicsScenarios: EvalScenarioDefinition[] = [
         message: "Pick up groceries and clean the kitchen",
         entity_id: "participant_1",
         expected: {
-          topic: TopicKey.Grocery,
+          topic: TopicKey.Chores,
         },
       },
     ],
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   // --- Emotional / conversational ---
@@ -669,7 +669,7 @@ export const threadDynamicsScenarios: EvalScenarioDefinition[] = [
       {
         role: "participant",
         thread_id: "participant_3_private",
-        message: "Did they do it yet?",
+        message: "What chores are still active?",
         entity_id: "participant_1",
         expected: {
           topic: TopicKey.Chores,

@@ -56,10 +56,12 @@ export function EditableCell({
         variant="outline"
         size="sm"
         onClick={() => setEditing(true)}
-        className={`h-auto min-h-8 w-full justify-between border-dashed px-2 py-1 text-left text-sm font-normal ${className ?? ""}`}
+        className={`h-auto min-h-8 w-full items-start justify-between border-dashed px-2 py-1 text-left text-sm font-normal ${className ?? ""}`}
       >
-        <span>{value || <span className="text-muted-foreground italic">empty</span>}</span>
-        <span className="ml-3 shrink-0 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+        <span className="min-w-0 whitespace-normal break-words pr-2">
+          {value || <span className="text-muted-foreground italic">empty</span>}
+        </span>
+        <span className="mt-0.5 ml-3 shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground">
           Edit
         </span>
       </Button>
@@ -80,7 +82,7 @@ export function EditableCell({
           setEditing(false);
         }
       }}
-      className="h-7 w-full text-sm"
+      className="h-8 w-full text-sm"
     />
   );
 }

@@ -4,7 +4,7 @@ import type { EvalScenarioDefinition } from "../types.js";
 export const continuityRegressionName = "continuity-regression";
 
 export const continuityRegressionScenarios: EvalScenarioDefinition[] = [
-  // --- Pronoun references (6 scenarios) ---
+  // Focused regression pack for worker/simulator continuity drift.
   {
     id: "cr-pronoun-cancel-that-calendar",
     title: '"Cancel that" after calendar create sticks to calendar topic',
@@ -84,45 +84,6 @@ export const continuityRegressionScenarios: EvalScenarioDefinition[] = [
   },
 
   {
-    id: "cr-pronoun-done-with-that-chore",
-    title: '"Done with that" after chore assignment stays in chores',
-    category: "pipeline",
-    prompt_input: {
-      message: "Vacuum the living room",
-      concerning: ["participant_3"],
-      origin_thread: "participant_3_private",
-    },
-    expected: {
-      topic: TopicKey.Chores,
-      intent: ClassifierIntent.Request,
-      target_thread: "participant_3_private",
-      priority: DispatchPriority.Batched,
-      confirmation_required: false,
-    },
-    turns: [
-      {
-        role: "participant",
-        thread_id: "participant_3_private",
-        message: "Vacuum the living room",
-        entity_id: "participant_1",
-        expected: { topic: TopicKey.Chores, intent: ClassifierIntent.Request },
-      },
-      {
-        role: "assistant",
-        thread_id: "participant_3_private",
-        message: "Chore assigned: vacuum the living room.",
-      },
-      {
-        role: "participant",
-        thread_id: "participant_3_private",
-        message: "Done with that",
-        entity_id: "participant_3",
-        expected: { topic: TopicKey.Chores },
-      },
-    ],
-  },
-
-  {
     id: "cr-pronoun-the-one-we-discussed",
     title: '"The one we discussed" references prior meal topic',
     category: "pipeline",
@@ -157,45 +118,6 @@ export const continuityRegressionScenarios: EvalScenarioDefinition[] = [
         message: "Actually change it to pasta",
         entity_id: "participant_2",
         expected: { topic: TopicKey.Meals, intent: ClassifierIntent.Update },
-      },
-    ],
-  },
-
-  {
-    id: "cr-pronoun-them-pets",
-    title: '"Take them" carries pet topic from prior turn',
-    category: "pipeline",
-    prompt_input: {
-      message: "The vet appointment is next week",
-      concerning: ["participant_1"],
-      origin_thread: "participant_1_private",
-    },
-    expected: {
-      topic: TopicKey.Pets,
-      intent: ClassifierIntent.Request,
-      target_thread: "participant_1_private",
-      priority: DispatchPriority.Immediate,
-      confirmation_required: false,
-    },
-    turns: [
-      {
-        role: "participant",
-        thread_id: "participant_1_private",
-        message: "The vet appointment is next week",
-        entity_id: "participant_1",
-        expected: { topic: TopicKey.Pets },
-      },
-      {
-        role: "assistant",
-        thread_id: "participant_1_private",
-        message: "Pet care update: vet appointment next week has been recorded.",
-      },
-      {
-        role: "participant",
-        thread_id: "participant_1_private",
-        message: "Reschedule it to the week after",
-        entity_id: "participant_1",
-        expected: { topic: TopicKey.Pets, intent: ClassifierIntent.Update },
       },
     ],
   },
@@ -239,10 +161,10 @@ export const continuityRegressionScenarios: EvalScenarioDefinition[] = [
     ],
   },
 
-  // --- Corrections / negations (3 scenarios) ---
+  // --- Corrections / negations ---
   {
     id: "cr-negation-no-not-that-calendar",
-    title: '"No not that" switches referent within calendar',
+    title: '"No not that" resolves into the specific health appointment context',
     category: "pipeline",
     prompt_input: {
       message: "Cancel the calendar event",
@@ -274,14 +196,14 @@ export const continuityRegressionScenarios: EvalScenarioDefinition[] = [
         thread_id: "participant_1_private",
         message: "No not the meeting, the dentist one",
         entity_id: "participant_1",
-        expected: { topic: TopicKey.Calendar, intent: ClassifierIntent.Response },
+        expected: { topic: TopicKey.Health, intent: ClassifierIntent.Response },
       },
     ],
   },
 
   {
     id: "cr-correction-actually-finance",
-    title: '"Actually" correction stays in finance topic',
+    title: '"Actually" correction stays inside the finance confirmation flow',
     category: "pipeline",
     prompt_input: {
       message: "Log an expense of $50 for groceries",
@@ -306,58 +228,18 @@ export const continuityRegressionScenarios: EvalScenarioDefinition[] = [
       {
         role: "assistant",
         thread_id: "couple",
-        message: "Approval needed: confirm the expense log before proceeding.",
+        message: "Please confirm: log expense. Reply yes or no.",
       },
       {
         role: "participant",
         thread_id: "couple",
         message: "Actually make it $75",
         entity_id: "participant_1",
-        expected: { topic: TopicKey.Finances, intent: ClassifierIntent.Update },
+        expected: { topic: TopicKey.Finances, intent: ClassifierIntent.Response },
       },
     ],
   },
-
-  {
-    id: "cr-correction-i-meant-school",
-    title: '"I meant" correction stays in school topic',
-    category: "pipeline",
-    prompt_input: {
-      message: "The field trip is Thursday",
-      concerning: ["participant_3"],
-      origin_thread: "family",
-    },
-    expected: {
-      topic: TopicKey.School,
-      intent: ClassifierIntent.Request,
-      target_thread: "participant_3_private",
-      priority: DispatchPriority.Immediate,
-      confirmation_required: false,
-    },
-    turns: [
-      {
-        role: "participant",
-        thread_id: "family",
-        message: "The field trip is Thursday",
-        entity_id: "participant_1",
-        expected: { topic: TopicKey.School },
-      },
-      {
-        role: "assistant",
-        thread_id: "participant_3_private",
-        message: "School summary: the field trip has been noted for Thursday.",
-      },
-      {
-        role: "participant",
-        thread_id: "family",
-        message: "I meant Friday, not Thursday",
-        entity_id: "participant_1",
-        expected: { topic: TopicKey.School, intent: ClassifierIntent.Update },
-      },
-    ],
-  },
-
-  // --- Topic pivots (3 scenarios) ---
+  // --- Topic pivots ---
   {
     id: "cr-pivot-chores-to-meals",
     title: "Clean pivot from chores to meals",

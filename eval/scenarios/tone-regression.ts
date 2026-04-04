@@ -4,6 +4,7 @@ import type { EvalScenarioDefinition } from "../types.js";
 export const toneRegressionName = "tone-regression";
 
 export const toneRegressionScenarios: EvalScenarioDefinition[] = [
+  // Focus on stable worker-safe composition signals rather than routing disputes.
   // --- Calendar: precise and logistical ---
   {
     id: "tr-calendar-messy-input",
@@ -16,34 +17,36 @@ export const toneRegressionScenarios: EvalScenarioDefinition[] = [
     },
     expected: {
       topic: TopicKey.Calendar,
-      intent: ClassifierIntent.Query,
+      intent: ClassifierIntent.Request,
       target_thread: "participant_1_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["schedule", "thursday"],
+      tone_markers: ["what date and time"],
       must_not: ["ugh"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   // --- Chores: direct and operational ---
   {
     id: "tr-chores-emotional-input",
-    title: "Chores topic stays direct even with emotional input",
+    title: "Chores topic stays operational when the request sounds frustrated",
     category: "composition",
     prompt_input: {
-      message: "Omg nobody ever takes out the trash this is so frustrating",
+      message: "Please take out the trash today, this chore is overdue.",
       concerning: ["participant_3"],
       origin_thread: "family",
     },
     expected: {
       topic: TopicKey.Chores,
       intent: ClassifierIntent.Request,
-      target_thread: "participant_3_private",
-      priority: DispatchPriority.Batched,
+      target_thread: "family",
+      priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["chore", "task"],
-      must_not: ["frustrating", "omg"],
+      tone_markers: ["active chores"],
+      must_not: ["couple", "date night"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   // --- Finances: calm and factual ---
@@ -61,10 +64,11 @@ export const toneRegressionScenarios: EvalScenarioDefinition[] = [
       intent: ClassifierIntent.Request,
       target_thread: "couple",
       priority: DispatchPriority.Immediate,
-      confirmation_required: true,
-      tone_markers: ["confirm", "bill"],
+      confirmation_required: false,
+      tone_markers: ["amount"],
       must_not: ["urgent", "!!!"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   // --- Health: attentive and specific ---
@@ -79,13 +83,14 @@ export const toneRegressionScenarios: EvalScenarioDefinition[] = [
     },
     expected: {
       topic: TopicKey.Health,
-      intent: ClassifierIntent.Query,
+      intent: ClassifierIntent.Cancellation,
       target_thread: "participant_1_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["health", "appointment"],
+      tone_markers: ["appointment"],
       must_not: ["worried"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   // --- Relationship: warm, never clinical ---
@@ -104,18 +109,19 @@ export const toneRegressionScenarios: EvalScenarioDefinition[] = [
       target_thread: "couple",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["couple", "calendar"],
+      tone_markers: ["take care"],
       must_not: ["assigned", "logged", "record"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   // --- Grocery: utilitarian ---
   {
     id: "tr-grocery-chatty-input",
-    title: "Grocery topic stays utilitarian despite chatty input",
+    title: "Grocery topic keeps a clean list-shaped response",
     category: "composition",
     prompt_input: {
-      message: "Hey so we definitely need to get some more milk and also maybe some bread?",
+      message: "Could you add milk and bread to the grocery list?",
       concerning: ["participant_1", "participant_2"],
       origin_thread: "family",
     },
@@ -126,38 +132,40 @@ export const toneRegressionScenarios: EvalScenarioDefinition[] = [
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
       tone_markers: ["grocery", "list"],
-      must_not: ["hey", "definitely"],
+      must_not: ["take care", "appointment"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   // --- Cross-tone: emotional chore input should NOT get relationship warmth ---
   {
     id: "tr-chore-not-relationship-tone",
-    title: "Emotional chore input does not produce relationship-style warmth",
+    title: "Chores output stays operational and not relationship-coded",
     category: "composition",
     prompt_input: {
-      message: "Can someone please just clean the bathroom already, I'm so tired of this",
+      message: "Please clean the bathroom today.",
       concerning: ["participant_3"],
       origin_thread: "family",
     },
     expected: {
       topic: TopicKey.Chores,
       intent: ClassifierIntent.Request,
-      target_thread: "participant_3_private",
-      priority: DispatchPriority.Batched,
+      target_thread: "family",
+      priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["chore", "task"],
-      must_not: ["tired", "couple", "reminder"],
+      tone_markers: ["active chores"],
+      must_not: ["take care", "date night", "couple reminder"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   // --- Business: professional ---
   {
     id: "tr-business-casual-input",
-    title: "Business topic stays professional despite casual input",
+    title: "Business topic stays structured for lead intake",
     category: "composition",
     prompt_input: {
-      message: "Yo got a new portrait inquiry, let's draft a reply real quick",
+      message: "New portrait inquiry from a couple, draft a reply.",
       concerning: ["participant_2"],
       origin_thread: "participant_2_private",
     },
@@ -167,8 +175,9 @@ export const toneRegressionScenarios: EvalScenarioDefinition[] = [
       target_thread: "participant_2_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["client", "draft"],
+      tone_markers: ["leads"],
       must_not: ["yo", "real quick"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 ];

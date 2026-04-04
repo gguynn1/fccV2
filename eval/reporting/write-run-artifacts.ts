@@ -30,6 +30,7 @@ const KNOWN_SCENARIO_SET_FILES: Record<string, string> = {
   "digest-quality": "eval/scenarios/digest-quality.ts",
   "tone-regression": "eval/scenarios/tone-regression.ts",
   "nudge-realism": "eval/scenarios/nudge-realism.ts",
+  "system-triggered-truth": "eval/scenarios/system-triggered-truth.ts",
 };
 
 function scenarioSourceFile(scenarioSet: string): string {
@@ -41,17 +42,21 @@ function scenarioSourceFile(scenarioSet: string): string {
 
 function buildInsights(state: EvalRunState): {
   topicCoverageLine: string;
+  turnTopicCoverageLine: string;
   missingTopicsLine: string;
   categoryCoverageLine: string;
   topFailureFieldsLine: string;
   fixabilityLine: string;
+  multiTurnDriftLine: string;
 } {
   const allTopics = new Set<string>(Object.values(TopicKey));
   const expectedTopics = new Set<string>();
+  const turnExpectedTopics = new Set<string>();
   const categoryCounts = new Map<string, number>();
   const failureFieldCounts = new Map<string, number>();
   let promptFixableFailures = 0;
   let structuralFailures = 0;
+  let laterTurnStructuralFailures = 0;
 
   for (const scenario of state.scenarios) {
     expectedTopics.add(String(scenario.expected.topic));
@@ -62,6 +67,20 @@ function buildInsights(state: EvalRunState): {
         promptFixableFailures += 1;
       } else {
         structuralFailures += 1;
+      }
+      if (
+        typeof failure.turn_index === "number" &&
+        failure.turn_index >= 2 &&
+        !failure.prompt_fixable
+      ) {
+        laterTurnStructuralFailures += 1;
+      }
+    }
+    for (const turn of scenario.turn_results ?? []) {
+      for (const failure of turn.failures) {
+        if (failure.field === "topic" && typeof failure.expected === "string") {
+          turnExpectedTopics.add(failure.expected);
+        }
       }
     }
   }
@@ -74,6 +93,10 @@ function buildInsights(state: EvalRunState): {
 
   return {
     topicCoverageLine: `${expectedTopics.size}/${allTopics.size} topics represented in scenario expectations.`,
+    turnTopicCoverageLine:
+      turnExpectedTopics.size > 0
+        ? `${turnExpectedTopics.size}/${allTopics.size} topics represented in failing turn expectations.`
+        : "No failing turn-level topic expectations were recorded in this run.",
     missingTopicsLine:
       missingTopics.length > 0
         ? missingTopics.join(", ")
@@ -84,6 +107,10 @@ function buildInsights(state: EvalRunState): {
     topFailureFieldsLine:
       topFailureFields.length > 0 ? topFailureFields.join(", ") : "No failing fields in this run.",
     fixabilityLine: `Prompt-fixable failures: ${promptFixableFailures}; structural failures: ${structuralFailures}.`,
+    multiTurnDriftLine:
+      laterTurnStructuralFailures > 0
+        ? `${laterTurnStructuralFailures} structural failure(s) occurred on later participant turns; inspect worker-replay context preservation before assuming runtime config is wrong.`
+        : "No obvious later-turn structural drift signal in this run.",
   };
 }
 
@@ -107,6 +134,10 @@ function toLikelyFiles(scenario: EvalRunState["scenarios"][number], scenarioSet:
       case "priority":
       case "confirmation_required":
         files.add("eval/runners/sequential-runner.ts");
+        if ((scenario.turn_results?.length ?? 0) >= 3) {
+          files.add(scenarioSourceFile(scenarioSet));
+          files.add("eval/scenarios/SCENARIO_SETS.md");
+        }
         files.add("src/config/minimal-system-config.ts");
         files.add("src/config/runtime-system-config.ts");
         files.add("src/02-supporting-services/03-state-service/index.ts");
@@ -138,6 +169,16 @@ function buildAgentPrompt(state: EvalRunState): string {
       const suggestionLine = scenario.tuner?.candidate
         ? `- Prompt suggestion is embedded in this run artifact under the detailed results section.`
         : "- No embedded prompt suggestion was generated.";
+      const laterTurnStructuralFailures = scenario.failures.filter(
+        (failure) =>
+          typeof failure.turn_index === "number" &&
+          failure.turn_index >= 2 &&
+          !failure.prompt_fixable,
+      );
+      const harnessHint =
+        laterTurnStructuralFailures.length > 0
+          ? `\nHarness hint:\n- This scenario has ${laterTurnStructuralFailures.length} structural failure(s) on later participant turns. Check worker-replay context preservation and primary-outbound capture before assuming runtime config is wrong.\n`
+          : "";
       return `### ${scenario.title}
 
 - Scenario ID: \`${scenario.id}\`
@@ -147,6 +188,8 @@ ${suggestionLine}
 
 Failures:
 ${failureLines}
+
+${quoteForPrompt(harnessHint)}
 
 Likely files to inspect:
 ${likelyFiles}
@@ -231,19 +274,24 @@ Run summary:
 
 Coverage insights:
 - ${insights.topicCoverageLine}
+- turn-level topic coverage: ${insights.turnTopicCoverageLine}
 - missing topics: ${insights.missingTopicsLine}
 - categories: ${insights.categoryCoverageLine}
 - top failing dimensions: ${insights.topFailureFieldsLine}
 - ${insights.fixabilityLine}
+- ${insights.multiTurnDriftLine}
 
 Your task:
 1. Read the artifact files listed above.
 2. Read the failing scenarios listed below.
-3. Inspect the suggested files first.
-4. Decide whether each failure should be fixed in scenario expectations, runner logic, tuner output, or another nearby file.
-5. Implement the fixes.
-6. Re-run to verify: ${rerunCommand}
-7. Confirm the result improves without breaking other scenarios.
+3. If this is a multi-turn worker-replay failure cluster, inspect the harness first:
+   - does worker replay preserve conversation context across participant turns?
+   - does it capture the primary outbound rather than the last auxiliary notice?
+4. Inspect the suggested files first.
+5. Decide whether each failure should be fixed in scenario expectations, runner logic, tuner output, or another nearby file.
+6. Implement the fixes.
+7. Re-run to verify: ${rerunCommand}
+8. Confirm the result improves without breaking other scenarios.
 
 After fixing:
 - The JSON and markdown artifacts in \`eval/results/\` will be overwritten with the new results.
@@ -326,10 +374,12 @@ ${formatLogLines(state, scenario.id)}
 ## Coverage Insights
 
 - Topic coverage: ${insights.topicCoverageLine}
+- Turn-level topic coverage: ${insights.turnTopicCoverageLine}
 - Missing topics: ${insights.missingTopicsLine}
 - Category distribution: ${insights.categoryCoverageLine}
 - Top failing dimensions: ${insights.topFailureFieldsLine}
 - ${insights.fixabilityLine}
+- ${insights.multiTurnDriftLine}
 
 ## Pasteable Prompt
 

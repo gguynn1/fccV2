@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
+import { PageHeader } from "@/components/page-header";
 import { PageModeBanner } from "@/components/page-mode-banner";
 import { ReconciliationSummary } from "@/components/reconciliation-summary";
 import { Badge } from "@/components/ui/badge";
@@ -132,7 +133,15 @@ export function EntitiesRoute() {
   );
 
   if (isLoading || !data) {
-    return <p className="text-sm text-muted-foreground">Loading entities…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Entities"
+          description="Participants, permissions, and thread assignments."
+        />
+        <p className="text-sm text-muted-foreground">Loading entities…</p>
+      </div>
+    );
   }
 
   const allPermissions = systemData?.permissions ?? [];
@@ -220,12 +229,10 @@ export function EntitiesRoute() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Entities</h2>
-        <p className="text-sm text-muted-foreground">
-          Participants, permissions, and thread assignments.
-        </p>
-      </div>
+      <PageHeader
+        title="Entities"
+        description="Participants, permissions, and thread assignments."
+      />
       <PageModeBanner
         mode="editable"
         detail="Add, remove, and edit entities inline. Required roots are enforced server-side, and dependent queue or history references are auto-cleaned."

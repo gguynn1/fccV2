@@ -1,4 +1,5 @@
 import { DeviceCard } from "@/components/device-card";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,20 +26,26 @@ export function EmulationRoute() {
   const allThreads = entitiesData?.threads ?? [];
 
   if (entitiesLoading) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Emulation"
+          description="Interactive messaging simulation for all participants."
+        />
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Emulation</h2>
-        <p className="text-sm text-muted-foreground">
-          Interactive messaging simulation for all participants.
-        </p>
-      </div>
+      <PageHeader
+        title="Emulation"
+        description="Interactive messaging simulation for all participants."
+      />
 
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-3 text-sm">
               Session

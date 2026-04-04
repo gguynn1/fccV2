@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
+import { PageHeader } from "@/components/page-header";
 import { PageModeBanner } from "@/components/page-mode-banner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -17,6 +18,25 @@ const DIGEST_SUBTITLES: Record<string, string> = {
   "Evening Check-in": "Brief check-in if anything is still open. Otherwise, nothing.",
 };
 
+function toTitleCase(value: string): string {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function formatDigestRecipientLabel(entityKey: string): string {
+  const participantMatch = /^participant_(\d+)$/i.exec(entityKey);
+  if (participantMatch) {
+    return `Participant ${participantMatch[1]}`;
+  }
+  if (entityKey.toLowerCase() === "pet") {
+    return "Pet";
+  }
+  return toTitleCase(entityKey.replace(/_/g, " "));
+}
+
 export interface DigestBlockProps {
   title: string;
   block: { times: Record<string, string | null> };
@@ -26,15 +46,18 @@ export interface DigestBlockProps {
 function DigestBlock({ title, block, onTimeChange }: DigestBlockProps) {
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
         <p className="text-xs text-muted-foreground">{DIGEST_SUBTITLES[title]}</p>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
           {Object.entries(block.times).map(([entity, time]) => (
-            <div key={entity} className="flex items-center justify-between">
-              <span className="font-mono text-xs">{entity}</span>
+            <div key={entity} className="flex items-center gap-3">
+              <div className="w-28 shrink-0">
+                <p className="truncate text-xs font-medium">{formatDigestRecipientLabel(entity)}</p>
+                <p className="font-mono text-[10px] text-muted-foreground">{entity}</p>
+              </div>
               {time === null ? (
                 <span className="text-xs text-muted-foreground italic">not scheduled</span>
               ) : (
@@ -103,7 +126,15 @@ export function SchedulerRoute() {
   );
 
   if (isLoading || !data) {
-    return <p className="text-sm text-muted-foreground">Loading scheduler…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Scheduler"
+          description="Digest windows, timing, and eligibility rules."
+        />
+        <p className="text-sm text-muted-foreground">Loading scheduler…</p>
+      </div>
+    );
   }
 
   const rhythm = data.daily_rhythm;
@@ -111,12 +142,7 @@ export function SchedulerRoute() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Scheduler</h2>
-        <p className="text-sm text-muted-foreground">
-          Digest windows, timing, and eligibility rules.
-        </p>
-      </div>
+      <PageHeader title="Scheduler" description="Digest windows, timing, and eligibility rules." />
       <PageModeBanner
         mode="editable"
         detail="Scheduler edits apply live. Changes here are synchronized back to per-entity digest settings."

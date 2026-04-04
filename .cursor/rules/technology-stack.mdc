@@ -7,28 +7,28 @@ alwaysApply: true
 
 ## External Dependencies (only two paid subscriptions)
 
-| Service                                                | Purpose                                                                              |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Service                                                             | Purpose                                                                                                          |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Twilio messaging stack (Programmable Messaging + Conversations API) | All inbound/outbound phone-native messaging; Conversations is the canonical shared-thread substrate when enabled |
-| Anthropic Claude API                                   | Classification, message composition, image parsing, email extraction, digest merging |
+| Anthropic Claude API                                                | Classification, message composition, image parsing, email extraction, digest merging                             |
 
 Email (IMAP via imapflow) connects to existing family inboxes — no new subscription.
 
 ## Local Infrastructure
 
-| Layer                     | Technology                                                                                       |
-| ------------------------- | ------------------------------------------------------------------------------------------------ |
-| Runtime                   | Node.js (LTS) + TypeScript (strict, ESM)                                                         |
+| Layer                     | Technology                                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Runtime                   | Node.js (LTS) + TypeScript (strict, ESM)                                                                   |
 | HTTP server               | Fastify — Twilio messaging webhooks on localhost:3000; CalDAV on a separate local-only port (default 3001) |
-| Queue + scheduling        | BullMQ backed by Redis (AOF persistence required)                                                |
-| Persistence               | SQLite via better-sqlite3 — WAL mode required                                                    |
-| Calendar serving          | Local CalDAV endpoint — the system serves events outward; calendar apps subscribe to it          |
-| Rate limiting / counters  | Redis (shared instance with BullMQ)                                                              |
-| Escalation state machines | XState v5                                                                                        |
-| Validation                | Zod                                                                                              |
-| Logging                   | pino (structured JSON)                                                                           |
-| Environment config        | dotenv (loads `.env` into `process.env` at startup)                                              |
-| Testing                   | Vitest                                                                                           |
+| Queue + scheduling        | BullMQ backed by Redis (AOF persistence required)                                                          |
+| Persistence               | SQLite via better-sqlite3 — WAL mode required                                                              |
+| Calendar serving          | Local CalDAV endpoint — the system serves events outward; calendar apps subscribe to it                    |
+| Rate limiting / counters  | Redis (shared instance with BullMQ)                                                                        |
+| Escalation state machines | XState v5                                                                                                  |
+| Validation                | Zod                                                                                                        |
+| Logging                   | pino (structured JSON)                                                                                     |
+| Environment config        | dotenv (loads `.env` into `process.env` at startup)                                                        |
+| Testing                   | Vitest                                                                                                     |
 
 ## Tunnel
 

@@ -81,6 +81,38 @@ Topics are partially editable through the UI today: tone, format, escalation lev
 - **No inline styles.** All styling through Tailwind utility classes. No `style={}` props.
 - **Consistent file structure.** One component per file. File name matches component name in kebab-case. Colocate component-specific hooks and utilities in the same directory.
 
+## Visual Conventions
+
+These conventions are enforced across all route files and shared components. Do not deviate from them when adding or modifying pages.
+
+### Page Headers
+
+Every route must use `<PageHeader title="..." description="..." />` from `components/page-header.tsx`. Do not hand-roll `<h2>` + `<p>` blocks. The optional `children` slot renders right-aligned controls (filters, action buttons) when needed.
+
+### Status / Metric Cards
+
+Top-of-page metric cards must use `<StatusCard>` from `components/status-card.tsx`. Do not create ad-hoc `<Card><CardContent className="pt-6">` patterns for simple label + value displays. `StatusCard` supports optional `to` (link), `variant` (color), and `badge` props.
+
+### Micro-Typography (Overlines / Section Labels)
+
+All tiny uppercase labels (section overlines, inline badges outside `<Badge>`, edit hints) use a single standard: **`text-[10px] uppercase tracking-wider text-muted-foreground`**. Do not use `text-xs uppercase` with custom `tracking-[...]` values. `<Badge>` components manage their own internal typography and are exempt.
+
+### Card Density
+
+`CardHeader` defaults to `p-6 pb-3` (set in `components/ui/card.tsx`). Do not add `pb-3` overrides to individual `<CardHeader>` elements — that is the default. Use `pb-2` only when intentionally tighter density is needed (e.g., `StatusCard`).
+
+### Inline Editing Height
+
+`EditableCell` view state (`Button`) and edit state (`Input`) must have matching heights (`min-h-8` / `h-8`). Do not introduce height mismatches that cause vertical jitter on click.
+
+### Loading States
+
+Loading early-returns must preserve the page shell. Always wrap in `<div className="space-y-6">` and render `<PageHeader>` above the loading text. Do not return a bare `<p>Loading ...</p>` that strips the title.
+
+### Table Empty States
+
+When a table can be empty, always render the full `<Table>` + `<TableHeader>`. Show a single `<TableRow>` with `<TableCell colSpan={N} className="h-24 text-center text-muted-foreground">` for the empty message. Do not conditionally remove the entire `<Table>` when there is no data.
+
 ## Project Structure
 
 ```

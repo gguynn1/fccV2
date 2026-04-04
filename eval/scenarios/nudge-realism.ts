@@ -4,10 +4,11 @@ import type { EvalScenarioDefinition } from "../types.js";
 export const nudgeRealismName = "nudge-realism";
 
 export const nudgeRealismScenarios: EvalScenarioDefinition[] = [
+  // Worker-safe routing and confirmation shapes only; reminder timing lives elsewhere.
   {
-    id: "nr-chore-reminder-includes-context",
-    title: "Chore reminder after assignment includes chore name and assignee",
-    category: "pipeline",
+    id: "nr-chore-assignment-routes-private",
+    title: "Chore assignment routes to the assignee private thread",
+    category: "routing",
     prompt_input: {
       message: "Take out the trash",
       concerning: ["participant_3"],
@@ -17,47 +18,17 @@ export const nudgeRealismScenarios: EvalScenarioDefinition[] = [
       topic: TopicKey.Chores,
       intent: ClassifierIntent.Request,
       target_thread: "participant_3_private",
-      priority: DispatchPriority.Batched,
+      priority: DispatchPriority.Immediate,
       confirmation_required: false,
+      tone_markers: ["active chores"],
+      format_markers: ["1."],
     },
-    turns: [
-      {
-        role: "participant",
-        thread_id: "participant_3_private",
-        message: "Take out the trash",
-        entity_id: "participant_1",
-        expected: {
-          topic: TopicKey.Chores,
-          intent: ClassifierIntent.Request,
-          target_thread: "participant_3_private",
-        },
-      },
-      {
-        role: "assistant",
-        thread_id: "participant_3_private",
-        message: "Chore assigned: take out the trash before dinner.",
-      },
-      {
-        role: "assistant",
-        thread_id: "participant_3_private",
-        message:
-          'Reminder: "take out the trash" for participant_3 is still pending (opened 1h ago).',
-      },
-      {
-        role: "participant",
-        thread_id: "participant_3_private",
-        message: "Done",
-        entity_id: "participant_3",
-        expected: {
-          topic: TopicKey.Chores,
-        },
-      },
-    ],
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   {
-    id: "nr-reminder-routes-private",
-    title: "Reminder routes to the correct private thread",
+    id: "nr-reminder-source-stays-honest",
+    title: "Shared-thread chore request stays visible in the shared reply thread",
     category: "routing",
     prompt_input: {
       message: "Vacuum the upstairs",
@@ -67,50 +38,21 @@ export const nudgeRealismScenarios: EvalScenarioDefinition[] = [
     expected: {
       topic: TopicKey.Chores,
       intent: ClassifierIntent.Request,
-      target_thread: "participant_3_private",
-      priority: DispatchPriority.Batched,
+      target_thread: "family",
+      priority: DispatchPriority.Immediate,
       confirmation_required: false,
+      tone_markers: ["active chores"],
+      format_markers: ["1."],
     },
-    turns: [
-      {
-        role: "participant",
-        thread_id: "family",
-        message: "Vacuum the upstairs",
-        entity_id: "participant_1",
-        expected: {
-          topic: TopicKey.Chores,
-          target_thread: "participant_3_private",
-        },
-      },
-      {
-        role: "assistant",
-        thread_id: "participant_3_private",
-        message: "Chore assigned: vacuum the upstairs.",
-      },
-      {
-        role: "assistant",
-        thread_id: "participant_3_private",
-        message:
-          'Follow-up: "vacuum the upstairs" for participant_3 has not been addressed (opened 2h ago).',
-      },
-      {
-        role: "participant",
-        thread_id: "participant_3_private",
-        message: "I'll do it after school",
-        entity_id: "participant_3",
-        expected: {
-          topic: TopicKey.Chores,
-        },
-      },
-    ],
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   {
-    id: "nr-finance-confirmation-reminder",
-    title: "Finance confirmation reminder fires in couple thread",
+    id: "nr-finance-confirmation-opens-in-couple",
+    title: "Finance confirmation opens in the couple thread",
     category: "confirmation",
     prompt_input: {
-      message: "Pay the electric bill",
+      message: "Log $45 for the electric bill",
       concerning: ["participant_1", "participant_2"],
       origin_thread: "couple",
     },
@@ -120,48 +62,18 @@ export const nudgeRealismScenarios: EvalScenarioDefinition[] = [
       target_thread: "couple",
       priority: DispatchPriority.Immediate,
       confirmation_required: true,
+      tone_markers: ["confirm", "expense"],
+      format_markers: ["yes", "no"],
     },
-    turns: [
-      {
-        role: "participant",
-        thread_id: "couple",
-        message: "Pay the electric bill",
-        entity_id: "participant_1",
-        expected: {
-          topic: TopicKey.Finances,
-          intent: ClassifierIntent.Request,
-          confirmation_required: true,
-        },
-      },
-      {
-        role: "assistant",
-        thread_id: "couple",
-        message: "Approval needed: confirm the bill payment. Reply yes to confirm.",
-      },
-      {
-        role: "assistant",
-        thread_id: "couple",
-        message: 'Reminder: "Pay the electric bill" is still awaiting approval (opened 1h ago).',
-      },
-      {
-        role: "participant",
-        thread_id: "couple",
-        message: "Yes, go ahead",
-        entity_id: "participant_2",
-        expected: {
-          topic: TopicKey.Finances,
-          intent: ClassifierIntent.Confirmation,
-        },
-      },
-    ],
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   {
-    id: "nr-health-follow-up-after-appointment",
-    title: "Health follow-up after appointment stays attentive",
-    category: "pipeline",
+    id: "nr-health-private-followup-shape",
+    title: "Health scheduling stays private and attentive",
+    category: "routing",
     prompt_input: {
-      message: "Schedule dentist for next Monday",
+      message: "Schedule dentist for next Monday at 10am",
       concerning: ["participant_1"],
       origin_thread: "participant_1_private",
     },
@@ -171,37 +83,9 @@ export const nudgeRealismScenarios: EvalScenarioDefinition[] = [
       target_thread: "participant_1_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
+      tone_markers: ["appointment"],
+      format_markers: ["upcoming"],
     },
-    turns: [
-      {
-        role: "participant",
-        thread_id: "participant_1_private",
-        message: "Schedule dentist for next Monday",
-        entity_id: "participant_1",
-        expected: {
-          topic: TopicKey.Health,
-          intent: ClassifierIntent.Request,
-        },
-      },
-      {
-        role: "assistant",
-        thread_id: "participant_1_private",
-        message: "Health record update: dentist appointment for next Monday is logged.",
-      },
-      {
-        role: "assistant",
-        thread_id: "participant_1_private",
-        message: "Reminder: dentist appointment is coming up on Monday. Any notes to add?",
-      },
-      {
-        role: "participant",
-        thread_id: "participant_1_private",
-        message: "Nope, all good",
-        entity_id: "participant_1",
-        expected: {
-          topic: TopicKey.Health,
-        },
-      },
-    ],
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 ];

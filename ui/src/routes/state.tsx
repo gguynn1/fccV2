@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -174,11 +175,21 @@ export function StateRoute() {
   const [filter, setFilter] = useState<"all" | "populated">("populated");
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading state…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Domain State" description="Persisted topic and operational state." />
+        <p className="text-sm text-muted-foreground">Loading state…</p>
+      </div>
+    );
   }
 
   if (!data) {
-    return <p className="text-sm text-muted-foreground">No state data available.</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Domain State" description="Persisted topic and operational state." />
+        <p className="text-sm text-muted-foreground">No state data available.</p>
+      </div>
+    );
   }
 
   const isEmpty = (arr: unknown[] | undefined) => !arr || arr.length === 0;
@@ -295,11 +306,7 @@ export function StateRoute() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Domain State</h2>
-          <p className="text-sm text-muted-foreground">Persisted topic and operational state.</p>
-        </div>
+      <PageHeader title="Domain State" description="Persisted topic and operational state.">
         <div className="flex gap-1">
           <Button
             variant={filter === "populated" ? "default" : "outline"}
@@ -316,7 +323,7 @@ export function StateRoute() {
             All ({sections.length})
           </Button>
         </div>
-      </div>
+      </PageHeader>
 
       {visibleSections.length === 0 && (
         <p className="text-sm text-muted-foreground">
@@ -1023,7 +1030,7 @@ export function StateRoute() {
                     ] as const
                   ).map(([label, source]) => (
                     <div key={label}>
-                      <p className="mb-2 text-xs font-medium text-muted-foreground">
+                      <div className="mb-2 text-xs font-medium text-muted-foreground">
                         {label}
                         <Badge
                           variant={source.active ? "default" : "outline"}
@@ -1031,7 +1038,7 @@ export function StateRoute() {
                         >
                           {source.active ? "active" : "inactive"}
                         </Badge>
-                      </p>
+                      </div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
                         <div>
                           <span className="text-muted-foreground">Last poll: </span>
@@ -1088,7 +1095,7 @@ export function StateRoute() {
                   <div className="space-y-4">
                     {Object.entries(data.threads).map(([threadId, history]) => (
                       <div key={threadId}>
-                        <p className="mb-2 text-xs font-medium text-muted-foreground">
+                        <div className="mb-2 text-xs font-medium text-muted-foreground">
                           <span className="font-mono">{threadId}</span>
                           <Badge variant="outline" className="ml-2 text-xs">
                             {history.active_topic_context}
@@ -1096,7 +1103,7 @@ export function StateRoute() {
                           <span className="ml-2">
                             Last activity: {formatDate(history.last_activity)}
                           </span>
-                        </p>
+                        </div>
                         {history.recent_messages.length > 0 ? (
                           <Table>
                             <TableHeader>

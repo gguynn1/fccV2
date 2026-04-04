@@ -157,6 +157,29 @@ interface SimulatedThreadContext {
   pending_clarification: boolean;
 }
 
+interface WorkerReplayTurnContext {
+  active_topic_context: TopicKey | null;
+  pending_clarification: boolean;
+  pending_confirmation: boolean;
+  primary_outbound_thread: string | null;
+  primary_outbound_message: string | null;
+}
+
+interface WorkerReplayHarness {
+  evaluate: (
+    scenario: EvalScenarioDefinition,
+    options?: { interpreter_fixture?: EvalScenarioSimulation["interpreter_fixture"] },
+  ) => Promise<EvalScenarioActual>;
+  evaluateTurn: (
+    message: string,
+    concerning: string[],
+    originThread: string,
+    scenarioId: string,
+    turnIndex: number,
+  ) => Promise<EvalScenarioActual>;
+  advanceAssistantTurn: (message: string, threadId: string) => void;
+}
+
 const DEICTIC_PATTERNS =
   /^(that|it|this|those|these|the one|cancel that|move that|change that|actually|no|yes|yeah|yep|nah|nope|ok|okay|sure|right|correct|the \w+)\b/i;
 const SHORT_MESSAGE_WORD_LIMIT = 12;
@@ -359,6 +382,27 @@ function inferIntent(message: string, context?: SimulatedThreadContext): Classif
   }
 
   return ClassifierIntent.Request;
+}
+
+function inferWorkerReplayTopic(message: string, context: WorkerReplayTurnContext): TopicKey {
+  const simulatedContext: SimulatedThreadContext = {
+    recent_messages: [],
+    active_topic_context: context.active_topic_context,
+    pending_clarification: context.pending_clarification || context.pending_confirmation,
+  };
+  return inferTopic(message, simulatedContext);
+}
+
+function inferWorkerReplayIntent(
+  message: string,
+  context: WorkerReplayTurnContext,
+): ClassifierIntent {
+  const simulatedContext: SimulatedThreadContext = {
+    recent_messages: [],
+    active_topic_context: context.active_topic_context,
+    pending_clarification: context.pending_clarification || context.pending_confirmation,
+  };
+  return inferIntent(message, simulatedContext);
 }
 
 function parseDefaultThreadHint(
@@ -590,23 +634,18 @@ function evaluateScenario(
   };
 }
 
-function createWorkerReplayHarness(config: SystemConfig): {
-  evaluate: (
-    scenario: EvalScenarioDefinition,
-    options?: { interpreter_fixture?: EvalScenarioSimulation["interpreter_fixture"] },
-  ) => Promise<EvalScenarioActual>;
-  evaluateTurn: (
-    message: string,
-    concerning: string[],
-    originThread: string,
-    scenarioId: string,
-    turnIndex: number,
-  ) => Promise<EvalScenarioActual>;
-} {
+function createWorkerReplayHarness(config: SystemConfig): WorkerReplayHarness {
   applyRuntimeSystemConfig(config);
   const state: SystemState = createMinimalSystemState(new Date());
   const transportCalls: TransportOutboundEnvelope[] = [];
   const threadHistory = new Map<string, Awaited<SystemState["threads"][string]>>();
+  let workerReplayTurnContext: WorkerReplayTurnContext = {
+    active_topic_context: null,
+    pending_clarification: false,
+    pending_confirmation: false,
+    primary_outbound_thread: null,
+    primary_outbound_message: null,
+  };
   const stateService = {
     getSystemConfig: () => Promise.resolve(config),
     saveSystemConfig: () => Promise.resolve(undefined),
@@ -656,6 +695,13 @@ function createWorkerReplayHarness(config: SystemConfig): {
     transportCalls.length = 0;
     threadHistory.clear();
     activeInterpreterFixture = null;
+    workerReplayTurnContext = {
+      active_topic_context: null,
+      pending_clarification: false,
+      pending_confirmation: false,
+      primary_outbound_thread: null,
+      primary_outbound_message: null,
+    };
   }
 
   function toEvalPriority(
@@ -680,6 +726,44 @@ function createWorkerReplayHarness(config: SystemConfig): {
         step.action === WorkerAction.CheckConfirmation &&
         step.output_summary === "confirmation_prompted",
     );
+  }
+
+  function isAuxiliaryWorkerNotice(outbound: TransportOutboundEnvelope): boolean {
+    const normalized = outbound.content.toLowerCase();
+    return (
+      normalized.includes("follow-up will stay in this thread") ||
+      normalized.includes(" update: an item was ")
+    );
+  }
+
+  function capturePrimaryOutbound(): TransportOutboundEnvelope | undefined {
+    const primary = [...transportCalls]
+      .reverse()
+      .find((outbound) => !isAuxiliaryWorkerNotice(outbound));
+    return primary ?? transportCalls.at(-1);
+  }
+
+  function advanceContextFromAssistantTurn(message: string, threadId: string): void {
+    const normalized = message.toLowerCase();
+    workerReplayTurnContext.pending_confirmation =
+      normalized.includes("reply yes or no") ||
+      normalized.includes("approval needed") ||
+      normalized.includes("please confirm");
+    workerReplayTurnContext.pending_clarification =
+      !workerReplayTurnContext.pending_confirmation &&
+      /\?\s*$/.test(message.trim()) &&
+      !normalized.includes("what did you see today") &&
+      !normalized.includes("what are you holding for later");
+    workerReplayTurnContext.primary_outbound_thread = threadId;
+    workerReplayTurnContext.primary_outbound_message = message;
+  }
+
+  function advanceContextFromParticipantActual(actual: EvalScenarioActual): void {
+    workerReplayTurnContext.active_topic_context = actual.topic;
+    workerReplayTurnContext.pending_clarification = false;
+    workerReplayTurnContext.pending_confirmation = false;
+    workerReplayTurnContext.primary_outbound_thread = actual.target_thread;
+    workerReplayTurnContext.primary_outbound_message = actual.composed_message;
   }
 
   function defaultActionTypeForTopic(topic: TopicKey): string {
@@ -1017,7 +1101,7 @@ function createWorkerReplayHarness(config: SystemConfig): {
         intent: inferredIntent,
       };
       const trace = await worker.process(queueItem);
-      const outbound = transportCalls.at(-1);
+      const outbound = capturePrimaryOutbound();
       const actual: EvalScenarioActual = {
         topic: inferredTopic,
         intent: inferredIntent,
@@ -1030,6 +1114,7 @@ function createWorkerReplayHarness(config: SystemConfig): {
         composed_message: outbound?.content ?? "No outbound generated.",
       };
       activeInterpreterFixture = null;
+      advanceContextFromParticipantActual(actual);
       return actual;
     },
     evaluateTurn: async (
@@ -1045,8 +1130,8 @@ function createWorkerReplayHarness(config: SystemConfig): {
         transportCalls.length = 0;
         activeInterpreterFixture = null;
       }
-      const inferredTopic = inferTopic(message);
-      const inferredIntent = inferIntent(message);
+      const inferredTopic = inferWorkerReplayTopic(message, workerReplayTurnContext);
+      const inferredIntent = inferWorkerReplayIntent(message, workerReplayTurnContext);
       const queueItem: StackQueueItem = {
         id: `eval_worker_${scenarioId}_turn_${turnIndex}`,
         source: QueueItemSource.HumanMessage,
@@ -1058,8 +1143,8 @@ function createWorkerReplayHarness(config: SystemConfig): {
         intent: inferredIntent,
       };
       const trace = await worker.process(queueItem);
-      const outbound = transportCalls.at(-1);
-      return {
+      const outbound = capturePrimaryOutbound();
+      const actual = {
         topic: inferredTopic,
         intent: inferredIntent,
         target_thread: outbound?.target_thread ?? originThread,
@@ -1070,6 +1155,11 @@ function createWorkerReplayHarness(config: SystemConfig): {
             outbound.content.toLowerCase().includes("please confirm")),
         composed_message: outbound?.content ?? "No outbound generated.",
       };
+      advanceContextFromParticipantActual(actual);
+      return actual;
+    },
+    advanceAssistantTurn: (message: string, threadId: string) => {
+      advanceContextFromAssistantTurn(message, threadId);
     },
   };
 }
@@ -1286,15 +1376,7 @@ function evaluateMultiTurnScenario(
 async function evaluateMultiTurnViaWorker(
   scenario: EvalScenarioDefinition,
   turns: EvalTurn[],
-  workerReplay: {
-    evaluateTurn: (
-      message: string,
-      concerning: string[],
-      originThread: string,
-      scenarioId: string,
-      turnIndex: number,
-    ) => Promise<EvalScenarioActual>;
-  },
+  workerReplay: WorkerReplayHarness,
 ): Promise<{
   allFailures: EvalScenarioFailure[];
   turnResults: EvalTurnResult[];
@@ -1308,6 +1390,7 @@ async function evaluateMultiTurnViaWorker(
     const turn = turns[i];
 
     if (turn.role === "assistant") {
+      workerReplay.advanceAssistantTurn(turn.message, turn.thread_id);
       turnResults.push({
         turn_index: i,
         role: "assistant",

@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
+import { PageHeader } from "@/components/page-header";
 import { PageModeBanner } from "@/components/page-mode-banner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +29,12 @@ export function BudgetRoute() {
   );
 
   if (isLoading || !data) {
-    return <p className="text-sm text-muted-foreground">Loading budget…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Budget" description="Outbound budget limits and collision precedence." />
+        <p className="text-sm text-muted-foreground">Loading budget…</p>
+      </div>
+    );
   }
 
   const budget = data.dispatch.outbound_budget;
@@ -36,12 +42,7 @@ export function BudgetRoute() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Budget</h2>
-        <p className="text-sm text-muted-foreground">
-          Outbound budget limits and collision precedence.
-        </p>
-      </div>
+      <PageHeader title="Budget" description="Outbound budget limits and collision precedence." />
       <PageModeBanner
         mode="editable"
         detail="Budget limits apply live. Collision precedence is shown for reference and is currently read-only."

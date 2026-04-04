@@ -8,11 +8,11 @@ alwaysApply: false
 
 ## File Roles
 
-| File               | Role                                                                      |
-| ------------------ | ------------------------------------------------------------------------- |
-| `src/types.ts`     | Shared vocabulary enums only. Pure definitions, zero imports.             |
-| `src/index.ts`     | Barrel re-exports + aggregate interfaces (SystemConfig, ScenarioTesting). |
-| Service `types.ts` | Types owned by that service.                                              |
+| File               | Role                                                                        |
+| ------------------ | --------------------------------------------------------------------------- |
+| `src/types.ts`     | Shared vocabulary enums only. Pure definitions, zero imports.               |
+| `src/index.ts`     | Barrel re-exports + aggregate interfaces (SystemConfig, ScenarioTesting).   |
+| Service `types.ts` | Types owned by that service.                                                |
 | Parent `types.ts`  | Barrel re-exports plus aggregate service contracts/interfaces where needed. |
 
 ## Rules

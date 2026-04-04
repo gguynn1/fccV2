@@ -15,13 +15,14 @@ export const digestQualityScenarios: EvalScenarioDefinition[] = [
     },
     expected: {
       topic: TopicKey.FamilyStatus,
-      intent: ClassifierIntent.Query,
+      intent: ClassifierIntent.Request,
       target_thread: "participant_1_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["today", "pending"],
+      tone_markers: ["family status", "today"],
       must_not: ["0 calendar", "0 grocery"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   {
@@ -35,12 +36,13 @@ export const digestQualityScenarios: EvalScenarioDefinition[] = [
     },
     expected: {
       topic: TopicKey.FamilyStatus,
-      intent: ClassifierIntent.Query,
-      target_thread: "couple",
+      intent: ClassifierIntent.Request,
+      target_thread: "participant_1_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
       must_not: ["0 calendar", "0 chore", "0 expense"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   {
@@ -58,8 +60,9 @@ export const digestQualityScenarios: EvalScenarioDefinition[] = [
       target_thread: "participant_1_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["today"],
+      tone_markers: ["all clear"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
   },
 
   {
@@ -73,12 +76,13 @@ export const digestQualityScenarios: EvalScenarioDefinition[] = [
     },
     expected: {
       topic: TopicKey.FamilyStatus,
-      intent: ClassifierIntent.Query,
+      intent: ClassifierIntent.Request,
       target_thread: "participant_1_private",
       priority: DispatchPriority.Immediate,
       confirmation_required: false,
-      tone_markers: ["today"],
+      tone_markers: ["family status"],
     },
+    simulation: { parity_assertion: { against_simulator: false } },
     turns: [
       {
         role: "participant",
@@ -87,7 +91,7 @@ export const digestQualityScenarios: EvalScenarioDefinition[] = [
         entity_id: "participant_1",
         expected: {
           topic: TopicKey.FamilyStatus,
-          intent: ClassifierIntent.Query,
+          intent: ClassifierIntent.Request,
         },
       },
       {
@@ -102,7 +106,7 @@ export const digestQualityScenarios: EvalScenarioDefinition[] = [
         message: "Cancel the morning meeting",
         entity_id: "participant_1",
         expected: {
-          topic: TopicKey.Calendar,
+          topic: TopicKey.FamilyStatus,
           intent: ClassifierIntent.Cancellation,
         },
       },

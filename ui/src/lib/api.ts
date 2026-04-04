@@ -21,11 +21,16 @@ async function parseError(response: Response): Promise<string> {
 }
 
 export async function adminFetch<TResponse>(path: string, init?: RequestInit): Promise<TResponse> {
+  const headers = new Headers(init?.headers);
+  const hasBody = init?.body !== undefined && init.body !== null;
+  const bodyIsString = typeof init?.body === "string";
+
+  if (hasBody && bodyIsString && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+
   const response = await fetch(`/api/admin${path}`, {
-    headers: {
-      "content-type": "application/json",
-      ...init?.headers,
-    },
+    headers,
     ...init,
   });
 

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -107,17 +108,23 @@ export function EvalRoute() {
   }, [selectedRun, overviewQuery.data]);
 
   if (overviewQuery.isLoading || !overviewQuery.data) {
-    return <p className="text-sm text-muted-foreground">Loading eval runner…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Eval"
+          description="Run scenarios sequentially, inspect logs, and review the generated prompt markdown."
+        />
+        <p className="text-sm text-muted-foreground">Loading eval runner…</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Eval</h2>
-        <p className="text-sm text-muted-foreground">
-          Run scenarios sequentially, inspect logs, and review the generated prompt markdown.
-        </p>
-      </div>
+      <PageHeader
+        title="Eval"
+        description="Run scenarios sequentially, inspect logs, and review the generated prompt markdown."
+      />
 
       <Card>
         <CardHeader>
@@ -126,7 +133,9 @@ export function EvalRoute() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-end">
             <div className="w-full max-w-xs space-y-2">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Scenario set</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Scenario set
+              </p>
               <Select value={selectedScenarioSet} onValueChange={setSelectedScenarioSet}>
                 <SelectTrigger>
                   <SelectValue />

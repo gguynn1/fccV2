@@ -55,7 +55,7 @@ export function ReconciliationSummary({
           <div className="grid gap-2 sm:grid-cols-2">
             {entries.map(([label, count]) => (
               <div key={label} className="rounded-md border border-border px-3 py-2">
-                <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {label}
                 </div>
                 <div className="mt-1 text-lg font-semibold text-foreground">{count}</div>

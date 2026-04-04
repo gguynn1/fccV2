@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 
 import { EditableCell } from "@/components/editable-cell";
+import { PageHeader } from "@/components/page-header";
 import { PageModeBanner } from "@/components/page-mode-banner";
 import { ReconciliationSummary } from "@/components/reconciliation-summary";
 import { Badge } from "@/components/ui/badge";
@@ -59,7 +60,12 @@ export function ThreadsRoute() {
   );
 
   if (entitiesLoading || configLoading || !entitiesData || !configData) {
-    return <p className="text-sm text-muted-foreground">Loading threads…</p>;
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Threads" description="System config plus the generated thread graph." />
+        <p className="text-sm text-muted-foreground">Loading threads…</p>
+      </div>
+    );
   }
 
   const entityIds = entitiesData.entities.map((e) => e.id);
@@ -72,12 +78,7 @@ export function ThreadsRoute() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Threads</h2>
-        <p className="text-sm text-muted-foreground">
-          System config plus the generated thread graph.
-        </p>
-      </div>
+      <PageHeader title="Threads" description="System config plus the generated thread graph." />
       <PageModeBanner
         mode="editable"
         detail="Timezone, locale, and couple membership update live. Private and family threads are generated from the current entity roster and shown read-only."
