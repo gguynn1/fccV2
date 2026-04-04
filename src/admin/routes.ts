@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
-import { entitySchema } from "../01-service-stack/02-identity-service/types.js";
+import { entitySchema, Permission } from "../01-service-stack/02-identity-service/types.js";
 import { type BullQueueService } from "../01-service-stack/04-queue/index.js";
 import type { PendingQueueItem } from "../01-service-stack/04-queue/types.js";
 import { CollisionPrecedence } from "../01-service-stack/06-action-router/types.js";
@@ -12,7 +12,13 @@ import { ThreadType } from "../02-supporting-services/05-routing-service/types.j
 import { EscalationReassignmentPolicy } from "../02-supporting-services/07-escalation-service/types.js";
 import { ConfirmationActionType } from "../02-supporting-services/08-confirmation-service/types.js";
 import { applyRuntimeSystemConfig } from "../config/runtime-system-config.js";
-import { EscalationLevel, GrocerySection, QueueItemSource, TopicKey } from "../types.js";
+import {
+  EntityType,
+  EscalationLevel,
+  GrocerySection,
+  QueueItemSource,
+  TopicKey,
+} from "../types.js";
 import type { EmulationStore } from "./emulation-store.js";
 import {
   generateScenarioSet,
@@ -62,7 +68,6 @@ const escalationProfileSchema = z.object({
 });
 
 const digestScheduleBlockSchema = z.object({
-  description: z.string().min(1),
   times: z.record(z.string(), z.union([z.string(), z.null()])),
 });
 
@@ -219,6 +224,8 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     return {
       version: APP_VERSION,
       messaging_identity: options.messaging_identity,
+      entity_types: Object.values(EntityType),
+      permissions: Object.values(Permission),
       caldav: {
         port: options.caldav_port,
         path: "/caldav",

@@ -1,7 +1,6 @@
 import type { PendingQueueItem } from "../../01-service-stack/04-queue/types.js";
 
 export interface DigestScheduleBlock {
-  description: string;
   times: Record<string, string | null>;
 }
 

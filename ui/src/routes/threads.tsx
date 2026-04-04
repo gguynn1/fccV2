@@ -14,22 +14,12 @@ import {
 } from "@/components/ui/table";
 import { useConfig, useUpdateConfig } from "@/hooks/use-config";
 import { useEntities } from "@/hooks/use-entities";
+import { EntityType } from "@/lib/constants";
 
 export function ThreadsRoute() {
   const { data: entitiesData, isLoading: entitiesLoading } = useEntities();
   const { data: configData, isLoading: configLoading } = useConfig();
   const updateConfig = useUpdateConfig();
-
-  const saveThreadField = useCallback(
-    (threadId: string, field: string, value: string) => {
-      if (!configData) return;
-      const nextThreads = configData.threads.map((t) =>
-        t.id === threadId ? { ...t, [field]: value } : t,
-      );
-      updateConfig.mutate({ ...configData, threads: nextThreads });
-    },
-    [configData, updateConfig],
-  );
 
   const saveSystemField = useCallback(
     (field: "timezone" | "locale", value: string) => {
@@ -62,6 +52,9 @@ export function ThreadsRoute() {
   }
 
   const entityIds = entitiesData.entities.map((e) => e.id);
+  const adultEntityIds = entitiesData.entities
+    .filter((entity) => entity.type === EntityType.Adult)
+    .map((entity) => entity.id);
 
   return (
     <div className="space-y-6">
@@ -76,14 +69,14 @@ export function ThreadsRoute() {
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div>
-            <p className="mb-1 text-xs text-muted-foreground">Timezone</p>
+            <p className="mb-1 text-xs text-muted-foreground">Timezone *</p>
             <EditableCell
               value={configData.system.timezone}
               onSave={(value) => saveSystemField("timezone", value)}
             />
           </div>
           <div>
-            <p className="mb-1 text-xs text-muted-foreground">Locale</p>
+            <p className="mb-1 text-xs text-muted-foreground">Locale *</p>
             <EditableCell
               value={configData.system.locale}
               onSave={(value) => saveSystemField("locale", value)}
@@ -102,7 +95,6 @@ export function ThreadsRoute() {
               <TableRow>
                 <TableHead>Thread ID</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Description</TableHead>
                 <TableHead>Participants</TableHead>
               </TableRow>
             </TableHeader>
@@ -116,14 +108,8 @@ export function ThreadsRoute() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <EditableCell
-                      value={thread.description}
-                      onSave={(v) => saveThreadField(thread.id, "description", v)}
-                    />
-                  </TableCell>
-                  <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {entityIds.map((eId) => {
+                      {(thread.id === "couple" ? adultEntityIds : entityIds).map((eId) => {
                         const isMember = thread.participants.includes(eId);
                         return (
                           <Button

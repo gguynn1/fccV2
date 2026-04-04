@@ -1,7 +1,6 @@
 import {
   EscalationLevel,
   EscalationStepAction,
-  ThreadType,
   TopicKey,
   type SystemConfig,
   type SystemState,
@@ -9,45 +8,10 @@ import {
 
 // ── Config ──
 
-export const seedThreads: SystemConfig["threads"] = [
-  {
-    id: "participant_1_private",
-    type: ThreadType.Private,
-    participants: ["participant_1"],
-    description:
-      "PARTICIPANT 1's private thread with the assistant. Health, personal reminders, digests, drafts, review space.",
-  },
-  {
-    id: "participant_2_private",
-    type: ThreadType.Private,
-    participants: ["participant_2"],
-    description:
-      "PARTICIPANT 2's private thread. Business leads, morning check-in, digests, drafts, review space.",
-  },
-  {
-    id: "participant_3_private",
-    type: ThreadType.Private,
-    participants: ["participant_3"],
-    description: "PARTICIPANT 3's thread. Chore reminders, school nudges, tasks.",
-  },
-  {
-    id: "couple",
-    type: ThreadType.Shared,
-    participants: ["participant_1", "participant_2"],
-    description: "Couple thread. Finances, relationship, couple-level coordination.",
-  },
-  {
-    id: "family",
-    type: ThreadType.Shared,
-    participants: ["participant_1", "participant_2", "participant_3"],
-    description: "Family thread. Chores, grocery, travel, pets, general household.",
-  },
-];
+export const seedThreads: SystemConfig["threads"] = [];
 
 export const seedDailyRhythm: SystemConfig["daily_rhythm"] = {
   morning_digest: {
-    description:
-      "Delivered to each person in their private thread. What's ahead, what's due, what's unresolved.",
     times: {
       participant_1: "07:00",
       participant_2: "07:00",
@@ -55,7 +19,6 @@ export const seedDailyRhythm: SystemConfig["daily_rhythm"] = {
     },
   },
   evening_checkin: {
-    description: "Brief check-in if anything is still open. Otherwise, nothing.",
     times: {
       participant_1: "20:00",
       participant_2: "20:00",

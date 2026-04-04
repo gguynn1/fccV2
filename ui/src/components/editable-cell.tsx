@@ -8,6 +8,7 @@ export interface EditableCellProps {
   disabled?: boolean;
   className?: string;
   type?: "text" | "number" | "time";
+  allowEmpty?: boolean;
 }
 
 export function EditableCell({
@@ -16,6 +17,7 @@ export function EditableCell({
   disabled = false,
   className,
   type = "text",
+  allowEmpty = false,
 }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -35,12 +37,12 @@ export function EditableCell({
   const commit = useCallback(() => {
     setEditing(false);
     const trimmed = draft.trim();
-    if (trimmed !== value && trimmed.length > 0) {
+    if (trimmed !== value && (trimmed.length > 0 || allowEmpty)) {
       onSave(trimmed);
     } else {
       setDraft(value);
     }
-  }, [draft, value, onSave]);
+  }, [allowEmpty, draft, value, onSave]);
 
   if (disabled) {
     return <span className="text-sm text-muted-foreground">{value}</span>;

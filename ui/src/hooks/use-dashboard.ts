@@ -7,6 +7,7 @@ import type {
 } from "@/hooks/use-activity";
 import type { BudgetResponse } from "@/hooks/use-budget";
 import type { QueueResponse } from "@/hooks/use-queue";
+import type { SystemResponse } from "@/hooks/use-system";
 import { adminFetch } from "@/lib/api";
 
 export interface DashboardData {
@@ -15,15 +16,7 @@ export interface DashboardData {
   confirmations: ConfirmationsResponse;
   dispatches: DispatchesResponse;
   budget: BudgetResponse;
-  system: {
-    version: string;
-    messaging_identity: string;
-    caldav: {
-      port: number;
-      path: string;
-      local_only: boolean;
-    };
-  };
+  system: SystemResponse;
 }
 
 export function useDashboard() {

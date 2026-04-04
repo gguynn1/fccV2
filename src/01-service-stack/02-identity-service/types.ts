@@ -80,7 +80,10 @@ export const entitySchema = z
       });
     }
 
-    if (entity.type !== EntityType.Pet && entity.messaging_identity === null) {
+    if (
+      entity.type !== EntityType.Pet &&
+      (entity.messaging_identity === null || entity.messaging_identity.trim().length === 0)
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Adult and child entities must have a messaging identity.",
@@ -89,4 +92,47 @@ export const entitySchema = z
     }
   });
 
-export const entitiesSchema = z.array(entitySchema);
+export const entitiesSchema = z.array(entitySchema).superRefine((entities, context) => {
+  const idToIndex = new Map<string, number>();
+  const identityToIndex = new Map<string, number>();
+
+  entities.forEach((entity, index) => {
+    const existingIdIndex = idToIndex.get(entity.id);
+    if (existingIdIndex !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Entity IDs must be unique.",
+        path: [index, "id"],
+      });
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Entity IDs must be unique.",
+        path: [existingIdIndex, "id"],
+      });
+    } else {
+      idToIndex.set(entity.id, index);
+    }
+
+    if (entity.messaging_identity === null) {
+      return;
+    }
+
+    const normalizedIdentity = entity.messaging_identity.trim();
+    const existingIdentityIndex = identityToIndex.get(normalizedIdentity);
+    if (existingIdentityIndex !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Messaging identities must be unique.",
+        path: [index, "messaging_identity"],
+      });
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Messaging identities must be unique.",
+        path: [existingIdentityIndex, "messaging_identity"],
+      });
+      return;
+    }
+
+    identityToIndex.set(normalizedIdentity, index);
+  });
+});

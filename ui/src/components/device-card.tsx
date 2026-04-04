@@ -12,6 +12,7 @@ import {
   type EmulationMessage,
 } from "@/hooks/use-emulation";
 import type { EntityPayload, ThreadPayload } from "@/hooks/use-entities";
+import { EntityType } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 export interface DeviceCardProps {
@@ -106,7 +107,7 @@ export function DeviceCard({ entity, threads, sessionActive }: DeviceCardProps) 
     }
   }
 
-  const typeBadgeVariant = entity.type === "adult" ? "secondary" : "outline";
+  const typeBadgeVariant = entity.type === EntityType.Adult ? "secondary" : "outline";
 
   return (
     <Card className="flex h-[540px] flex-col">

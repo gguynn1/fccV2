@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api";
 
 export interface DigestScheduleBlockPayload {
-  description: string;
   times: Record<string, string | null>;
 }
 

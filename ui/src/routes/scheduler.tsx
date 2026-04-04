@@ -10,9 +10,15 @@ import {
   type SchedulerResponse,
 } from "@/hooks/use-scheduler";
 
+const DIGEST_SUBTITLES: Record<string, string> = {
+  "Morning Digest":
+    "Delivered to each person in their private thread. What's ahead, what's due, what's unresolved.",
+  "Evening Check-in": "Brief check-in if anything is still open. Otherwise, nothing.",
+};
+
 export interface DigestBlockProps {
   title: string;
-  block: { description: string; times: Record<string, string | null> };
+  block: { times: Record<string, string | null> };
   onTimeChange: (entity: string, time: string | null) => void;
 }
 
@@ -21,7 +27,7 @@ function DigestBlock({ title, block, onTimeChange }: DigestBlockProps) {
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">{title}</CardTitle>
-        <p className="text-xs text-muted-foreground">{block.description}</p>
+        <p className="text-xs text-muted-foreground">{DIGEST_SUBTITLES[title]}</p>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">

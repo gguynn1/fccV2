@@ -147,7 +147,18 @@ function createMinimalSystemConfig(): SystemConfig {
       topic_disambiguation: { description: "Topic disambiguation rules", rules: [] },
       intent_disambiguation: { description: "Intent disambiguation rules", rules: [] },
     },
-    daily_rhythm: {} as SystemConfig["daily_rhythm"],
+    daily_rhythm: {
+      morning_digest: { times: {} },
+      evening_checkin: { times: {} },
+      default_state: "quiet",
+      digest_eligibility: {
+        exclude_already_dispatched: true,
+        exclude_stale: true,
+        staleness_threshold_hours: 24,
+        suppress_repeats_from_previous_digest: true,
+        include_unresolved_from_yesterday: true,
+      },
+    },
     worker: {
       processing_sequence: [],
       max_thread_history_messages: 15,
