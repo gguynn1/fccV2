@@ -11,6 +11,8 @@ import type { OutboundBudgetTracker } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "budget-service" });
 const DEFAULT_QUEUE_NAME = "fcc-budget-counters";
+const DEFAULT_QUIET_WINDOW_MINUTES = 20;
+const DEFAULT_TOPIC_COOLDOWN_MINUTES = 30;
 
 interface RecentDispatchRecord {
   id: string;
@@ -110,6 +112,13 @@ export class RedisBudgetService implements BudgetService {
       ),
       this.collectCollisionIds(queue_item, target_thread),
     ]);
+    const [threadQuietMs, personQuietMs, state] = await Promise.all([
+      this.getThreadQuietRemainingMs(target_thread),
+      Promise.all(
+        queue_item.concerning.map((participantId) => this.getPersonQuietRemainingMs(participantId)),
+      ),
+      this.stateService.getSystemState(),
+    ]);
 
     const budget = this.getOutboundBudget();
     const isThreadAtLimit = this.asNumber(threadCount) >= budget.max_messages_per_thread_per_hour;
@@ -125,6 +134,23 @@ export class RedisBudgetService implements BudgetService {
         hold_until: new Date(now.getTime() + budget.batch_window_minutes * 60_000),
         included_queue_item_ids: collisionIds,
         reason: "Collision or budget limit detected; item moved into batch window.",
+      };
+    }
+
+    const quietWindowMs = Math.max(threadQuietMs, ...personQuietMs, 0);
+    const topicCooldownUntil = this.detectTopicCooldownUntil(queue_item, target_thread, state, now);
+    const topicCooldownMs = topicCooldownUntil ? topicCooldownUntil.getTime() - now.getTime() : 0;
+    const shouldSuppressForNoise =
+      priority !== DispatchPriority.Immediate &&
+      !this.isParticipantInitiated(queue_item.source) &&
+      (quietWindowMs > 0 || topicCooldownMs > 0);
+    if (shouldSuppressForNoise) {
+      const holdUntil = new Date(now.getTime() + Math.max(quietWindowMs, topicCooldownMs));
+      return {
+        priority: DispatchPriority.Batched,
+        hold_until: holdUntil,
+        included_queue_item_ids: collisionIds,
+        reason: "Active quiet window or topic cooldown; deferred to reduce alert fatigue.",
       };
     }
 
@@ -151,6 +177,20 @@ export class RedisBudgetService implements BudgetService {
     const threadKey = this.threadHourlyKey(queue_item.target_thread, dispatched_at);
     pipeline.incr(threadKey);
     pipeline.expire(threadKey, this.secondsUntilEndOfHour(dispatched_at));
+    if (
+      this.isParticipantInitiated(queue_item.source) &&
+      !queue_item.target_thread.endsWith("_private")
+    ) {
+      const quietSeconds = DEFAULT_QUIET_WINDOW_MINUTES * 60;
+      const threadQuietKey = this.threadQuietKey(queue_item.target_thread);
+      pipeline.set(threadQuietKey, "1");
+      pipeline.expire(threadQuietKey, quietSeconds);
+      for (const participantId of queue_item.concerning) {
+        const personQuietKey = this.personQuietKey(participantId);
+        pipeline.set(personQuietKey, "1");
+        pipeline.expire(personQuietKey, quietSeconds);
+      }
+    }
     await pipeline.exec();
   }
 
@@ -221,6 +261,14 @@ export class RedisBudgetService implements BudgetService {
   private threadHourlyKey(threadId: string, at: Date): string {
     const hourStamp = at.toISOString().slice(0, 13);
     return `fcc:budget:thread:${threadId}:${hourStamp}`;
+  }
+
+  private threadQuietKey(threadId: string): string {
+    return `fcc:budget:quiet:thread:${threadId}`;
+  }
+
+  private personQuietKey(participantId: string): string {
+    return `fcc:budget:quiet:person:${participantId}`;
   }
 
   private secondsUntilEndOfDay(at: Date): number {
@@ -410,6 +458,66 @@ export class RedisBudgetService implements BudgetService {
       return [];
     }
     return value.map((entry) => (typeof entry === "string" ? entry : null));
+  }
+
+  private async getThreadQuietRemainingMs(threadId: string): Promise<number> {
+    const client = await this.queue.client;
+    const ttlMs = await client.pttl(this.threadQuietKey(threadId));
+    return typeof ttlMs === "number" && ttlMs > 0 ? ttlMs : 0;
+  }
+
+  private async getPersonQuietRemainingMs(participantId: string): Promise<number> {
+    const client = await this.queue.client;
+    const ttlMs = await client.pttl(this.personQuietKey(participantId));
+    return typeof ttlMs === "number" && ttlMs > 0 ? ttlMs : 0;
+  }
+
+  private detectTopicCooldownUntil(
+    queueItem: StackQueueItem,
+    targetThread: string,
+    state: Awaited<ReturnType<StateService["getSystemState"]>>,
+    now: Date,
+  ): Date | null {
+    const topic = queueItem.topic;
+    if (!topic) {
+      return null;
+    }
+    const cooldownStartMs = now.getTime() - DEFAULT_TOPIC_COOLDOWN_MINUTES * 60_000;
+    const concerning = new Set(queueItem.concerning);
+    let latestMatch: Date | null = null;
+
+    for (const dispatched of state.queue.recently_dispatched) {
+      if (dispatched.dispatched_at.getTime() < cooldownStartMs) {
+        continue;
+      }
+      if (dispatched.topic !== topic) {
+        continue;
+      }
+      const sameThread = dispatched.target_thread === targetThread;
+      const intersects = this.resolveParticipantsForThread(dispatched.target_thread).some(
+        (entityId) => concerning.has(entityId),
+      );
+      if (!sameThread && !intersects) {
+        continue;
+      }
+      if (latestMatch === null || dispatched.dispatched_at > latestMatch) {
+        latestMatch = dispatched.dispatched_at;
+      }
+    }
+
+    if (!latestMatch) {
+      return null;
+    }
+    return new Date(latestMatch.getTime() + DEFAULT_TOPIC_COOLDOWN_MINUTES * 60_000);
+  }
+
+  private isParticipantInitiated(source: QueueItemSource): boolean {
+    return (
+      source === QueueItemSource.HumanMessage ||
+      source === QueueItemSource.Reaction ||
+      source === QueueItemSource.ForwardedMessage ||
+      source === QueueItemSource.ImageAttachment
+    );
   }
 }
 

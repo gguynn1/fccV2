@@ -3,6 +3,7 @@ import { pino, type Logger } from "pino";
 import { assign, createActor, setup } from "xstate";
 
 import type { StackQueueItem } from "../../01-service-stack/types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
 import { toRedisConnection } from "../../lib/redis.js";
 import { ClassifierIntent, EscalationLevel, QueueItemSource, TopicKey } from "../../types.js";
 import type { EscalationDecision, EscalationService, StateService } from "../types.js";
@@ -67,23 +68,6 @@ const PROFILE_BY_LEVEL: Record<EscalationLevel, EscalationProfileRuntime> = {
     steps: [],
     reassignment_policy: EscalationReassignmentPolicy.Cancel,
   },
-};
-
-const TOPIC_LEVEL_MAP: Record<TopicKey, EscalationLevel> = {
-  [TopicKey.Chores]: EscalationLevel.High,
-  [TopicKey.Finances]: EscalationLevel.High,
-  [TopicKey.School]: EscalationLevel.Medium,
-  [TopicKey.Health]: EscalationLevel.Medium,
-  [TopicKey.Calendar]: EscalationLevel.Medium,
-  [TopicKey.Travel]: EscalationLevel.Medium,
-  [TopicKey.Relationship]: EscalationLevel.Low,
-  [TopicKey.Pets]: EscalationLevel.Low,
-  [TopicKey.FamilyStatus]: EscalationLevel.Low,
-  [TopicKey.Maintenance]: EscalationLevel.Low,
-  [TopicKey.Grocery]: EscalationLevel.None,
-  [TopicKey.Vendors]: EscalationLevel.None,
-  [TopicKey.Business]: EscalationLevel.None,
-  [TopicKey.Meals]: EscalationLevel.None,
 };
 
 export interface EscalationServiceOptions {
@@ -212,7 +196,7 @@ export class XStateEscalationService implements EscalationService {
     target_thread: string,
   ): Promise<EscalationDecision> {
     const topic = queue_item.topic ?? TopicKey.FamilyStatus;
-    const level = TOPIC_LEVEL_MAP[topic] ?? EscalationLevel.None;
+    const level = runtimeSystemConfig.topics[topic]?.escalation ?? EscalationLevel.None;
     if (level === EscalationLevel.None) {
       return { should_escalate: false };
     }

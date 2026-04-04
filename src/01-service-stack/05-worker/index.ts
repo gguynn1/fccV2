@@ -31,9 +31,10 @@ import {
   type TopicAction,
   type TopicProfile,
 } from "../../02-supporting-services/04-topic-profile-service/types.js";
-import type {
-  RoutingDecision,
-  ThreadHistory,
+import {
+  RoutingRule,
+  type RoutingDecision,
+  type ThreadHistory,
 } from "../../02-supporting-services/05-routing-service/types.js";
 import {
   ConfirmationActionType,
@@ -73,7 +74,6 @@ import {
   type StackClassificationResult,
   type StackQueueItem,
   type StoreAction,
-  type TransportOutboundEnvelope,
   type TransportServiceContract,
   type WorkerDecision,
 } from "../types.js";
@@ -704,7 +704,8 @@ export class Worker {
       }
       determined = await this.dispatchClarification(
         classifiedQueueItem,
-        classification.topic,
+        classification,
+        identity,
         error.clarification,
       );
     }
@@ -780,6 +781,8 @@ export class Worker {
       async () =>
         this.handleConfirmation(
           classifiedQueueItem,
+          classification,
+          identity,
           determined.typed_action,
           escalationTargetThread,
         ),
@@ -853,6 +856,54 @@ export class Worker {
         const stateBackedMessage = await this.composeStateBackedMessage(actionToExecute);
         if (stateBackedMessage) {
           composed = stateBackedMessage;
+        }
+        const classifierWithComposer = this.classifierService as {
+          composeTopicMessage?: (input: {
+            topic: TopicKey;
+            intent: ClassifierIntent;
+            source_message: string;
+            proposed_message: string;
+            behavior: {
+              tone: string;
+              format: string;
+              initiative_style: string;
+              framework_grounding: string | null;
+            };
+            recent_messages: Array<{
+              from: string;
+              content: string;
+              at: string;
+              topic_context: string | null;
+            }>;
+          }) => Promise<string | null>;
+        };
+        if (typeof classifierWithComposer.composeTopicMessage === "function") {
+          const sourceMessage =
+            typeof classifiedQueueItem.content === "string"
+              ? classifiedQueueItem.content
+              : JSON.stringify(classifiedQueueItem.content);
+          const recentMessages = (cappedHistory?.recent_messages ?? []).map((message) => ({
+            from: message.from,
+            content: message.content,
+            at: message.at.toISOString(),
+            topic_context: message.topic_context ?? null,
+          }));
+          const composedFromModel = await classifierWithComposer.composeTopicMessage({
+            topic: classification.topic,
+            intent: classification.intent,
+            source_message: sourceMessage,
+            proposed_message: composed,
+            behavior: {
+              tone: profile.tone,
+              format: profile.format,
+              initiative_style: profile.initiative_style,
+              framework_grounding: profile.framework_grounding,
+            },
+            recent_messages: recentMessages,
+          });
+          if (typeof composedFromModel === "string" && composedFromModel.trim().length > 0) {
+            composed = composedFromModel.trim();
+          }
         }
         await this.enqueueCrossTopicEvents(classifiedQueueItem, classification, profile, {
           ...determined,
@@ -1033,7 +1084,6 @@ export class Worker {
     now: Date,
     message: string,
   ): boolean {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return -- method exists on RoutingService; IDE resolver lags behind tsc
     return this.routingService.shouldResetActiveTopicContext(history, nextTopic, now, message);
   }
 
@@ -2376,6 +2426,8 @@ export class Worker {
 
   private async handleConfirmation(
     queueItem: StackQueueItem,
+    classification: StackClassificationResult,
+    identity: IdentityResolutionResult,
     action: TopicAction,
     targetThread: string,
   ): Promise<
@@ -2417,22 +2469,14 @@ export class Worker {
       ),
     });
     const prompt = `Please confirm: ${action.type.replaceAll("_", " ")}. Reply yes or no.`;
-    const outbound: TransportOutboundEnvelope = {
+    await this.persistSystemDispatch({
+      queue_item: queueItem,
+      classification,
+      identity,
       target_thread: targetThread,
       content: prompt,
-      priority: DispatchPriority.Immediate,
-      concerning: queueItem.concerning,
-    };
-    await this.transportService.sendOutbound(outbound);
-    await this.stateService.appendDispatchResult(queueItem, {
-      decision: "dispatch",
-      outbound,
-    } satisfies DispatchAction);
-    await this.appendOutboundHistory(
-      targetThread,
-      prompt,
-      queueItem.topic ?? TopicKey.FamilyStatus,
-    );
+      reason: "confirmation prompt",
+    });
     return {
       kind: "confirmation_prompted",
       metadata: { confirmation_id: confirmation.id, target_thread: targetThread },
@@ -2512,6 +2556,49 @@ export class Worker {
         "description" in determined.typed_action ? String(determined.typed_action.description) : "";
       const items = extractGroceryItemsFromMealDescription(description);
       return items.length > 0 ? items.join(", ") : null;
+    }
+
+    if (sourceTopic === TopicKey.Calendar && targetTopic === TopicKey.School) {
+      if ("title" in determined.typed_action && typeof determined.typed_action.title === "string") {
+        return `Calendar-linked school event: ${determined.typed_action.title}`;
+      }
+      return "Calendar update relevant to school schedule.";
+    }
+
+    if (sourceTopic === TopicKey.Calendar && targetTopic === TopicKey.Health) {
+      if ("title" in determined.typed_action && typeof determined.typed_action.title === "string") {
+        return `Calendar-linked health appointment: ${determined.typed_action.title}`;
+      }
+      return "Calendar update relevant to health tracking.";
+    }
+
+    if (sourceTopic === TopicKey.Health && targetTopic === TopicKey.Calendar) {
+      if ("date" in determined.typed_action) {
+        return "Create or update a calendar appointment tied to the health record.";
+      }
+      return "Health follow-up may require a calendar reminder.";
+    }
+
+    if (sourceTopic === TopicKey.Travel && targetTopic === TopicKey.Calendar) {
+      if ("name" in determined.typed_action && typeof determined.typed_action.name === "string") {
+        return `Travel itinerary checkpoint for ${determined.typed_action.name}`;
+      }
+      return "Travel update that should be reflected on the calendar.";
+    }
+
+    if (sourceTopic === TopicKey.Travel && targetTopic === TopicKey.Grocery) {
+      return "Travel prep groceries reminder (snacks, toiletries, trip supplies).";
+    }
+
+    if (sourceTopic === TopicKey.Maintenance && targetTopic === TopicKey.Vendors) {
+      if ("name" in determined.typed_action && typeof determined.typed_action.name === "string") {
+        return `Maintenance task may require a vendor for ${determined.typed_action.name}`;
+      }
+      return "Maintenance update that may require vendor follow-up.";
+    }
+
+    if (sourceTopic === TopicKey.Maintenance && targetTopic === TopicKey.Finances) {
+      return "Maintenance update likely to impact expenses/budget.";
     }
 
     // Only emit explicit cross-topic payloads. Generic placeholders create noisy
@@ -2617,6 +2704,68 @@ export class Worker {
     };
   }
 
+  private async persistSystemDispatch(input: {
+    queue_item: StackQueueItem;
+    classification: StackClassificationResult;
+    identity: IdentityResolutionResult;
+    target_thread: string;
+    content: string;
+    reason: string;
+  }): Promise<void> {
+    const routingDecision: RoutingDecision = {
+      target: {
+        thread_id: input.target_thread,
+        rule_applied:
+          input.classification.intent === ClassifierIntent.Query
+            ? RoutingRule.ResponseInPlace
+            : RoutingRule.ProactiveNarrowest,
+        reason: input.reason,
+      },
+    };
+    const budget: BudgetDecision = {
+      priority: DispatchPriority.Immediate,
+      reason: input.reason,
+    };
+    const action = await this.routeToAction(
+      input.queue_item,
+      input.classification,
+      input.identity,
+      routingDecision,
+      budget,
+      input.content,
+    );
+
+    if (action.decision !== "dispatch") {
+      const forcedDispatch: ActionRouterResult = {
+        decision: "dispatch",
+        outbound: {
+          target_thread: input.target_thread,
+          content: input.content,
+          priority: DispatchPriority.Immediate,
+          concerning: input.queue_item.concerning,
+        },
+      };
+      await this.persistOutcome(
+        input.queue_item,
+        input.classification,
+        forcedDispatch,
+        input.content,
+        routingDecision,
+        budget,
+      );
+      return;
+    }
+
+    await this.persistOutcome(
+      input.queue_item,
+      input.classification,
+      action,
+      input.content,
+      routingDecision,
+      budget,
+    );
+  }
+
   private async persistOutcome(
     queueItem: StackQueueItem,
     classification: StackClassificationResult,
@@ -2640,6 +2789,12 @@ export class Worker {
         action.outbound.target_thread,
         composedMessage,
         classification.topic,
+      );
+      await this.maybeDispatchFollowUpThreadNotice(
+        queueItem,
+        classification,
+        action.outbound.target_thread,
+        routingDecision,
       );
       this.logger.info(
         {
@@ -2698,31 +2853,80 @@ export class Worker {
     });
   }
 
+  private async maybeDispatchFollowUpThreadNotice(
+    queueItem: StackQueueItem,
+    classification: StackClassificationResult,
+    primaryTargetThread: string,
+    routingDecision: RoutingDecision,
+  ): Promise<void> {
+    const followUpThread = routingDecision.follow_up_target?.thread_id;
+    if (!followUpThread || followUpThread === primaryTargetThread) {
+      return;
+    }
+    if (
+      !this.isParticipantInitiatedSource(queueItem.source) ||
+      classification.intent === ClassifierIntent.Query ||
+      classification.intent === ClassifierIntent.Confirmation
+    ) {
+      return;
+    }
+    if (primaryTargetThread.endsWith("_private")) {
+      return;
+    }
+
+    const state = await this.stateService.getSystemState();
+    const now = this.now();
+    const cooldownMs = 20 * 60 * 1000;
+    const hasRecentNotice = state.queue.recently_dispatched.some(
+      (record) =>
+        record.target_thread === followUpThread &&
+        record.topic === TopicKey.FamilyStatus &&
+        now.getTime() - record.dispatched_at.getTime() <= cooldownMs &&
+        record.content.toLowerCase().includes("follow-up will stay in this thread"),
+    );
+    if (hasRecentNotice) {
+      return;
+    }
+
+    const notice = "Quick note: follow-up will stay in this thread to avoid duplicate alerts.";
+    const outbound: DispatchAction = {
+      decision: "dispatch",
+      outbound: {
+        target_thread: followUpThread,
+        content: notice,
+        priority: DispatchPriority.Batched,
+        concerning: queueItem.concerning,
+      },
+    };
+    await this.transportService.sendOutbound(outbound.outbound);
+    await this.stateService.appendDispatchResult(
+      { ...queueItem, target_thread: followUpThread, topic: TopicKey.FamilyStatus },
+      outbound,
+    );
+    await this.appendOutboundHistory(followUpThread, notice, TopicKey.FamilyStatus);
+  }
+
   private async dispatchClarification(
     queueItem: StackQueueItem,
-    topic: TopicKey,
+    classification: StackClassificationResult,
+    identity: IdentityResolutionResult,
     clarification: ClarificationRequest,
   ): Promise<ClarificationDispatch> {
     const targetThread = await this.routingService.resolveTargetThread({
-      topic,
+      topic: classification.topic,
       intent: ClassifierIntent.Query,
       concerning: queueItem.concerning,
       origin_thread: queueItem.target_thread,
       is_response: true,
     });
-    const outbound: TransportOutboundEnvelope = {
+    await this.persistSystemDispatch({
+      queue_item: queueItem,
+      classification,
+      identity,
       target_thread: targetThread,
       content: clarification.message_to_participant,
-      priority: DispatchPriority.Immediate,
-      concerning: queueItem.concerning,
-    };
-    await this.transportService.sendOutbound(outbound);
-    await this.stateService.appendDispatchResult(queueItem, {
-      decision: "dispatch",
-      outbound,
-    } satisfies DispatchAction);
-    await this.appendInboundHistory(queueItem, topic);
-    await this.appendOutboundHistory(targetThread, clarification.message_to_participant, topic);
+      reason: "clarification prompt",
+    });
     return { clarification, routing_target: targetThread };
   }
 

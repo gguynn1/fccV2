@@ -10,10 +10,12 @@ import type { StackClassificationResult, StackQueueItem } from "../types.js";
 import {
   classifierSystemPrompt,
   classifierUserPrompt,
+  topicMessageComposerSystemPrompt,
   topicScopedContentSystemPrompt,
 } from "./prompts.js";
 import {
   classificationResultSchema,
+  topicMessageSchema,
   topicScopedContentSchema,
   type ClassifierContextMessage,
   type ClassifierInput,
@@ -171,6 +173,54 @@ export class ClaudeClassifierService {
       this.logger.warn(
         { err: error instanceof Error ? error.message : String(error) },
         "Topic-scoped content extraction failed; continuing with original message.",
+      );
+      return null;
+    }
+  }
+
+  public async composeTopicMessage(input: {
+    topic: TopicKey;
+    intent: ClassifierIntent;
+    source_message: string;
+    proposed_message: string;
+    behavior: {
+      tone: string;
+      format: string;
+      initiative_style: string;
+      framework_grounding: string | null;
+    };
+    recent_messages: Array<{
+      from: string;
+      content: string;
+      at: string;
+      topic_context: string | null;
+    }>;
+  }): Promise<string | null> {
+    try {
+      const response = await this.anthropic.messages.create({
+        model: this.model,
+        max_tokens: 220,
+        temperature: 0.2,
+        system: topicMessageComposerSystemPrompt(),
+        messages: [
+          {
+            role: "user",
+            content: JSON.stringify(input, null, 2),
+          },
+        ],
+      });
+      const textBlock = response.content.find((block) => block.type === "text");
+      if (!textBlock || textBlock.type !== "text") {
+        return null;
+      }
+      const raw = this.extractJson(textBlock.text);
+      const parsed = topicMessageSchema.parse(JSON.parse(raw));
+      const composed = parsed.composed_message.trim();
+      return composed.length > 0 ? composed : null;
+    } catch (error: unknown) {
+      this.logger.warn(
+        { err: error instanceof Error ? error.message : String(error) },
+        "Topic-native composition failed; using deterministic fallback message.",
       );
       return null;
     }

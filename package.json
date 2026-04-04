@@ -11,6 +11,7 @@
     "eval": "tsx eval/cli.ts watch",
     "eval:list": "tsx eval/cli.ts list",
     "eval:run": "tsx eval/cli.ts run",
+    "eval:run:worker": "tsx eval/cli.ts run --mode worker",
     "eval:coverage": "tsx eval/cli.ts coverage",
     "eval:generate-set": "tsx eval/cli.ts generate-set",
     "format": "prettier --write .",

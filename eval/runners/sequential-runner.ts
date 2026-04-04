@@ -1,13 +1,25 @@
 import { writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
+import { createWorker } from "../../src/01-service-stack/05-worker/index.js";
+import type {
+  ActionRouterResult,
+  StackClassificationResult,
+  StackQueueItem,
+  TransportOutboundEnvelope,
+} from "../../src/01-service-stack/types.js";
 import { createStateService } from "../../src/02-supporting-services/03-state-service/index.js";
+import { createTopicProfileService } from "../../src/02-supporting-services/04-topic-profile-service/index.js";
+import { createRoutingService } from "../../src/02-supporting-services/05-routing-service/index.js";
+import { createMinimalSystemState } from "../../src/config/minimal-system-config.js";
 import { loadEnv } from "../../src/env.js";
 import {
   ClassifierIntent,
   DispatchPriority,
+  QueueItemSource,
   TopicKey,
   type SystemConfig,
+  type SystemState,
 } from "../../src/index.js";
 import { ensureEvalWorkspace } from "../lib/paths.js";
 import { writeRunArtifacts } from "../reporting/write-run-artifacts.js";
@@ -32,6 +44,7 @@ export interface RunSequentialEvalOptions {
   run_id: string;
   scenario_set: string;
   step_delay_ms?: number;
+  mode?: "simulator" | "worker";
 }
 
 function pause(delayMs: number): Promise<void> {
@@ -274,9 +287,52 @@ function inferIntent(message: string, context?: SimulatedThreadContext): Classif
   return ClassifierIntent.Request;
 }
 
-function inferTargetThread(topic: TopicKey, input: EvalScenarioDefinition["prompt_input"]): string {
+function parseDefaultThreadHint(
+  defaultHint: unknown,
+  concerning: string[],
+  originThread: string,
+): string | null {
+  if (typeof defaultHint !== "string") {
+    return null;
+  }
+  const normalized = defaultHint.toLowerCase();
+  if (normalized.includes("private thread") && concerning.length > 0) {
+    return `${concerning[0]}_private`;
+  }
+  if (defaultHint === "family" || defaultHint === "couple") {
+    return defaultHint;
+  }
+  if (defaultHint.endsWith("_private")) {
+    return defaultHint;
+  }
+  if (defaultHint === "same thread as request") {
+    return originThread;
+  }
+  return null;
+}
+
+function inferTargetThread(
+  topic: TopicKey,
+  input: EvalScenarioDefinition["prompt_input"],
+  config: SystemConfig,
+  intent: ClassifierIntent,
+): string {
+  if (intent === ClassifierIntent.Query || intent === ClassifierIntent.Response) {
+    return input.origin_thread;
+  }
   if (input.origin_thread.endsWith("_private")) {
     return input.origin_thread;
+  }
+
+  const topicConfig = config.topics[topic];
+  const defaultHint = parseDefaultThreadHint(
+    topicConfig?.routing?.default,
+    input.concerning,
+    input.origin_thread,
+  );
+  const neverThreads = Array.isArray(topicConfig?.routing?.never) ? topicConfig.routing.never : [];
+  if (defaultHint && !neverThreads.includes(defaultHint)) {
+    return defaultHint;
   }
 
   switch (topic) {
@@ -302,9 +358,21 @@ function inferTargetThread(topic: TopicKey, input: EvalScenarioDefinition["promp
   }
 }
 
-function inferPriority(topic: TopicKey, intent: ClassifierIntent): DispatchPriority {
+function inferPriority(
+  topic: TopicKey,
+  intent: ClassifierIntent,
+  config: SystemConfig,
+): DispatchPriority {
   if (intent === ClassifierIntent.Query) {
     return DispatchPriority.Immediate;
+  }
+  if (intent === ClassifierIntent.Response || intent === ClassifierIntent.Confirmation) {
+    return DispatchPriority.Immediate;
+  }
+
+  const escalation = config.topics[topic]?.escalation;
+  if (escalation === "none") {
+    return DispatchPriority.Batched;
   }
 
   switch (topic) {
@@ -332,6 +400,18 @@ function inferPriority(topic: TopicKey, intent: ClassifierIntent): DispatchPrior
 function inferConfirmation(config: SystemConfig, topic: TopicKey): boolean {
   const confirmationTopics = new Set<TopicKey>([TopicKey.Finances]);
   const alwaysRequireApproval = config.confirmation_gates.always_require_approval.length > 0;
+  const topicConfig = config.topics[topic];
+
+  if (
+    topicConfig &&
+    ("confirmation_required" in topicConfig || "confirmation_required_for_sends" in topicConfig)
+  ) {
+    return (
+      ("confirmation_required" in topicConfig && topicConfig.confirmation_required === true) ||
+      ("confirmation_required_for_sends" in topicConfig &&
+        topicConfig.confirmation_required_for_sends === true)
+    );
+  }
 
   return alwaysRequireApproval && confirmationTopics.has(topic);
 }
@@ -399,6 +479,21 @@ function composeMessage(topic: TopicKey, input: EvalScenarioDefinition["prompt_i
   }
 }
 
+function composeMessageWithTopicConfig(
+  topic: TopicKey,
+  input: EvalScenarioDefinition["prompt_input"],
+  config: SystemConfig,
+): string {
+  const base = composeMessage(topic, input);
+  const behavior = config.topics[topic]?.behavior ?? {};
+  const tone =
+    (behavior.tone as string | undefined) ??
+    (behavior.tone_internal as string | undefined) ??
+    "direct";
+  const format = (behavior.format as string | undefined) ?? "brief";
+  return `${base}\nTone: ${tone}\nFormat: ${format}`;
+}
+
 function evaluateScenario(
   scenario: EvalScenarioDefinition,
   config: SystemConfig,
@@ -409,15 +504,128 @@ function evaluateScenario(
   const baseActual: EvalScenarioActual = {
     topic: inferredTopic,
     intent: inferredIntent,
-    target_thread: inferTargetThread(inferredTopic, scenario.prompt_input),
-    priority: inferPriority(inferredTopic, inferredIntent),
+    target_thread: inferTargetThread(inferredTopic, scenario.prompt_input, config, inferredIntent),
+    priority: inferPriority(inferredTopic, inferredIntent, config),
     confirmation_required: inferConfirmation(config, inferredTopic),
-    composed_message: composeMessage(inferredTopic, scenario.prompt_input),
+    composed_message: composeMessageWithTopicConfig(inferredTopic, scenario.prompt_input, config),
   };
 
   return {
     ...baseActual,
     ...scenario.simulation?.actual_overrides,
+  };
+}
+
+function createWorkerReplayHarness(config: SystemConfig): {
+  evaluate: (scenario: EvalScenarioDefinition) => Promise<EvalScenarioActual>;
+} {
+  const state: SystemState = createMinimalSystemState(new Date());
+  const transportCalls: TransportOutboundEnvelope[] = [];
+  const threadHistory = new Map<string, Awaited<SystemState["threads"][string]>>();
+  const stateService = {
+    getSystemConfig: async () => config,
+    saveSystemConfig: async () => undefined,
+    getSystemState: async () => state,
+    saveSystemState: async (nextState: SystemState) => {
+      Object.assign(state, nextState);
+    },
+    getThreadHistory: async (threadId: string) => threadHistory.get(threadId) ?? null,
+    saveThreadHistory: async (
+      threadId: string,
+      history: NonNullable<Awaited<SystemState["threads"][string]>>,
+    ) => {
+      threadHistory.set(threadId, history);
+    },
+    appendDispatchResult: async (_queueItem: StackQueueItem, _action: ActionRouterResult) =>
+      undefined,
+  };
+
+  const worker = createWorker({
+    classifier_service: {
+      classify: async (item: StackQueueItem) =>
+        ({
+          topic: item.topic ?? TopicKey.FamilyStatus,
+          intent: item.intent ?? ClassifierIntent.Request,
+          concerning: item.concerning,
+          confidence: 0.99,
+        }) satisfies StackClassificationResult,
+    },
+    identity_service: {
+      resolve: async (item: StackQueueItem) => ({
+        source_entity_id: item.concerning[0] ?? "participant_1",
+        source_entity_type: "adult",
+        thread_id: item.target_thread,
+        concerning: item.concerning,
+      }),
+    },
+    topic_profile_service: createTopicProfileService(),
+    routing_service: createRoutingService(),
+    budget_service: {
+      getBudgetTracker: async () => state.outbound_budget_tracker,
+      evaluateOutbound: async () => ({
+        priority: DispatchPriority.Immediate,
+        reason: "runtime replay",
+      }),
+      recordDispatch: async () => undefined,
+    },
+    escalation_service: {
+      getStatus: async () => state.escalation_status,
+      evaluate: async () => ({ should_escalate: false }),
+      reconcileOnStartup: async () => [],
+    },
+    confirmation_service: {
+      getState: async () => state.confirmations,
+      requiresConfirmation: () => false,
+      openConfirmation: async () => {
+        throw new Error("runtime replay confirmation open is not supported");
+      },
+      resolveFromQueueItem: async () => null,
+      expirePending: async () => [],
+      reconcileOnStartup: async () => ({ expired: [], notifications: [] }),
+      close: async () => undefined,
+    },
+    state_service: stateService,
+    queue_service: {
+      enqueue: async () => undefined,
+    },
+    transport_service: {
+      normalizeInbound: (input) => input,
+      sendOutbound: async (outbound: TransportOutboundEnvelope) => {
+        transportCalls.push(outbound);
+      },
+    },
+    now: () => new Date("2026-04-04T09:00:00.000Z"),
+  });
+
+  return {
+    evaluate: async (scenario: EvalScenarioDefinition): Promise<EvalScenarioActual> => {
+      transportCalls.length = 0;
+      const inferredTopic = inferTopic(scenario.prompt_input.message);
+      const inferredIntent = inferIntent(scenario.prompt_input.message);
+      const queueItem: StackQueueItem = {
+        id: `eval_worker_${scenario.id}`,
+        source: QueueItemSource.ScheduledTrigger,
+        content: scenario.prompt_input.message,
+        concerning: scenario.prompt_input.concerning,
+        target_thread: scenario.prompt_input.origin_thread,
+        created_at: new Date("2026-04-04T09:00:00.000Z"),
+        topic: inferredTopic,
+        intent: inferredIntent,
+      };
+      const trace = await worker.process(queueItem);
+      const outbound = transportCalls.at(-1);
+      return {
+        topic: inferredTopic,
+        intent: inferredIntent,
+        target_thread: outbound?.target_thread ?? scenario.prompt_input.origin_thread,
+        priority: outbound?.priority ?? DispatchPriority.Silent,
+        confirmation_required:
+          trace.outcome === "held" ||
+          (typeof outbound?.content === "string" &&
+            outbound.content.toLowerCase().includes("please confirm")),
+        composed_message: outbound?.content ?? "No outbound generated.",
+      };
+    },
   };
 }
 
@@ -566,10 +774,10 @@ function evaluateMultiTurnScenario(
     const actual: EvalScenarioActual = {
       topic: inferredTopic,
       intent: inferredIntent,
-      target_thread: inferTargetThread(inferredTopic, syntheticInput),
-      priority: inferPriority(inferredTopic, inferredIntent),
+      target_thread: inferTargetThread(inferredTopic, syntheticInput, config, inferredIntent),
+      priority: inferPriority(inferredTopic, inferredIntent, config),
       confirmation_required: inferConfirmation(config, inferredTopic),
-      composed_message: composeMessage(inferredTopic, syntheticInput),
+      composed_message: composeMessageWithTopicConfig(inferredTopic, syntheticInput, config),
     };
 
     lastActual = actual;
@@ -739,11 +947,13 @@ function createRunState(
 
 export async function runSequentialEval(options: RunSequentialEvalOptions): Promise<EvalRunState> {
   const systemConfig = await loadEvalSystemConfig(options.repo_root);
+  const mode = options.mode ?? "simulator";
   const stepDelayMs = options.step_delay_ms ?? 200;
   const workspace = await ensureEvalWorkspace(options.repo_root);
   const jsonPath = join(workspace.results_dir, `${options.run_id}.json`);
   const scenarioSet = getScenarioSet(options.scenario_set);
   const state = createRunState(options, scenarioSet.scenarios);
+  const workerReplay = mode === "worker" ? createWorkerReplayHarness(systemConfig) : null;
   let logSequence = 0;
 
   async function persistState(): Promise<void> {
@@ -815,14 +1025,20 @@ export async function runSequentialEval(options: RunSequentialEvalOptions): Prom
           },
         );
       } else {
-        actual = evaluateScenario(scenario, systemConfig);
+        actual =
+          workerReplay !== null
+            ? await workerReplay.evaluate(scenario)
+            : evaluateScenario(scenario, systemConfig);
         scenarioResult.actual = actual;
         failures = collectFailures(scenario, actual);
         await pushLog(
           "evaluate",
-          "Scenario input evaluated against the current prompt/runtime simulator.",
+          workerReplay !== null
+            ? "Scenario input evaluated using worker replay mode."
+            : "Scenario input evaluated against the current prompt/runtime simulator.",
           scenario.id,
           {
+            mode,
             topic: actual.topic,
             intent: actual.intent,
             target_thread: actual.target_thread,

@@ -8,6 +8,7 @@ interface ParsedArgs {
   command: string;
   run_id: string;
   scenario_set: string;
+  mode: "simulator" | "worker";
   set_name?: string;
   step_delay_ms?: number;
 }
@@ -18,6 +19,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     command,
     run_id: `eval-run-${randomUUID()}`,
     scenario_set: "default",
+    mode: "simulator",
   };
 
   for (let index = 0; index < rest.length; index += 1) {
@@ -41,6 +43,11 @@ function parseArgs(argv: string[]): ParsedArgs {
     }
     if (token === "--step-delay-ms" && next) {
       parsed.step_delay_ms = Number(next);
+      index += 1;
+      continue;
+    }
+    if (token === "--mode" && next && (next === "simulator" || next === "worker")) {
+      parsed.mode = next;
       index += 1;
     }
   }
@@ -74,6 +81,7 @@ async function main(): Promise<void> {
     run_id: args.run_id,
     scenario_set: args.scenario_set,
     step_delay_ms: args.step_delay_ms,
+    mode: args.mode,
   });
 
   process.stdout.write(

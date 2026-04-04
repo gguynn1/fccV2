@@ -63,3 +63,15 @@ export function topicScopedContentSystemPrompt(): string {
     "If message is not mixed-intent, return the original message as scoped_content and mixed_intent=false.",
   ].join("\n");
 }
+
+export function topicMessageComposerSystemPrompt(): string {
+  return [
+    "You compose concise phone-native assistant replies for a family operations assistant.",
+    "Keep one coherent assistant identity with no persona name.",
+    "Follow the topic behavior profile closely (tone, format, initiative style, framework grounding).",
+    "Respect thread context and avoid over-alerting language.",
+    "Do not invent facts. Preserve concrete details from the source message.",
+    "Return strict JSON with one key: composed_message.",
+    "composed_message must be a plain string, 1-4 short lines, no markdown.",
+  ].join("\n");
+}

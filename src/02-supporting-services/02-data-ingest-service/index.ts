@@ -98,6 +98,129 @@ function normalizeText(value: string): string {
   return value.replace(/\r\n/gu, "\n").replace(/\r/gu, "\n").trim();
 }
 
+function parseMimeHeaders(rawHeaders: string): Record<string, string> {
+  const lines = rawHeaders.split(/\r?\n/gu);
+  const merged: string[] = [];
+  for (const line of lines) {
+    if (/^\s/u.test(line) && merged.length > 0) {
+      merged[merged.length - 1] = `${merged[merged.length - 1]} ${line.trim()}`;
+      continue;
+    }
+    merged.push(line.trim());
+  }
+  const headers: Record<string, string> = {};
+  for (const line of merged) {
+    if (!line.includes(":")) {
+      continue;
+    }
+    const [key, ...rest] = line.split(":");
+    headers[key.trim().toLowerCase()] = rest.join(":").trim();
+  }
+  return headers;
+}
+
+function decodeQuotedPrintable(value: string): string {
+  return value
+    .replace(/=\r?\n/gu, "")
+    .replace(/=([A-Fa-f0-9]{2})/gu, (_match, hex: string) =>
+      String.fromCharCode(Number.parseInt(hex, 16)),
+    );
+}
+
+function decodeMimeBody(body: string, encoding?: string): string {
+  const normalizedEncoding = encoding?.toLowerCase();
+  if (normalizedEncoding === "base64") {
+    return Buffer.from(body.replace(/\s+/gu, ""), "base64").toString("utf8");
+  }
+  if (normalizedEncoding === "quoted-printable") {
+    return decodeQuotedPrintable(body);
+  }
+  return body;
+}
+
+function extractBoundary(contentType?: string): string | null {
+  if (!contentType) {
+    return null;
+  }
+  const boundaryMatch = contentType.match(/boundary="?([^";]+)"?/iu);
+  return boundaryMatch?.[1] ?? null;
+}
+
+function parseDispositionFilename(disposition?: string): string | null {
+  if (!disposition) {
+    return null;
+  }
+  const match = disposition.match(/filename\*?="?([^";]+)"?/iu);
+  return match?.[1] ?? null;
+}
+
+function parseMimeMessage(rawMessage: string): {
+  text: string | null;
+  html: string | null;
+  attachments: IngestAttachment[];
+} {
+  const normalized = rawMessage.replace(/\r\n/gu, "\n");
+  const separatorIndex = normalized.indexOf("\n\n");
+  const rawHeaders = separatorIndex >= 0 ? normalized.slice(0, separatorIndex) : "";
+  const rawBody = separatorIndex >= 0 ? normalized.slice(separatorIndex + 2) : normalized;
+  const headers = parseMimeHeaders(rawHeaders);
+  const contentType = headers["content-type"] ?? "text/plain";
+  const transferEncoding = headers["content-transfer-encoding"];
+  const boundary = extractBoundary(contentType);
+
+  if (!boundary) {
+    const decodedBody = decodeMimeBody(rawBody, transferEncoding);
+    if (contentType.toLowerCase().includes("text/html")) {
+      return { text: null, html: decodedBody, attachments: [] };
+    }
+    return { text: decodedBody, html: null, attachments: [] };
+  }
+
+  const parts = rawBody.split(new RegExp(`--${boundary}(?:--)?\\n`, "u"));
+  const attachments: IngestAttachment[] = [];
+  let text: string | null = null;
+  let html: string | null = null;
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const partSeparator = trimmed.indexOf("\n\n");
+    if (partSeparator < 0) {
+      continue;
+    }
+    const partHeaders = parseMimeHeaders(trimmed.slice(0, partSeparator));
+    const partBody = trimmed.slice(partSeparator + 2);
+    const partType = partHeaders["content-type"] ?? "text/plain";
+    const partEncoding = partHeaders["content-transfer-encoding"];
+    const disposition = partHeaders["content-disposition"];
+    const decodedPart = decodeMimeBody(partBody, partEncoding);
+    const filename = parseDispositionFilename(disposition) ?? parseDispositionFilename(partType);
+
+    if (partType.toLowerCase().includes("text/plain") && !filename) {
+      text = text ?? decodedPart;
+      continue;
+    }
+    if (partType.toLowerCase().includes("text/html") && !filename) {
+      html = html ?? decodedPart;
+      continue;
+    }
+
+    attachments.push({
+      filename: filename ?? `attachment_${attachments.length + 1}`,
+      content_type: partType.split(";")[0]?.trim() ?? "application/octet-stream",
+      content:
+        partEncoding?.toLowerCase() === "base64"
+          ? partBody.replace(/\s+/gu, "")
+          : Buffer.from(decodedPart, "utf8").toString("base64"),
+      content_transfer_encoding: partEncoding?.toLowerCase() === "base64" ? "base64" : "utf8",
+    });
+  }
+
+  return { text, html, attachments };
+}
+
 function summarizeQueueContent(content: StackQueueItem["content"]): string {
   return typeof content === "string" ? content : JSON.stringify(content);
 }
@@ -349,6 +472,10 @@ export class DataIngestService implements DataIngestServiceContract {
 
     await client.connect();
     await client.mailboxOpen(this.imapConfig.mailbox);
+    await this.pollMailbox(client);
+    client.on("exists", () => {
+      void this.pollMailbox(client);
+    });
     this.logger.info({ mailbox: this.imapConfig.mailbox }, "IMAP monitor connected.");
     return client;
   }
@@ -362,6 +489,56 @@ export class DataIngestService implements DataIngestServiceContract {
       void this.startMonitoring();
     }, this.imapConfig.reconnect_delay_ms);
     this.reconnectTimer.unref();
+  }
+
+  private async pollMailbox(client: ImapFlow): Promise<void> {
+    try {
+      const lock = await client.getMailboxLock(this.imapConfig.mailbox);
+      try {
+        const unseenResult = await client.search({ seen: false });
+        const unseen = Array.isArray(unseenResult) ? unseenResult : [];
+        if (unseen.length === 0) {
+          return;
+        }
+        for await (const message of client.fetch(unseen, {
+          uid: true,
+          envelope: true,
+          source: true,
+          internalDate: true,
+        })) {
+          const envelope = message.envelope;
+          const fromAddress = envelope?.from?.[0];
+          const sourceText = Buffer.isBuffer(message.source)
+            ? message.source.toString("utf8")
+            : typeof message.source === "string"
+              ? message.source
+              : "";
+          const parsedMime = parseMimeMessage(sourceText);
+          const inboxMessage: InboxMessage = {
+            message_id: String(message.uid),
+            inbox_address: this.imapConfig.user,
+            received_at:
+              message.internalDate instanceof Date
+                ? message.internalDate
+                : new Date(message.internalDate ?? Date.now()),
+            from: fromAddress?.address ?? fromAddress?.name ?? "unknown",
+            subject: envelope?.subject ?? "Inbox update",
+            text: parsedMime.text ?? sourceText.slice(0, 20_000),
+            html: parsedMime.html ?? undefined,
+            attachments: parsedMime.attachments,
+          };
+          await this.processInboxMessage(inboxMessage);
+          await client.messageFlagsAdd(message.uid, ["\\Seen"]);
+        }
+      } finally {
+        lock.release();
+      }
+    } catch (error: unknown) {
+      this.logger.error(
+        { err: error instanceof Error ? error.message : String(error) },
+        "IMAP polling cycle failed.",
+      );
+    }
   }
 
   private isImapConfigured(): boolean {

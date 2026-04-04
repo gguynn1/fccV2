@@ -190,7 +190,7 @@ function createRuntimeStubs(
           return resolved(undefined);
         }),
       },
-      now: overrides.now,
+      now: overrides.now ?? (() => new Date("2026-04-03T19:00:00.000Z")),
     }),
   };
 }

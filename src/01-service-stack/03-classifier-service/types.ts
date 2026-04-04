@@ -369,6 +369,10 @@ export const topicScopedContentSchema = z.object({
   mixed_intent: z.boolean().optional(),
 });
 
+export const topicMessageSchema = z.object({
+  composed_message: z.string().trim().min(1),
+});
+
 export interface ClassifierServiceOptions {
   anthropic_api_key: string;
   model?: string;

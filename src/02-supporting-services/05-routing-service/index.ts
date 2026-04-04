@@ -68,7 +68,7 @@ export class StaticRoutingService implements RoutingService {
     }
 
     return {
-      target: this.buildProactiveTarget(input.concerning),
+      target: this.buildProactiveTarget(input.topic, input.concerning, input.origin_thread),
     };
   }
 
@@ -110,21 +110,51 @@ export class StaticRoutingService implements RoutingService {
     };
   }
 
-  private buildProactiveTarget(concerning: string[]): ThreadTarget {
+  private buildProactiveTarget(
+    topic: RoutingDecisionInput["topic"],
+    concerning: string[],
+    originThread: string,
+  ): ThreadTarget {
     const normalizedConcerning = this.normalizeConcerning(concerning);
     const privateIfSingle = this.tryResolveSingleEntityThread(normalizedConcerning);
-    if (privateIfSingle) {
+    if (privateIfSingle && this.isThreadAllowedByTopic(topic, privateIfSingle.thread_id)) {
       return privateIfSingle;
     }
 
     const threads = this.getThreads();
+    const topicRouting = runtimeSystemConfig.topics[topic]?.routing ?? {};
+    const defaultThreadHint =
+      typeof topicRouting.default === "string" ? topicRouting.default : undefined;
+    const hintedThread = defaultThreadHint
+      ? threads.find((thread) => thread.id === defaultThreadHint)
+      : undefined;
+    if (
+      hintedThread &&
+      this.isThreadAllowedByTopic(topic, hintedThread.id) &&
+      normalizedConcerning.every((entity) => hintedThread.participants.includes(entity))
+    ) {
+      return {
+        thread_id: hintedThread.id,
+        rule_applied: RoutingRule.ProactiveNarrowest,
+        reason: "Rule 2: proactive message followed topic default routing hint.",
+      };
+    }
+
     const candidates = threads
       .filter((thread) => thread.type === ThreadType.Shared)
       .filter((thread) =>
         normalizedConcerning.every((entity) => thread.participants.includes(entity)),
       )
+      .filter((thread) => this.isThreadAllowedByTopic(topic, thread.id))
       .sort((a, b) => a.participants.length - b.participants.length);
-    const selected = candidates[0] ?? threads.find((thread) => thread.id === "family");
+    const selected =
+      candidates[0] ??
+      threads.find(
+        (thread) => thread.id === "family" && this.isThreadAllowedByTopic(topic, thread.id),
+      ) ??
+      threads.find(
+        (thread) => thread.id === originThread && this.isThreadAllowedByTopic(topic, thread.id),
+      );
     if (!selected) {
       throw new Error("No routing thread available for proactive message.");
     }
@@ -134,6 +164,17 @@ export class StaticRoutingService implements RoutingService {
       rule_applied: RoutingRule.ProactiveNarrowest,
       reason: "Rule 2: proactive message routed to the narrowest shared thread.",
     };
+  }
+
+  private isThreadAllowedByTopic(topic: RoutingDecisionInput["topic"], threadId: string): boolean {
+    const routing = runtimeSystemConfig.topics[topic]?.routing;
+    if (!routing) {
+      return true;
+    }
+    const neverThreads = Array.isArray(routing.never)
+      ? routing.never.filter((value): value is string => typeof value === "string")
+      : [];
+    return !neverThreads.includes(threadId);
   }
 
   private normalizeConcerning(concerning: string[]): string[] {

@@ -44,6 +44,18 @@ describe("RoutingService decision table", () => {
     expect(target).toBe("couple");
   });
 
+  it("respects topic never-thread constraints for proactive routing", async () => {
+    const target = await service.resolveTargetThread({
+      topic: TopicKey.Relationship,
+      intent: ClassifierIntent.Request,
+      concerning: ["participant_1", "participant_2"],
+      origin_thread: "family",
+      is_response: false,
+    });
+
+    expect(target).toBe("couple");
+  });
+
   it("routes pet proactive messages to responsible adult private thread", async () => {
     const target = await service.resolveTargetThread({
       topic: TopicKey.Pets,

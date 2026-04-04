@@ -10,6 +10,7 @@ import {
   EntityType,
   QueueItemSource,
   QueueItemType,
+  TopicKey,
 } from "../../types.js";
 import type { StateService } from "../types.js";
 import {
@@ -144,22 +145,25 @@ export class BullSchedulerService {
   }
 
   public async produceScheduledItemsForEvent(event: ScheduledEvent): Promise<PendingQueueItem[]> {
+    const dueAt = this.toEventDueAt(event);
+    const policyItems = await this.producePolicyDrivenItems(dueAt);
+
     if (
       event.type !== ScheduledEventType.MorningDigest &&
       event.type !== ScheduledEventType.EveningCheckin
     ) {
-      return [];
+      return policyItems;
     }
-    const dueAt = this.toEventDueAt(event);
     const dueEntityIds = this.resolveDueEntityIds(event.type, dueAt);
-    if (dueEntityIds.length === 0) {
-      return [];
-    }
-    return this.produceScheduledItemsForWindow({
-      type: event.type,
-      due_at: dueAt,
-      entity_ids: dueEntityIds,
-    });
+    const digestItems =
+      dueEntityIds.length === 0
+        ? []
+        : await this.produceScheduledItemsForWindow({
+            type: event.type,
+            due_at: dueAt,
+            entity_ids: dueEntityIds,
+          });
+    return this.dedupeById([...digestItems, ...policyItems]);
   }
 
   public async produceScheduledItemsForWindow(
@@ -399,6 +403,154 @@ export class BullSchedulerService {
 
   private getTimezone(): string {
     return runtimeSystemConfig.system.timezone;
+  }
+
+  private async producePolicyDrivenItems(referenceTime: Date): Promise<PendingQueueItem[]> {
+    const state = await this.stateService.getSystemState();
+    const items: PendingQueueItem[] = [];
+    const existingDispatchKeys = new Set(
+      state.queue.recently_dispatched
+        .map((entry) => (entry as { idempotency_key?: string }).idempotency_key)
+        .filter((value): value is string => typeof value === "string"),
+    );
+    const dayKey = referenceTime.toISOString().slice(0, 10);
+    const healthFollowUpMinutes = this.readTopicMinutes(
+      TopicKey.Health,
+      "post_visit_follow_up",
+      120,
+    );
+    const calendarFollowUpMinutes = this.readTopicMinutes(
+      TopicKey.Calendar,
+      "follow_up_after",
+      120,
+    );
+
+    for (const event of state.calendar.events) {
+      const start = "date_start" in event ? new Date(String(event.date_start)) : null;
+      if (!start || Number.isNaN(start.getTime())) {
+        continue;
+      }
+      const elapsedMs = referenceTime.getTime() - start.getTime();
+      if (
+        elapsedMs < calendarFollowUpMinutes * 60_000 ||
+        elapsedMs > (calendarFollowUpMinutes + 30) * 60_000
+      ) {
+        continue;
+      }
+      const key = `policy:calendar_follow_up:${event.id}:${dayKey}`;
+      if (existingDispatchKeys.has(key)) {
+        continue;
+      }
+      items.push({
+        id: `policy_calendar_follow_up_${event.id}_${dayKey}`,
+        source: QueueItemSource.ScheduledTrigger,
+        type: QueueItemType.Outbound,
+        topic: TopicKey.Calendar,
+        intent: ClassifierIntent.Query,
+        concerning: Array.isArray(event.concerning) ? event.concerning : [],
+        content: `Follow-up: any updates after "${event.title}"?`,
+        priority: DispatchPriority.Batched,
+        target_thread: this.resolvePolicyThread(
+          Array.isArray(event.concerning) ? event.concerning : [],
+        ),
+        created_at: referenceTime,
+        idempotency_key: key,
+      });
+      existingDispatchKeys.add(key);
+    }
+
+    for (const profile of state.health.profiles) {
+      for (const appointment of profile.upcoming_appointments) {
+        const appointmentDate = "date" in appointment ? new Date(String(appointment.date)) : null;
+        if (!appointmentDate || Number.isNaN(appointmentDate.getTime())) {
+          continue;
+        }
+        const elapsedMs = referenceTime.getTime() - appointmentDate.getTime();
+        if (
+          elapsedMs < healthFollowUpMinutes * 60_000 ||
+          elapsedMs > (healthFollowUpMinutes + 30) * 60_000
+        ) {
+          continue;
+        }
+        const appointmentId =
+          "id" in appointment ? String(appointment.id) : `${profile.entity}_${dayKey}`;
+        const key = `policy:health_follow_up:${appointmentId}:${dayKey}`;
+        if (existingDispatchKeys.has(key)) {
+          continue;
+        }
+        items.push({
+          id: `policy_health_follow_up_${appointmentId}_${dayKey}`,
+          source: QueueItemSource.ScheduledTrigger,
+          type: QueueItemType.Outbound,
+          topic: TopicKey.Health,
+          intent: ClassifierIntent.Query,
+          concerning: [profile.entity],
+          content: `Follow-up: any care notes to log after the appointment for ${profile.entity}?`,
+          priority: DispatchPriority.Batched,
+          target_thread: `${profile.entity}_private`,
+          created_at: referenceTime,
+          idempotency_key: key,
+        });
+        existingDispatchKeys.add(key);
+      }
+    }
+
+    const relationshipTopic = runtimeSystemConfig.topics[TopicKey.Relationship];
+    if (
+      relationshipTopic &&
+      state.relationship.next_nudge_eligible <= referenceTime &&
+      runtimeSystemConfig.threads.some((thread) => thread.id === "couple")
+    ) {
+      const key = `policy:relationship_nudge:${dayKey}`;
+      if (!existingDispatchKeys.has(key)) {
+        items.push({
+          id: `policy_relationship_nudge_${dayKey}`,
+          source: QueueItemSource.ScheduledTrigger,
+          type: QueueItemType.Outbound,
+          topic: TopicKey.Relationship,
+          intent: ClassifierIntent.Query,
+          concerning:
+            runtimeSystemConfig.threads.find((thread) => thread.id === "couple")?.participants ??
+            [],
+          content: "Gentle connection prompt: take 5 minutes to check in with each other today.",
+          priority: DispatchPriority.Batched,
+          target_thread: "couple",
+          created_at: referenceTime,
+          idempotency_key: key,
+        });
+      }
+    }
+
+    return items;
+  }
+
+  private resolvePolicyThread(concerning: string[]): string {
+    if (concerning.length === 1) {
+      return `${concerning[0]}_private`;
+    }
+    const pair = runtimeSystemConfig.threads
+      .filter((thread) => !thread.id.endsWith("_private"))
+      .filter((thread) => concerning.every((entityId) => thread.participants.includes(entityId)))
+      .sort((a, b) => a.participants.length - b.participants.length)[0];
+    return pair?.id ?? "family";
+  }
+
+  private readTopicMinutes(topic: TopicKey, key: string, fallbackMinutes: number): number {
+    const topicConfig = runtimeSystemConfig.topics[topic];
+    if (!topicConfig || !("proactive" in topicConfig)) {
+      return fallbackMinutes;
+    }
+    const proactive = topicConfig.proactive as unknown as Record<string, unknown>;
+    const rawValue = proactive[key];
+    if (typeof rawValue !== "string") {
+      return fallbackMinutes;
+    }
+    const match = rawValue.match(/^(\d+)\s*([hm])$/iu);
+    if (!match?.[1] || !match[2]) {
+      return fallbackMinutes;
+    }
+    const amount = Number(match[1]);
+    return match[2].toLowerCase() === "h" ? amount * 60 : amount;
   }
 }
 

@@ -6,22 +6,10 @@ import type {
   StackQueueItem,
   WorkerDecision,
 } from "../../01-service-stack/types.js";
+import { runtimeSystemConfig } from "../../config/runtime-system-config.js";
+import type { TopicConfigMap } from "../../index.js";
 import { ClassifierIntent, EscalationLevel, TopicKey } from "../../types.js";
 import type { ThreadHistory } from "../05-routing-service/types.js";
-import { CALENDAR_TOPIC_PROFILE } from "./04.01-calendar/profile.js";
-import { CHORES_TOPIC_PROFILE } from "./04.02-chores/profile.js";
-import { FINANCES_TOPIC_PROFILE } from "./04.03-finances/profile.js";
-import { GROCERY_TOPIC_PROFILE } from "./04.04-grocery/profile.js";
-import { HEALTH_TOPIC_PROFILE } from "./04.05-health/profile.js";
-import { PETS_TOPIC_PROFILE } from "./04.06-pets/profile.js";
-import { SCHOOL_TOPIC_PROFILE } from "./04.07-school/profile.js";
-import { TRAVEL_TOPIC_PROFILE } from "./04.08-travel/profile.js";
-import { VENDORS_TOPIC_PROFILE } from "./04.09-vendors/profile.js";
-import { BUSINESS_TOPIC_PROFILE } from "./04.10-business/profile.js";
-import { RELATIONSHIP_TOPIC_PROFILE } from "./04.11-relationship/profile.js";
-import { FAMILY_STATUS_TOPIC_PROFILE } from "./04.12-family-status/profile.js";
-import { MEALS_TOPIC_PROFILE } from "./04.13-meals/profile.js";
-import { MAINTENANCE_TOPIC_PROFILE } from "./04.14-maintenance/profile.js";
 import type { TopicProfile, TopicProfileConfig } from "./types.js";
 
 const DEFAULT_LOGGER = pino({ name: "topic-profile-service" });
@@ -88,22 +76,48 @@ const TONE_TEMPLATES: Record<string, Record<ToneBucket, string>> = {
   },
 };
 
-const TOPIC_PROFILES: TopicProfileConfig = {
-  [TopicKey.Calendar]: CALENDAR_TOPIC_PROFILE,
-  [TopicKey.Chores]: CHORES_TOPIC_PROFILE,
-  [TopicKey.Finances]: FINANCES_TOPIC_PROFILE,
-  [TopicKey.Grocery]: GROCERY_TOPIC_PROFILE,
-  [TopicKey.Health]: HEALTH_TOPIC_PROFILE,
-  [TopicKey.Pets]: PETS_TOPIC_PROFILE,
-  [TopicKey.School]: SCHOOL_TOPIC_PROFILE,
-  [TopicKey.Travel]: TRAVEL_TOPIC_PROFILE,
-  [TopicKey.Vendors]: VENDORS_TOPIC_PROFILE,
-  [TopicKey.Business]: BUSINESS_TOPIC_PROFILE,
-  [TopicKey.Relationship]: RELATIONSHIP_TOPIC_PROFILE,
-  [TopicKey.FamilyStatus]: FAMILY_STATUS_TOPIC_PROFILE,
-  [TopicKey.Meals]: MEALS_TOPIC_PROFILE,
-  [TopicKey.Maintenance]: MAINTENANCE_TOPIC_PROFILE,
-};
+function firstBehaviorValue(
+  behavior: Record<string, string>,
+  candidates: string[],
+  fallback: string,
+): string {
+  for (const key of candidates) {
+    const value = behavior[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return fallback;
+}
+
+function toTopicProfileConfig(topics: TopicConfigMap): TopicProfileConfig {
+  const profileEntries = Object.values(TopicKey).map((topic) => {
+    const config = topics[topic];
+    const behavior = config?.behavior ?? {};
+    const crossTopicConnections =
+      "cross_topic_connections" in config && Array.isArray(config.cross_topic_connections)
+        ? config.cross_topic_connections
+        : [];
+    const profile: TopicProfile = {
+      tone: firstBehaviorValue(
+        behavior,
+        ["tone", "tone_internal", "tone_to_student", "tone_to_parent"],
+        "direct",
+      ),
+      format: firstBehaviorValue(behavior, ["format"], "brief"),
+      initiative_style: firstBehaviorValue(behavior, ["initiative"], "minimal"),
+      escalation_level: config?.escalation ?? EscalationLevel.None,
+      framework_grounding:
+        "framework" in behavior && typeof behavior.framework === "string"
+          ? behavior.framework
+          : null,
+      response_format: firstBehaviorValue(behavior, ["format"], "plain"),
+      cross_topic_connections: crossTopicConnections,
+    };
+    return [topic, profile] as const;
+  });
+  return topicConfigSchema.parse(Object.fromEntries(profileEntries));
+}
 
 export interface TopicProfileServiceOptions {
   config?: TopicProfileConfig;
@@ -113,16 +127,17 @@ export interface TopicProfileServiceOptions {
 export class StaticTopicProfileService {
   private readonly logger: Logger;
 
-  private readonly config: TopicProfileConfig;
+  private readonly staticConfig?: TopicProfileConfig;
 
   public constructor(options?: TopicProfileServiceOptions) {
     this.logger = options?.logger ?? DEFAULT_LOGGER;
-    this.config = topicConfigSchema.parse(options?.config ?? TOPIC_PROFILES);
-    this.logger.info({ topics: Object.keys(this.config).length }, "Topic profiles loaded.");
+    this.staticConfig = options?.config ? topicConfigSchema.parse(options.config) : undefined;
+    const activeConfig = this.getAllProfiles();
+    this.logger.info({ topics: Object.keys(activeConfig).length }, "Topic profiles loaded.");
   }
 
   public getProfile(topic: TopicKey): TopicProfile {
-    const profile = this.config[topic];
+    const profile = this.getAllProfiles()[topic];
     if (!profile) {
       throw new Error(`No topic profile configured for ${topic}`);
     }
@@ -130,7 +145,10 @@ export class StaticTopicProfileService {
   }
 
   public getAllProfiles(): TopicProfileConfig {
-    return this.config;
+    if (this.staticConfig) {
+      return this.staticConfig;
+    }
+    return toTopicProfileConfig(runtimeSystemConfig.topics);
   }
 
   public getTopicConfig(topic: TopicKey): Promise<TopicProfile> {
@@ -154,7 +172,7 @@ export class StaticTopicProfileService {
     const topic = decision.classification.topic;
     const intent = decision.classification.intent;
     const content = this.readContentText(decision.queue_item.content);
-    const profile = this.config[topic];
+    const profile = this.getAllProfiles()[topic];
     const toneBucket = profile ? classifyToneBucket(profile.tone) : "direct";
 
     if (topic === TopicKey.Grocery) {

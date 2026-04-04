@@ -361,6 +361,23 @@ async function createRuntime(): Promise<RuntimeHandles> {
     { connection: toRedisConnection(env.REDIS_URL), concurrency: 1 },
   );
 
+  const confirmationTimerWorker = new Worker(
+    "fcc-confirmation-timers",
+    async (job) => {
+      const { confirmation_id } = job.data as { confirmation_id?: string };
+      logger.info({ confirmation_id }, "Confirmation timer fired.");
+      const recovery = await confirmationService.reconcileOnStartup(new Date());
+      if (recovery.notifications.length > 0) {
+        await Promise.all(
+          recovery.notifications.map((notification) =>
+            queueService.enqueue(notification.queue_item),
+          ),
+        );
+      }
+    },
+    { connection: toRedisConnection(env.REDIS_URL), concurrency: 1 },
+  );
+
   const workerService = createWorker({
     classifier_service: classifierService,
     identity_service: createWorkerIdentityService(),
@@ -397,6 +414,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
     scheduler: {
       stop: async () => {
         await escalationTimerWorker.close();
+        await confirmationTimerWorker.close();
         await schedulerWorker.close();
         await schedulerService.stop();
         logger.info("Scheduler service stopped.");
