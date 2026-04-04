@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import BetterSqlite3 from "better-sqlite3";
 import { pino, type Logger } from "pino";
 
-import { systemState as seedSystemState } from "../../_seed/system-state.js";
+import { loadSeedConfig, loadSeedState } from "../../_seed/resolve.js";
 import type { ActionRouterResult, StackQueueItem } from "../../01-service-stack/types.js";
 import type { SystemConfig } from "../../index.js";
 import type { ThreadHistory } from "../05-routing-service/types.js";
@@ -206,8 +206,9 @@ function extractQueueItemId(queueItem: StackQueueItem): string {
   return `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function createDefaultStateSnapshot(now: Date): SystemState {
-  const cloned = structuredClone(seedSystemState);
+async function createDefaultStateSnapshot(now: Date): Promise<SystemState> {
+  const seedState = await loadSeedState();
+  const cloned = structuredClone(seedState);
 
   // Keep type-safe topic defaults while zeroing operational queues/history for empty bootstrap.
   cloned.metadata.snapshot_time = now;
@@ -272,17 +273,23 @@ export class SqliteStateService implements StateService {
     return Promise.resolve();
   }
 
-  public getSystemState(): Promise<SystemState> {
+  public async getSystemState(): Promise<SystemState> {
     const snapshot = this.db.prepare("SELECT payload FROM state_snapshots WHERE id = 1").get() as
       | { payload: string }
       | undefined;
     if (!snapshot) {
-      return Promise.resolve(createDefaultStateSnapshot(new Date()));
+      return createDefaultStateSnapshot(new Date());
     }
 
     const state = reviveDatesFromJson<SystemState>(snapshot.payload);
     validateStateSlices(state);
-    return Promise.resolve(state);
+
+    // The worker's appendDispatchResult writes to queue_pending/queue_recently_dispatched
+    // SQL tables but does not update the snapshot blob. Read from the SQL tables so the
+    // scheduler and other consumers always see the current pending set.
+    state.queue.pending = this.readQueuePendingFromTable();
+
+    return state;
   }
 
   public saveSystemState(state: SystemState): Promise<void> {
@@ -428,13 +435,15 @@ export class SqliteStateService implements StateService {
     scenarioState?: SystemState,
   ): Promise<StateSnapshotEnvelope> {
     if (mode === StateSnapshotMode.Seed) {
-      const { systemConfig: seedConfig } = await import("../../_seed/system-config.js");
+      const seedConfig = await loadSeedConfig();
+      const seedState = await loadSeedState();
       await this.saveSystemConfig(seedConfig);
-      await this.saveSystemState(seedSystemState);
+      await this.saveSystemState(seedState);
+      this.syncQueuePendingToTable(seedState.queue.pending);
       return {
         mode,
         loaded_at: new Date(),
-        state: seedSystemState,
+        state: seedState,
       };
     }
 
@@ -442,9 +451,10 @@ export class SqliteStateService implements StateService {
       if (!scenarioState) {
         throw new Error("Scenario snapshot mode requires a provided state.");
       }
-      const { systemConfig: seedConfig } = await import("../../_seed/system-config.js");
+      const seedConfig = await loadSeedConfig();
       await this.saveSystemConfig(seedConfig);
       await this.saveSystemState(scenarioState);
+      this.syncQueuePendingToTable(scenarioState.queue.pending);
       return {
         mode,
         loaded_at: new Date(),
@@ -452,15 +462,40 @@ export class SqliteStateService implements StateService {
       };
     }
 
-    const emptyState = createDefaultStateSnapshot(new Date());
-    const { systemConfig: seedConfig } = await import("../../_seed/system-config.js");
+    const emptyState = await createDefaultStateSnapshot(new Date());
+    const seedConfig = await loadSeedConfig();
     await this.saveSystemConfig(seedConfig);
     await this.saveSystemState(emptyState);
+    this.syncQueuePendingToTable(emptyState.queue.pending);
     return {
       mode: StateSnapshotMode.Empty,
       loaded_at: new Date(),
       state: emptyState,
     };
+  }
+
+  private readQueuePendingFromTable(): SystemState["queue"]["pending"] {
+    const rows = this.db
+      .prepare("SELECT payload FROM queue_pending ORDER BY created_at ASC")
+      .all() as { payload: string }[];
+    return rows.map((row) => reviveDatesFromJson(row.payload));
+  }
+
+  private syncQueuePendingToTable(pending: SystemState["queue"]["pending"]): void {
+    const tx = this.db.transaction(() => {
+      this.db.prepare("DELETE FROM queue_pending").run();
+      const insert = this.db.prepare(
+        "INSERT INTO queue_pending (id, payload, created_at) VALUES (?, ?, ?)",
+      );
+      for (const item of pending) {
+        insert.run(
+          item.id,
+          serializeForStorage(item),
+          item.created_at instanceof Date ? item.created_at.toISOString() : String(item.created_at),
+        );
+      }
+    });
+    tx();
   }
 
   private applyPendingMigrations(): void {

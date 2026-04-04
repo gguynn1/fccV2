@@ -92,6 +92,7 @@ All project tasks run through `npm run`. Never invoke tooling directly when a sc
 npm start              # Run the compiled application
 npm run start:seed     # Run and populate database from src/_seed/
 npm run dev            # Run in development with file watching
+npm run dev:all        # Start Redis + backend + admin UI dev server in one terminal
 
 # Build and verify
 npm run build          # Compile backend TypeScript
@@ -182,6 +183,7 @@ npm run start:seed    # first boot — seed database and start server
 For subsequent runs after the database is seeded:
 
 ```bash
+npm run dev:all       # start Redis + backend + admin UI in one terminal (recommended)
 npm start             # start server with existing database
 npm run dev           # start with file watching (development)
 npm run ui:dev        # admin UI dev server on :5173 with API proxy to :3000
@@ -450,6 +452,7 @@ The `ui/` directory is a standalone React project. In production, Fastify serves
 | `npm run typecheck`  | Type check backend and admin UI                |
 | `npm run lint`       | Lint backend and admin UI, then run Prettier   |
 | `npm run lint:fix`   | Auto-fix backend and admin UI lint issues      |
+| `npm run dev:all`    | Start Redis + backend + admin UI in one shot   |
 | `npm run format`     | Format with Prettier                           |
 | `npm test`           | Run tests (Vitest)                             |
 | `npm run ui:dev`     | Start admin UI dev server (Vite, port 5173)    |

@@ -10,7 +10,8 @@ import { ThreadType } from "../02-supporting-services/05-routing-service/types.j
 import { EscalationReassignmentPolicy } from "../02-supporting-services/07-escalation-service/types.js";
 import { ConfirmationActionType } from "../02-supporting-services/08-confirmation-service/types.js";
 import { applyRuntimeSystemConfig } from "../config/runtime-system-config.js";
-import { EscalationLevel, GrocerySection, TopicKey } from "../types.js";
+import { EscalationLevel, GrocerySection, QueueItemSource, TopicKey } from "../types.js";
+import type { EmulationStore } from "./emulation-store.js";
 import {
   generateScenarioSet,
   getActiveEvalRunId,
@@ -132,10 +133,23 @@ const evalStartPayloadSchema = z.object({
   scenario_set: z.string().min(1).optional(),
 });
 
+const emulationSendSchema = z.object({
+  entity_id: z.string().min(1),
+  thread_id: z.string().min(1),
+  content: z.string().min(1),
+  source_type: z.enum(["text", "reaction", "image"]).optional().default("text"),
+});
+
+const emulationMessagesQuerySchema = z.object({
+  thread_id: z.string().min(1).optional(),
+  since: z.string().optional(),
+});
+
 export interface AdminRoutesOptions {
   queue_service: BullQueueService;
   state_service: SqliteStateService;
   caldav_port: number;
+  emulation_store: EmulationStore;
 }
 
 function requestArrivedViaTunnel(request: FastifyRequest): boolean {
@@ -459,6 +473,75 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (fastify, 
     }
 
     return artifact;
+  });
+
+  // ── Emulation ──
+
+  fastify.get("/emulation/session", () => {
+    return { active: options.emulation_store.active };
+  });
+
+  fastify.post("/emulation/session/start", () => {
+    options.emulation_store.active = true;
+    return { ok: true };
+  });
+
+  fastify.post("/emulation/session/stop", () => {
+    options.emulation_store.active = false;
+    return { ok: true };
+  });
+
+  fastify.post("/emulation/send", async (request) => {
+    const payload = emulationSendSchema.parse(request.body);
+
+    const sourceMap: Record<string, QueueItemSource> = {
+      text: QueueItemSource.HumanMessage,
+      reaction: QueueItemSource.Reaction,
+      image: QueueItemSource.ImageAttachment,
+    };
+
+    const message = options.emulation_store.recordInbound(
+      payload.entity_id,
+      payload.thread_id,
+      payload.content,
+      payload.source_type,
+    );
+
+    await options.queue_service.enqueue(
+      {
+        source: sourceMap[payload.source_type] ?? QueueItemSource.HumanMessage,
+        content: payload.content,
+        concerning: [payload.entity_id],
+        target_thread: payload.thread_id,
+        created_at: new Date(),
+        idempotency_key: `emulation:${message.id}`,
+      },
+      {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 1_000 },
+      },
+    );
+
+    return { ok: true, message_id: message.id };
+  });
+
+  fastify.get("/emulation/messages", (request) => {
+    const query = emulationMessagesQuerySchema.parse(request.query);
+
+    if (query.thread_id) {
+      return {
+        messages: options.emulation_store.getMessages(query.thread_id, query.since),
+      };
+    }
+
+    return {
+      messages: options.emulation_store.getAllMessages(),
+    };
+  });
+
+  fastify.delete("/emulation/messages", () => {
+    options.emulation_store.clearAll();
+    return { ok: true };
   });
 
   done();

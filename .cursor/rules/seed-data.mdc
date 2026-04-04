@@ -8,10 +8,21 @@ alwaysApply: false
 
 ## What These Files Are
 
-`src/_seed/system-config.ts` and `src/_seed/system-state.ts` are the initial state the application boots with. When the database is stood up with a `--seed` flag, these values populate every table as the starting data.
+`src/_seed/system-config.ts` and `src/_seed/system-state.ts` are the committed defaults the application boots with. When the database is stood up with a `--seed` flag, these values populate every table as the starting data.
 
 - `system-config.ts` — the full system definition: entities, threads, topics with behavior profiles, dispatch rules, confirmation gates, input recognition, disambiguation rules, data ingest sources, daily rhythm, worker processing sequence, escalation profiles, and scenario testing.
 - `system-state.ts` — a complete runtime snapshot: queue (pending + recently dispatched), outbound budget tracker, escalation status, and per-topic records across all 14 topics, plus confirmations, thread histories, data ingest state, and digests.
+- `resolve.ts` — async seed loader with local override support. Exports `loadSeedConfig()` and `loadSeedState()`.
+
+## Local Override
+
+A root-level `_seed/` directory (gitignored) can override the committed defaults. When the seeder runs, `resolve.ts` checks for `_seed/system-config.{js,ts}` and `_seed/system-state.{js,ts}` at the project root before falling back to `src/_seed/`.
+
+Resolution order: `.js` first (compiled `node dist/` runs), then `.ts` (tsx / dev mode). Override files must export the same named shapes (`systemConfig` / `systemState`) as their `src/_seed/` counterparts. Because root `_seed/` is gitignored, it is exempt from PID anonymization rules — it exists specifically for real personal data. The committed `src/_seed/` defaults remain fully anonymized.
+
+## Import Rule
+
+Runtime code must never import `system-config.ts` or `system-state.ts` directly. Always use `loadSeedConfig()` and `loadSeedState()` from `resolve.ts` so the local override path is respected.
 
 ## Constraints
 

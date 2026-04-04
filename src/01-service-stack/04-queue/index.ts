@@ -222,6 +222,31 @@ export class BullQueueService {
       }
     }
 
+    // Deduplicate by queue item ID: multiple scheduler ticks may have enqueued the
+    // same pending item with different idempotency keys (pre-fix: keys were scoped
+    // to the minute). Keep the most recent job per item ID, remove the rest.
+    const remainingJobs = await this.queue.getJobs(["waiting", "delayed"], 0, -1, true);
+    const byItemId = new Map<string, Job<PendingQueueItem>[]>();
+    for (const job of remainingJobs) {
+      const parsed = pendingQueueItemSchema.safeParse(job.data);
+      if (!parsed.success) {
+        continue;
+      }
+      const list = byItemId.get(parsed.data.id) ?? [];
+      list.push(job);
+      byItemId.set(parsed.data.id, list);
+    }
+    for (const [, jobs] of byItemId) {
+      if (jobs.length < 2) {
+        continue;
+      }
+      jobs.sort((left, right) => right.timestamp - left.timestamp);
+      for (const duplicate of jobs.slice(1)) {
+        await duplicate.remove();
+        removedDuplicates += 1;
+      }
+    }
+
     if (removedStale > 0 || removedDuplicates > 0) {
       this.logger.info(
         { removed_stale: removedStale, removed_duplicates: removedDuplicates },

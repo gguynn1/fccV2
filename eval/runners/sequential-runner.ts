@@ -172,7 +172,10 @@ function inferIntent(message: string): ClassifierIntent {
   if (
     normalized.includes("can come") ||
     normalized.includes("moved to") ||
-    normalized.includes("reschedule")
+    normalized.includes("reschedule") ||
+    normalized.includes(" is due ") ||
+    normalized.includes(" is confirmed ") ||
+    normalized.startsWith("replace ")
   ) {
     return ClassifierIntent.Update;
   }
@@ -271,7 +274,7 @@ function composeMessage(topic: TopicKey, input: EvalScenarioDefinition["prompt_i
     case TopicKey.Vendors:
       return `Vendor record update: the service visit is noted for ${timing}.`;
     case TopicKey.School:
-      return `School reminder: "${input.message}" has been noted for ${timing}.`;
+      return `School summary: "${input.message}" has been noted for ${timing}.`;
     case TopicKey.Health:
       return `Health record update: the appointment from "${input.message}" is logged.`;
     case TopicKey.Meals:

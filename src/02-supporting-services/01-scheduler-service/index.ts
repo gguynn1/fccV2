@@ -221,9 +221,7 @@ export class BullSchedulerService {
         type: QueueItemType.Outbound,
         created_at: window.due_at,
         hold_until: undefined,
-        idempotency_key: `scheduled_release:${pendingItem.id}:${window.type}:${formatClock(
-          window.due_at,
-        )}`,
+        idempotency_key: `scheduled_release:${pendingItem.id}:${window.type}:${window.due_at.toISOString().slice(0, 10)}`,
       });
     }
 

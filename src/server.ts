@@ -43,6 +43,7 @@ import {
   type BullConfirmationService,
 } from "./02-supporting-services/08-confirmation-service/index.js";
 import { createSchedulerService } from "./02-supporting-services/index.js";
+import { EmulationStore } from "./admin/emulation-store.js";
 import { adminRoutes } from "./admin/routes.js";
 import { initializeDatabase } from "./bootstrap.js";
 import { applyRuntimeSystemConfig, runtimeSystemConfig } from "./config/runtime-system-config.js";
@@ -84,12 +85,18 @@ async function verifyRedisAof(queue: Queue): Promise<void> {
 
 function createTransportContract(
   transportLayer: ReturnType<typeof createTwilioTransportLayer>,
+  emulationStore: EmulationStore,
 ): TransportServiceContract {
   return {
     normalizeInbound(input) {
       return input;
     },
     async sendOutbound(output: TransportOutboundEnvelope): Promise<void> {
+      if (emulationStore.active) {
+        emulationStore.recordOutbound(output.target_thread, output.content, output.concerning);
+        return;
+      }
+
       await transportLayer.queueOutbound({
         id: `out_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         target_thread: output.target_thread,
@@ -215,11 +222,14 @@ async function createRuntime(): Promise<RuntimeHandles> {
   fastify.get("/health", () => ({ ok: true }));
   const caldavPort = Number(env.CALDAV_PORT || "3001");
 
+  const emulationStore = new EmulationStore(db);
+
   await fastify.register(adminRoutes, {
     prefix: "/api/admin",
     queue_service: queueService,
     state_service: stateService,
     caldav_port: caldavPort,
+    emulation_store: emulationStore,
   });
 
   const adminDistPath = resolve(process.cwd(), "ui/dist");
@@ -339,7 +349,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
     confirmation_service: confirmationService,
     state_service: stateService,
     queue_service: queueService,
-    transport_service: createTransportContract(transportLayer),
+    transport_service: createTransportContract(transportLayer, emulationStore),
     logger,
     config: runtimeSystemConfig.worker,
   });

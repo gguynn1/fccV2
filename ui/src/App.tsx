@@ -6,6 +6,7 @@ import { ADMIN_POLLING_INTERVAL_MS } from "@/lib/api";
 import { ActivityRoute } from "@/routes/activity";
 import { BudgetRoute } from "@/routes/budget";
 import { DashboardRoute } from "@/routes/dashboard";
+import { EmulationRoute } from "@/routes/emulation";
 import { EntitiesRoute } from "@/routes/entities";
 import { EvalRoute } from "@/routes/eval";
 import { QueueRoute } from "@/routes/queue";
@@ -38,6 +39,7 @@ export function App() {
             <Route path="/queue" element={<QueueRoute />} />
             <Route path="/activity" element={<ActivityRoute />} />
             <Route path="/eval" element={<EvalRoute />} />
+            <Route path="/emulation" element={<EmulationRoute />} />
           </Routes>
         </Layout>
       </HashRouter>

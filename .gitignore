@@ -6,3 +6,5 @@ data/*
 !data/.gitkeep
 data/media/
 eval/results/
+_seed/
+!src/_seed/

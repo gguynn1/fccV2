@@ -20,6 +20,7 @@ const navigationItems: NavigationItem[] = [
   { to: "/queue", label: "Queue" },
   { to: "/activity", label: "Activity" },
   { to: "/eval", label: "Eval" },
+  { to: "/emulation", label: "Emulation" },
 ];
 
 export interface LayoutProps {
