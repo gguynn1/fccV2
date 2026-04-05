@@ -1,4 +1,4 @@
-import type { ClassifierIntent, TopicKey } from "../../types.js";
+import type { ClarificationReason, ClassifierIntent, TopicKey } from "../../types.js";
 
 export enum ThreadType {
   Private = "private",
@@ -25,6 +25,20 @@ export interface ThreadMessage {
   escalation_ref?: string;
 }
 
+export interface PendingClarificationSession {
+  original_queue_item_id: string;
+  topic: TopicKey;
+  intent: ClassifierIntent;
+  reason: ClarificationReason;
+  message_to_participant: string;
+  requested_at: Date;
+  source_thread: string;
+  source_entity_id: string;
+  source_concerning: string[];
+  source_message: string;
+  context: Record<string, unknown>;
+}
+
 export interface ContextTransitionPolicy {
   switch_on_new_topic: boolean;
   idle_reset_minutes: number;
@@ -35,6 +49,7 @@ export interface ThreadHistory {
   active_topic_context: string;
   last_activity: Date;
   recent_messages: ThreadMessage[];
+  pending_clarification?: PendingClarificationSession | null;
 }
 
 export interface RoutingDecisionInput {

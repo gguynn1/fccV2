@@ -14,6 +14,7 @@ export interface QueueItemMetadata {
   hold_until: string | null;
   status: string | null;
   content_kind: "text" | "structured";
+  content_preview: string;
 }
 
 export interface DeadLetterEntry {
@@ -32,6 +33,7 @@ export interface DispatchMetadata {
   included_in: string | null;
   response_received: boolean | null;
   escalation_step: number | null;
+  content: string;
 }
 
 export interface QueueDepthSnapshot {

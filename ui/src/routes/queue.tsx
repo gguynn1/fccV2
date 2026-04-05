@@ -11,7 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useDiscardDlq, useQueue, useRetryDlq, type DispatchMetadata } from "@/hooks/use-queue";
+import {
+  useDiscardDlq,
+  useQueue,
+  useRetryDlq,
+  type DispatchMetadata,
+  type QueueItemMetadata,
+} from "@/hooks/use-queue";
 
 function formatDate(d: string | null): string {
   if (!d) return "—";
@@ -29,7 +35,25 @@ function buildCompletionTooltip(item: DispatchMetadata): string {
     `Response received: ${item.response_received === null ? "unknown" : String(item.response_received)}`,
     `Escalation step: ${item.escalation_step ?? "—"}`,
     "",
-    "Message body is intentionally hidden on this page.",
+    item.content,
+  ];
+  return lines.join("\n");
+}
+
+function buildPendingTooltip(item: QueueItemMetadata): string {
+  const lines = [
+    `Item ID: ${item.id}`,
+    `Source: ${item.source}`,
+    `Type: ${item.type}`,
+    `Topic: ${item.topic ?? "—"}`,
+    `Intent: ${item.intent ?? "—"}`,
+    `Thread: ${item.target_thread}`,
+    `Concerning: ${item.concerning.join(", ") || "—"}`,
+    `Content kind: ${item.content_kind}`,
+    `Hold until: ${item.hold_until ? formatDate(item.hold_until) : "—"}`,
+    `Status: ${item.status ?? "queued"}`,
+    "",
+    item.content_preview,
   ];
   return lines.join("\n");
 }
@@ -93,6 +117,7 @@ export function QueueRoute() {
                   <TableHead>Thread</TableHead>
                   <TableHead>Concerning</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead>Details</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -109,6 +134,14 @@ export function QueueRoute() {
                     <TableCell className="font-mono text-xs">{item.target_thread}</TableCell>
                     <TableCell>{item.concerning.join(", ")}</TableCell>
                     <TableCell className="text-xs">{formatDate(item.created_at)}</TableCell>
+                    <TableCell className="text-xs">
+                      <span
+                        className="cursor-help text-muted-foreground underline decoration-dotted underline-offset-2"
+                        title={buildPendingTooltip(item)}
+                      >
+                        view
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs">
                         {item.status ?? "queued"}

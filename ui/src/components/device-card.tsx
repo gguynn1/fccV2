@@ -119,7 +119,7 @@ export function DeviceCard({ entity, threads, sessionActive }: DeviceCardProps) 
   const typeBadgeVariant = entity.type === EntityType.Adult ? "secondary" : "outline";
 
   return (
-    <Card className="flex h-[540px] flex-col">
+    <Card className="flex flex-col">
       <CardHeader className="flex-none space-y-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-semibold">{entity.name}</CardTitle>

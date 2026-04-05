@@ -260,6 +260,7 @@ async function createRuntime(): Promise<RuntimeHandles> {
     redis_url: env.REDIS_URL,
     public_base_url: env.PUBLIC_BASE_URL,
     conversations_enabled: conversationsEnabled,
+    state_service: stateService,
     logger,
   });
   transportLayer.registerRoutes(fastify, queueService);

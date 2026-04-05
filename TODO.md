@@ -22,3 +22,7 @@ This file is the single source of truth for remaining work.
 - [ ] IMAP reconnect behavior is verified after disconnect, sleep/wake, and provider timeout
 - [ ] stale time-sensitive email is stored silently instead of dispatched late
 - [ ] local-network calendar subscription renders expected events
+
+### Ideas
+
+- [ ] Ror "immediately deliver" items in queue, while processing, would be nice to see the agent "typing" back animation

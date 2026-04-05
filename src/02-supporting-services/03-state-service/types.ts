@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { QueueState } from "../../01-service-stack/04-queue/types.js";
+import { ClarificationReason, ClassifierIntent, TopicKey } from "../../types.js";
 import type { DigestsState } from "../01-scheduler-service/types.js";
 import type { DataIngestState } from "../02-data-ingest-service/types.js";
 import type { CalendarState } from "../04-topic-profile-service/04.01-calendar/types.js";
@@ -44,6 +45,21 @@ export const threadHistoryRecordSchema = z.object({
   active_topic_context: z.string(),
   last_activity: z.union([z.string(), z.date()]),
   recent_messages: z.array(z.unknown()),
+  pending_clarification: z
+    .object({
+      original_queue_item_id: z.string(),
+      topic: z.nativeEnum(TopicKey),
+      intent: z.nativeEnum(ClassifierIntent),
+      reason: z.nativeEnum(ClarificationReason),
+      message_to_participant: z.string(),
+      requested_at: z.union([z.string(), z.date()]),
+      source_thread: z.string(),
+      source_entity_id: z.string(),
+      source_concerning: z.array(z.string()),
+      context: z.record(z.string(), z.unknown()),
+    })
+    .nullable()
+    .optional(),
 });
 
 const zodDateField = z.union([z.date(), z.string()]);

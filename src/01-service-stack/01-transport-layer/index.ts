@@ -7,6 +7,7 @@ import { pino, type Logger } from "pino";
 import twilio from "twilio";
 
 import { ThreadType } from "../../02-supporting-services/05-routing-service/types.js";
+import type { StateService } from "../../02-supporting-services/types.js";
 import {
   runtimeSystemConfig,
   runtimeSystemConfigVersion,
@@ -48,6 +49,7 @@ export interface TwilioTransportLayerOptions {
   media_directory?: string;
   conversations_enabled?: boolean;
   logger?: Logger;
+  state_service?: StateService;
 }
 
 export class TwilioTransportLayer {
@@ -85,6 +87,8 @@ export class TwilioTransportLayer {
 
   private readonly outboundWorker: Worker<TransportOutboundMessage>;
 
+  private readonly stateService?: StateService;
+
   public constructor(options: TwilioTransportLayerOptions) {
     this.twilioClient = twilio(options.account_sid, options.auth_token);
     this.logger = options.logger ?? DEFAULT_LOGGER;
@@ -104,6 +108,7 @@ export class TwilioTransportLayer {
     this.conversationSidByThread = new Map();
     this.threadByConversationSid = new Map();
     this.lastSeenConfigVersion = -1;
+    this.stateService = options.state_service;
     this.outboundQueue = new Queue<TransportOutboundMessage>(DEFAULT_OUTBOUND_QUEUE_NAME, {
       connection: toRedisConnection(options.redis_url),
     });
@@ -137,7 +142,7 @@ export class TwilioTransportLayer {
       }
 
       const normalized = await this.normalizeInboundPayload(payload);
-      await queue.enqueue(this.toQueueItem(normalized), {
+      await queue.enqueue(await this.toQueueItem(normalized), {
         attempts: DEFAULT_RETRY.attempts,
         backoff: {
           type: "exponential",
@@ -239,7 +244,7 @@ export class TwilioTransportLayer {
             source_identity: author,
           },
         );
-        await queue.enqueue(this.toQueueItem(normalized), {
+        await queue.enqueue(await this.toQueueItem(normalized), {
           attempts: DEFAULT_RETRY.attempts,
           backoff: { type: "exponential", delay: DEFAULT_RETRY.backoff_ms },
         });
@@ -496,7 +501,7 @@ export class TwilioTransportLayer {
     };
   }
 
-  private toQueueItem(input: TransportInboundInput): StackQueueItem {
+  private async toQueueItem(input: TransportInboundInput): Promise<StackQueueItem> {
     const content =
       input.kind === TransportInputKind.Image
         ? {
@@ -508,6 +513,7 @@ export class TwilioTransportLayer {
             })),
           }
         : input.content;
+    const clarification_of = await this.inferClarificationOf(input);
 
     return {
       source: input.source,
@@ -516,7 +522,33 @@ export class TwilioTransportLayer {
       target_thread: input.thread_id,
       created_at: input.received_at,
       idempotency_key: `twilio:${input.provider_message_id}`,
+      clarification_of,
     };
+  }
+
+  private async inferClarificationOf(input: TransportInboundInput): Promise<string | undefined> {
+    if (!this.stateService) {
+      return undefined;
+    }
+    const history = await this.stateService.getThreadHistory(input.thread_id);
+    const session = history?.pending_clarification;
+    if (!session) {
+      return undefined;
+    }
+    if (
+      input.kind === TransportInputKind.StructuredChoice ||
+      input.kind === TransportInputKind.Reaction
+    ) {
+      return session.original_queue_item_id;
+    }
+    const content = input.content.trim();
+    if (content.length === 0) {
+      return undefined;
+    }
+    if (/^\d+$/u.test(content) || /^[a-z]$/iu.test(content)) {
+      return session.original_queue_item_id;
+    }
+    return content.split(/\s+/u).length <= 12 ? session.original_queue_item_id : undefined;
   }
 
   private async downloadAttachments(

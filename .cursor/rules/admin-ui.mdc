@@ -37,7 +37,7 @@ The admin UI is a **local operator surface** for system configuration, state, an
 ### Scope Boundaries
 
 - **Show only operationally useful data.** Pages should expose editable configuration, direct actions, or run-state that supports a direct action such as starting, following, or reviewing a run.
-- **No message content.** The UI never displays raw message bodies from participant threads. Queue items and dispatch records show metadata only: timestamps, topics, threads, entity IDs, status. **Exception: Emulation page.** The Emulation page is a developer/debug tool that exercises the full worker pipeline in simulation. It intentionally displays message content (inbound and composed outbound) as part of its purpose. This is the only admin surface exempt from the "no message content" rule.
+- **Message content is metadata-adjacent.** Queue page tooltips show the full message body alongside dispatch metadata (thread, topic, priority, etc.) for operational context. The Emulation page displays full inbound and composed outbound messages as part of its simulation purpose. Outside these two surfaces, message bodies should not appear in tables or card content.
 - **No manual enqueue.** The UI cannot create new queue items. Queue page is inspect + retry/discard for DLQ items only.
 - **Eval scope is narrow.** The Eval page may start a sequential run, show run status, show structured logs, show per-scenario outcomes, and display the generated prompt markdown artifact. It must not edit prompts, promote candidates, or expose participant message history.
 

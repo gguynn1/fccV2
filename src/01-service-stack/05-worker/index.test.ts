@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { type SystemState } from "../../02-supporting-services/03-state-service/types.js";
+import { CalendarEventStatus } from "../../02-supporting-services/04-topic-profile-service/04.01-calendar/types.js";
 import { createTopicProfileService } from "../../02-supporting-services/04-topic-profile-service/index.js";
 import { createRoutingService } from "../../02-supporting-services/05-routing-service/index.js";
 import { type ThreadHistory } from "../../02-supporting-services/05-routing-service/types.js";
@@ -9,6 +10,7 @@ import {
   ConfirmationReplyDecision,
   ConfirmationResult,
   ConfirmationStatus,
+  type PendingConfirmation,
   type ResolvedConfirmation,
 } from "../../02-supporting-services/08-confirmation-service/types.js";
 import {
@@ -18,6 +20,7 @@ import {
 import {
   ClassifierIntent,
   DispatchPriority,
+  GrocerySection,
   QueueItemSource,
   TopicKey,
   type ClarificationReason,
@@ -160,7 +163,27 @@ function createRuntimeStubs(
       confirmation_service: {
         getState: vi.fn(() => resolved(state.confirmations)),
         requiresConfirmation: vi.fn(() => false),
-        openConfirmation: vi.fn(),
+        openConfirmation: vi.fn(() =>
+          resolved<PendingConfirmation>({
+            id: "confirm_opened_test",
+            type: ConfirmationActionType.FinancialAction,
+            action: "log_expense",
+            requested_by: "participant_1",
+            requested_in_thread: "couple",
+            requested_at: new Date("2026-04-03T19:00:00.000Z"),
+            expires_at: new Date("2026-04-03T19:10:00.000Z"),
+            status: ConfirmationStatus.Pending,
+            result: ConfirmationResult.NotYetApproved,
+            reply_options: [
+              {
+                key: "yes",
+                label: "Yes",
+                aliases: ["yes"],
+                decision: ConfirmationReplyDecision.Approve,
+              },
+            ],
+          }),
+        ),
         resolveFromQueueItem: vi.fn(() => {
           const resolution = overrides.confirmationResolution ?? null;
           if (resolution === null) {
@@ -311,6 +334,266 @@ describe("Worker", () => {
     expect(trace.outcome).toBe("clarification_requested");
     expect(runtime.transportCalls[0]?.content).toContain("date and time");
     expect(runtime.transportCalls[0]?.target_thread).toBe("family");
+  });
+
+  it("reuses an explicit clarification session for school due-date follow-ups", async () => {
+    const runtime = createRuntimeStubs({
+      classify: (item: StackQueueItem) =>
+        resolved(
+          item.content === "tomorrow"
+            ? {
+                topic: TopicKey.FamilyStatus,
+                intent: ClassifierIntent.Update,
+                concerning: ["participant_1"],
+              }
+            : {
+                topic: TopicKey.School,
+                intent: ClassifierIntent.Request,
+                concerning: ["participant_3"],
+              },
+        ),
+    });
+
+    const firstTrace = await runtime.worker.process({
+      id: "school_parent_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1"],
+      target_thread: "family",
+      created_at: new Date("2026-04-03T18:20:00.000Z"),
+      content: "ask harrison to do his homework",
+    });
+
+    expect(firstTrace.outcome).toBe("clarification_requested");
+    expect(runtime.transportCalls.at(-1)?.content).toContain("When is it due?");
+
+    const secondTrace = await runtime.worker.process({
+      id: "school_parent_2",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1"],
+      target_thread: "family",
+      created_at: new Date("2026-04-03T18:21:00.000Z"),
+      content: "tomorrow",
+    });
+
+    expect(secondTrace.outcome).toBe("dispatched");
+    expect(runtime.transportCalls.some((call) => call.content.includes("School summary"))).toBe(
+      true,
+    );
+
+    const state = await runtime.stateService.getSystemState();
+    expect(state.school.students[0]?.assignments).toHaveLength(1);
+    expect(state.school.students[0]?.assignments[0]?.title).toContain(
+      "ask harrison to do his homework",
+    );
+    const history = await runtime.stateService.getThreadHistory("family");
+    expect(history?.pending_clarification ?? null).toBeNull();
+  });
+
+  it("splits compact grocery shorthand into separate items", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Grocery,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_1", "participant_2"],
+        }),
+    });
+
+    await runtime.worker.process({
+      id: "grocery_multi_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1", "participant_2"],
+      target_thread: "family",
+      created_at: new Date("2026-04-03T18:30:00.000Z"),
+      content: "get apples cheese and bananas",
+    });
+
+    const state = await runtime.stateService.getSystemState();
+    expect(state.grocery.list.map((entry) => entry.item)).toEqual(["apples", "cheese", "bananas"]);
+    expect(runtime.transportCalls.at(-1)?.content).toContain("apples, cheese, and bananas");
+  });
+
+  it("removes all exact duplicate grocery rows for requested items", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Grocery,
+          intent: ClassifierIntent.Cancellation,
+          concerning: ["participant_1", "participant_2"],
+        }),
+    });
+    const state = await runtime.stateService.getSystemState();
+    state.grocery.list.push(
+      {
+        id: "g_1",
+        item: "bananas",
+        section: GrocerySection.Produce,
+        added_by: "participant_1",
+        added_at: new Date("2026-04-03T12:00:00.000Z"),
+      },
+      {
+        id: "g_2",
+        item: "bananas",
+        section: GrocerySection.Produce,
+        added_by: "participant_1",
+        added_at: new Date("2026-04-03T12:05:00.000Z"),
+      },
+      {
+        id: "g_3",
+        item: "apples",
+        section: GrocerySection.Produce,
+        added_by: "participant_1",
+        added_at: new Date("2026-04-03T12:10:00.000Z"),
+      },
+      {
+        id: "g_4",
+        item: "oranges",
+        section: GrocerySection.Produce,
+        added_by: "participant_1",
+        added_at: new Date("2026-04-03T12:15:00.000Z"),
+      },
+    );
+    await runtime.stateService.saveSystemState(state);
+
+    await runtime.worker.process({
+      id: "grocery_remove_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1", "participant_2"],
+      target_thread: "family",
+      created_at: new Date("2026-04-03T18:31:00.000Z"),
+      content: "remove bananas and apples",
+    });
+
+    const nextState = await runtime.stateService.getSystemState();
+    expect(nextState.grocery.list.map((entry) => entry.item)).toEqual(["oranges"]);
+    expect(runtime.transportCalls.at(-1)?.content).toContain("bananas (2) and apples");
+  });
+
+  it("handles mixed grocery and finance actions in one message", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Finances,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_1", "participant_2"],
+        }),
+    });
+
+    const trace = await runtime.worker.process({
+      id: "mixed_multi_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1", "participant_2"],
+      target_thread: "couple",
+      created_at: new Date("2026-04-03T18:32:00.000Z"),
+      content: "get apples cheese and bananas, pay the $50 electric bill",
+    });
+
+    expect(trace.outcome).toBe("held");
+    const state = await runtime.stateService.getSystemState();
+    expect(state.grocery.list.map((entry) => entry.item)).toEqual(["apples", "cheese", "bananas"]);
+    const outbound = runtime.transportCalls.at(-1)?.content ?? "";
+    expect(outbound).toContain("Added to the grocery list");
+    expect(outbound).toContain("Approval needed");
+    expect(outbound).toContain("electric bill");
+  });
+
+  it("handles school plus family status updates in one message", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.FamilyStatus,
+          intent: ClassifierIntent.Update,
+          concerning: ["participant_3"],
+        }),
+    });
+
+    await runtime.worker.process({
+      id: "mixed_school_status_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_3"],
+      target_thread: "family",
+      created_at: new Date("2026-04-03T18:33:00.000Z"),
+      content: "Running late from practice, and homework is due tomorrow",
+    });
+
+    const state = await runtime.stateService.getSystemState();
+    expect(state.family_status.current[0]?.status).toContain("Running late");
+    expect(state.school.students[0]?.assignments).toHaveLength(1);
+    expect(
+      runtime.transportCalls.some(
+        (call) =>
+          call.content.includes("Family status recorded") &&
+          call.content.includes("School task recorded"),
+      ),
+    ).toBe(true);
+  });
+
+  it("handles calendar plus grocery updates in one message", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Calendar,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_1", "participant_2"],
+        }),
+    });
+
+    await runtime.worker.process({
+      id: "mixed_calendar_grocery_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_1", "participant_2"],
+      target_thread: "family",
+      created_at: new Date("2026-04-03T18:34:00.000Z"),
+      content:
+        "Put dentist appointment on the calendar tomorrow at 2pm, and get apples and bananas",
+    });
+
+    const state = await runtime.stateService.getSystemState();
+    expect(state.calendar.events).toHaveLength(1);
+    expect(state.grocery.list.map((entry) => entry.item)).toEqual(["apples", "bananas"]);
+    expect(
+      runtime.transportCalls.some(
+        (call) =>
+          call.content.includes("Added to the grocery list") &&
+          call.content.includes("Schedule summary"),
+      ),
+    ).toBe(true);
+  });
+
+  it("routes broad today-overview requests to the overview composer", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Calendar,
+          intent: ClassifierIntent.Query,
+          concerning: ["participant_2"],
+        }),
+    });
+    const state = await runtime.stateService.getSystemState();
+    state.calendar.events.push({
+      id: "cal_today_1",
+      title: "Health appointment",
+      date_start: new Date("2026-04-03T19:00:00.000Z"),
+      concerning: ["participant_2"],
+      topic: TopicKey.Calendar,
+      status: CalendarEventStatus.Upcoming,
+      created_by: "participant_2",
+      created_at: new Date("2026-04-03T12:00:00.000Z"),
+    });
+    await runtime.stateService.saveSystemState(state);
+
+    await runtime.worker.process({
+      id: "overview_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_2"],
+      target_thread: "participant_2_private",
+      created_at: new Date("2026-04-03T18:30:00.000Z"),
+      content: "whats up for today?",
+    });
+
+    expect(runtime.transportCalls.at(-1)?.content).toContain("Schedule");
+    expect(runtime.transportCalls.at(-1)?.content).toContain("Health appointment");
+    expect(runtime.transportCalls.at(-1)?.content).not.toContain("No current family status");
   });
 
   it("uses interpreter action before deterministic fallback", async () => {
@@ -585,5 +868,28 @@ describe("Worker", () => {
 
     expect(new Set(outputs).size).toBeGreaterThanOrEqual(3);
     expect(outputs.every((output) => typeof output === "string" && output.length > 0)).toBe(true);
+  });
+
+  it("keeps business draft replies client-facing and lead-scoped", async () => {
+    const runtime = createRuntimeStubs({
+      classify: () =>
+        resolved({
+          topic: TopicKey.Business,
+          intent: ClassifierIntent.Request,
+          concerning: ["participant_2"],
+        }),
+    });
+
+    await runtime.worker.process({
+      id: "business_draft_1",
+      source: QueueItemSource.HumanMessage,
+      concerning: ["participant_2"],
+      target_thread: "participant_2_private",
+      created_at: new Date("2026-04-03T18:35:00.000Z"),
+      content: "Draft a warm reply to the new wedding inquiry",
+    });
+
+    expect(runtime.transportCalls.at(-1)?.content).toContain("warm client draft reply");
+    expect(runtime.transportCalls.at(-1)?.content).toContain("Leads");
   });
 });

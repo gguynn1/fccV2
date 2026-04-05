@@ -41,6 +41,7 @@ import {
 import {
   RoutingRule,
   ThreadType,
+  type PendingClarificationSession,
   type RoutingDecision,
   type ThreadHistory,
 } from "../../02-supporting-services/05-routing-service/types.js";
@@ -473,7 +474,116 @@ interface DeterminedAction {
   typed_action: TopicAction;
   resolved_topic?: TopicKey;
   resolved_intent?: ClassifierIntent;
+  resolved_from_clarification?: boolean;
+  additional_actions?: SupplementalAction[];
 }
+
+interface SupplementalAction {
+  is_response: boolean;
+  typed_action: TopicAction;
+  resolved_topic: TopicKey;
+  resolved_intent: ClassifierIntent;
+}
+
+interface MutationSummary {
+  topic: TopicKey;
+  action_type: string;
+  lines: string[];
+}
+
+interface TopicBatchPolicy {
+  same_topic_mode: "single" | "batched_items";
+  cross_topic_companions: TopicKey[];
+  duplicate_removal: "remove_all_exact_matches" | "clarify_duplicates";
+  confirmation_mode: "single_required_action" | "allow_non_confirming_companions";
+}
+
+const TOPIC_BATCH_POLICIES: Record<TopicKey, TopicBatchPolicy> = {
+  [TopicKey.Calendar]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [TopicKey.Grocery],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "single_required_action",
+  },
+  [TopicKey.Chores]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "single_required_action",
+  },
+  [TopicKey.Finances]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [TopicKey.Grocery],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "allow_non_confirming_companions",
+  },
+  [TopicKey.Grocery]: {
+    same_topic_mode: "batched_items",
+    cross_topic_companions: [TopicKey.Finances, TopicKey.Meals],
+    duplicate_removal: "remove_all_exact_matches",
+    confirmation_mode: "allow_non_confirming_companions",
+  },
+  [TopicKey.Health]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "single_required_action",
+  },
+  [TopicKey.Pets]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [TopicKey.Grocery],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "allow_non_confirming_companions",
+  },
+  [TopicKey.School]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [TopicKey.FamilyStatus],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "allow_non_confirming_companions",
+  },
+  [TopicKey.Travel]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [TopicKey.Grocery, TopicKey.Calendar],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "single_required_action",
+  },
+  [TopicKey.Vendors]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [TopicKey.Maintenance],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "single_required_action",
+  },
+  [TopicKey.Business]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [TopicKey.Finances, TopicKey.Calendar],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "single_required_action",
+  },
+  [TopicKey.Relationship]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "single_required_action",
+  },
+  [TopicKey.FamilyStatus]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [TopicKey.School, TopicKey.Calendar, TopicKey.Chores],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "allow_non_confirming_companions",
+  },
+  [TopicKey.Meals]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [TopicKey.Grocery],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "allow_non_confirming_companions",
+  },
+  [TopicKey.Maintenance]: {
+    same_topic_mode: "single",
+    cross_topic_companions: [TopicKey.Vendors, TopicKey.Finances],
+    duplicate_removal: "clarify_duplicates",
+    confirmation_mode: "single_required_action",
+  },
+};
 
 interface ClarificationDispatch {
   clarification: ClarificationRequest;
@@ -509,6 +619,19 @@ function sentenceCaseResponse(content: string): string {
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 }
 
+function joinNaturalLanguageList(items: string[]): string {
+  if (items.length === 0) {
+    return "";
+  }
+  if (items.length === 1) {
+    return items[0] ?? "";
+  }
+  if (items.length === 2) {
+    return `${items[0]} and ${items[1]}`;
+  }
+  return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
+}
+
 function extractWeekdayReference(content: string): string | null {
   const match = content.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/iu);
   return match?.[1] ?? null;
@@ -526,6 +649,95 @@ function extractSchoolFocus(content: string): string | null {
     return "pickup";
   }
   return normalized.includes("school") ? "school" : null;
+}
+
+type OverviewScope = "today" | "tonight" | "this_week";
+
+interface QueryTimeWindow {
+  start: Date;
+  end: Date;
+  label: string;
+}
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+}
+
+function endOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+}
+
+function detectOverviewScope(content: string): OverviewScope | null {
+  const normalized = content.toLowerCase();
+  const hasTimeScope =
+    /\btoday\b/u.test(normalized) ||
+    /\btonight\b/u.test(normalized) ||
+    /\bthis\s+week\b/u.test(normalized) ||
+    /\bright\s+now\b/u.test(normalized);
+  const hasOverviewCue =
+    /\b(digest|summary|recap|overview)\b/u.test(normalized) ||
+    ((/\bwhat'?s up\b/u.test(normalized) ||
+      /\bwhat is up\b/u.test(normalized) ||
+      /\bwhat do i have\b/u.test(normalized)) &&
+      hasTimeScope);
+  if (!hasOverviewCue) {
+    return null;
+  }
+  if (/\bthis\s+week\b/u.test(normalized)) {
+    return "this_week";
+  }
+  if (/\btonight\b/u.test(normalized)) {
+    return "tonight";
+  }
+  return "today";
+}
+
+function buildQueryTimeWindow(content: string, fallback: Date): QueryTimeWindow | null {
+  const normalized = content.toLowerCase();
+  if (/\btonight\b/u.test(normalized)) {
+    const start = new Date(fallback);
+    start.setHours(Math.max(start.getHours(), 17), 0, 0, 0);
+    return { start, end: endOfLocalDay(fallback), label: "tonight" };
+  }
+  if (/\btoday\b/u.test(normalized)) {
+    return { start: startOfLocalDay(fallback), end: endOfLocalDay(fallback), label: "today" };
+  }
+  if (/\bthis\s+week\b/u.test(normalized)) {
+    const start = startOfLocalDay(fallback);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return { start, end, label: "this week" };
+  }
+  const weekday = extractWeekdayReference(content);
+  if (weekday) {
+    const day = nextWeekdayFromFallback(fallback, weekday);
+    if (day) {
+      return { start: startOfLocalDay(day), end: endOfLocalDay(day), label: weekday };
+    }
+  }
+  const explicit = extractDateHint(content, fallback);
+  if (explicit) {
+    return {
+      start: startOfLocalDay(explicit),
+      end: endOfLocalDay(explicit),
+      label: explicit.toDateString(),
+    };
+  }
+  return null;
+}
+
+function dateFallsWithinWindow(
+  date: Date | null | undefined,
+  window: QueryTimeWindow | null,
+): boolean {
+  if (!date) {
+    return false;
+  }
+  if (!window) {
+    return true;
+  }
+  return date.getTime() >= window.start.getTime() && date.getTime() <= window.end.getTime();
 }
 
 function isVagueCalendarRequest(content: string): boolean {
@@ -700,10 +912,82 @@ function extractAmount(content: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+const GROCERY_COMPOUND_PHRASES = new Set([
+  "cream cheese",
+  "ice cream",
+  "olive oil",
+  "paper towels",
+  "toilet paper",
+  "dish soap",
+  "garlic bread",
+  "brown sugar",
+  "green beans",
+  "sweet potatoes",
+  "sour cream",
+  "ground beef",
+  "chicken breast",
+  "almond milk",
+  "peanut butter",
+  "orange juice",
+  "sparkling water",
+]);
+
+const GROCERY_DESCRIPTOR_WORDS = new Set([
+  "baby",
+  "black",
+  "blue",
+  "brown",
+  "cream",
+  "dish",
+  "extra",
+  "fresh",
+  "frozen",
+  "garlic",
+  "green",
+  "ground",
+  "ice",
+  "olive",
+  "orange",
+  "paper",
+  "peanut",
+  "red",
+  "shredded",
+  "sour",
+  "sparkling",
+  "sweet",
+  "toilet",
+  "white",
+  "yellow",
+]);
+
+function splitMessageClauses(content: string): string[] {
+  return content
+    .split(/,|;|\n|\bthen\b|\balso\b|&|\+/iu)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function expandCompactGroceryPhrase(part: string): string[] {
+  const normalized = canonicalizeGroceryItem(part);
+  const words = normalized.split(/\s+/u).filter((word) => word.length > 0);
+  if (words.length <= 1) {
+    return [normalized];
+  }
+  if (GROCERY_COMPOUND_PHRASES.has(normalized)) {
+    return [normalized];
+  }
+  const hasDescriptor = words.some((word) => GROCERY_DESCRIPTOR_WORDS.has(word));
+  const hasQuantity = words.some((word) => /\d/u.test(word));
+  if (hasDescriptor || hasQuantity || words.length > 4) {
+    return [normalized];
+  }
+  return words;
+}
+
 function splitListItems(content: string): string[] {
   const containsRemovalCue = /\b(?:remove|delete|drop|take off|cross off|not)\b/iu.test(content);
-  return content
-    .split(/,| and |\n/iu)
+  return splitMessageClauses(content)
+    .flatMap((clause) => clause.split(/\band\b/iu))
     .map((part) =>
       part
         .trim()
@@ -729,6 +1013,7 @@ function splitListItems(content: string): string[] {
     )
     .filter((part) => !isLikelyNonGroceryClause(part))
     .filter((part) => part.length > 0)
+    .flatMap((part) => expandCompactGroceryPhrase(part))
     .slice(0, 6);
 }
 
@@ -769,18 +1054,6 @@ function isLikelyNonGroceryClause(value: string): boolean {
   return false;
 }
 
-function groceryItemsMatch(candidate: string, target: string): boolean {
-  const left = canonicalizeGroceryItem(candidate);
-  const right = canonicalizeGroceryItem(target);
-  if (left.length === 0 || right.length === 0) {
-    return false;
-  }
-  if (left === right) {
-    return true;
-  }
-  return left.includes(right) || right.includes(left);
-}
-
 function normalizeLegacyGroceryItemForStorage(value: string): string | null {
   const normalized = canonicalizeGroceryItem(value)
     .replace(/^(?:please\s+)?(?:add|get|buy|grab|pick up|put)\s+(?:me\s+)?(?:some\s+)?/iu, "")
@@ -807,9 +1080,45 @@ function isLikelyMixedIntent(content: string): boolean {
   const calendarCue =
     /\b(calendar|appointment|schedule|meeting|at\s+\d{1,2}(?::\d{2})?\s*(am|pm))\b/u.test(text);
   const choresCue = /\b(chore|trash|laundry|dishes|vacuum|clean|yard)\b/u.test(text);
+  const schoolCue = /\b(school|homework|assignment|field trip|pickup)\b/u.test(text);
+  const familyStatusCue =
+    /\b(running late|on my way|eta|home in|home around|at the store|at practice|pickup line)\b/u.test(
+      text,
+    );
 
-  const domains = [groceryCue, financeCue, calendarCue, choresCue].filter(Boolean).length;
+  const domains = [
+    groceryCue,
+    financeCue,
+    calendarCue,
+    choresCue,
+    schoolCue,
+    familyStatusCue,
+  ].filter(Boolean).length;
   return domains >= 2;
+}
+
+function clauseLooksLikeGrocery(content: string): boolean {
+  return /\b(grocery|shopping|list|cart|buy|get|pick up|grab|add|remove|delete|drop)\b/iu.test(
+    content,
+  );
+}
+
+function clauseLooksLikeFinance(content: string): boolean {
+  return /\b(\$|bill|invoice|payment|pay|expense|due|budget)\b/iu.test(content);
+}
+
+function clauseLooksLikeCalendar(content: string): boolean {
+  return /\b(calendar|appointment|schedule|meeting)\b/iu.test(content);
+}
+
+function clauseLooksLikeSchool(content: string): boolean {
+  return /\b(school|homework|assignment|field trip|pickup)\b/iu.test(content);
+}
+
+function clauseLooksLikeFamilyStatus(content: string): boolean {
+  return /\b(running late|on my way|eta|home in|home around|at the store|at practice|pickup line)\b/iu.test(
+    content,
+  );
 }
 
 function stripTemporalPhrases(content: string): string {
@@ -1018,6 +1327,10 @@ export class Worker {
           ),
         }
       : null;
+    const activeClarificationSession = this.getActiveClarificationSession(
+      normalizedQueueItem,
+      threadHistory,
+    );
 
     let classificationSource: ProcessingTrace["classification_source"] = "worker";
 
@@ -1128,6 +1441,7 @@ export class Worker {
             identity,
             cappedHistory,
             actionContent,
+            activeClarificationSession,
           ),
         (output) => ({
           output_summary: output.is_response ? "response" : "proactive",
@@ -1228,6 +1542,28 @@ export class Worker {
       escalation.should_escalate && escalation.next_target_thread
         ? escalation.next_target_thread
         : provisionalTargetThread;
+    const additionalActions = determined.additional_actions ?? [];
+    const additionalMutationSummaries: MutationSummary[] = [];
+    for (const additionalAction of additionalActions) {
+      if (
+        TOPIC_BATCH_POLICIES[effectiveClassification.topic].confirmation_mode ===
+          "single_required_action" &&
+        this.confirmationTypeForAction(additionalAction.typed_action) !== null
+      ) {
+        continue;
+      }
+      const summary = await this.applyStateMutation(
+        {
+          ...effectiveQueueItem,
+          topic: additionalAction.resolved_topic,
+          intent: additionalAction.resolved_intent,
+        },
+        additionalAction.typed_action,
+      );
+      if (summary) {
+        additionalMutationSummaries.push(summary);
+      }
+    }
 
     const confirmationResult = await this.traceStep(
       traceSteps,
@@ -1242,6 +1578,7 @@ export class Worker {
           identity,
           determined.typed_action,
           escalationTargetThread,
+          additionalMutationSummaries.flatMap((summary) => summary.lines),
         ),
       (output) => ({
         output_summary: output.kind,
@@ -1289,7 +1626,18 @@ export class Worker {
         ? confirmationResult.approved_action_payload
         : determined.typed_action;
 
-    await this.applyStateMutation(effectiveQueueItem, actionToExecute);
+    if (determined.resolved_from_clarification) {
+      await this.clearPendingClarificationSession(effectiveQueueItem.target_thread);
+    }
+
+    const mutationSummaries: MutationSummary[] = [...additionalMutationSummaries];
+    const primaryMutationSummary = await this.applyStateMutation(
+      effectiveQueueItem,
+      actionToExecute,
+    );
+    if (primaryMutationSummary) {
+      mutationSummaries.push(primaryMutationSummary);
+    }
 
     const profileResult = await this.traceStep(
       traceSteps,
@@ -1315,6 +1663,7 @@ export class Worker {
         const stateBackedMessage = await this.composeStateBackedMessage(
           actionToExecute,
           effectiveQueueItem,
+          mutationSummaries,
         );
         if (stateBackedMessage) {
           composed = stateBackedMessage;
@@ -1682,16 +2031,314 @@ export class Worker {
     return scoped;
   }
 
+  private buildGroceryActionFromContent(content: string): TopicAction | null {
+    const items = splitListItems(content);
+    if (items.length === 0) {
+      return null;
+    }
+    const removalCue = /\b(?:remove|delete|drop|take off|cross off)\b/iu.test(content);
+    return removalCue
+      ? {
+          type: "remove_items",
+          item_ids: items,
+        }
+      : {
+          type: "add_items",
+          items: items.map((item) => ({ item })),
+        };
+  }
+
+  private buildCalendarActionFromContent(
+    content: string,
+    fallbackDate: Date,
+    concerning: string[],
+  ): TopicAction | null {
+    const dateHint = extractDateHint(content, fallbackDate);
+    if (!dateHint || !clauseLooksLikeCalendar(content)) {
+      return null;
+    }
+    const title = stripTemporalPhrases(stripConversationalLeadIns(content))
+      .replace(/^(?:please\s+)?(?:add|put|set|schedule)\s+/iu, "")
+      .replace(/\s+(?:to|on)\s+(?:my\s+)?calendar$/iu, "")
+      .replace(/\s+/gu, " ")
+      .trim();
+    return {
+      type: "create_event",
+      title: title.length > 0 ? title.slice(0, 80) : "Calendar item",
+      date_start: dateHint,
+      concerning,
+    };
+  }
+
+  private buildSchoolActionFromContent(
+    content: string,
+    fallbackDate: Date,
+    childEntity: string | undefined,
+    parentEntity: string,
+  ): TopicAction | null {
+    if (!clauseLooksLikeSchool(content) || !childEntity) {
+      return null;
+    }
+    const dueDate = extractDateHint(content, fallbackDate);
+    if (!dueDate) {
+      return null;
+    }
+    return {
+      type: "add_assignment",
+      entity: childEntity,
+      parent_entity: parentEntity,
+      title: stripConversationalLeadIns(content).slice(0, 120),
+      due_date: dueDate,
+      source: SchoolInputSource.Conversation,
+    };
+  }
+
+  private buildFamilyStatusActionFromContent(
+    content: string,
+    fallbackDate: Date,
+    entity: string,
+  ): TopicAction | null {
+    if (!clauseLooksLikeFamilyStatus(content)) {
+      return null;
+    }
+    return {
+      type: "update_status",
+      entity,
+      status: stripConversationalLeadIns(content).slice(0, 120),
+      expires_at: new Date(fallbackDate.getTime() + 6 * 60 * 60 * 1000),
+    };
+  }
+
+  private resolveMixedActionPlan(input: {
+    queueItem: StackQueueItem;
+    classification: StackClassificationResult;
+    actor: string;
+    content: string;
+  }): DeterminedAction | null {
+    if (!isLikelyMixedIntent(input.content)) {
+      return null;
+    }
+    const policy = TOPIC_BATCH_POLICIES[input.classification.topic];
+    if (policy.cross_topic_companions.length === 0) {
+      return null;
+    }
+
+    const clauses = splitMessageClauses(input.content);
+    const groceryClauses = clauses.filter((clause) => clauseLooksLikeGrocery(clause));
+    const financeClauses = clauses.filter((clause) => clauseLooksLikeFinance(clause));
+    const calendarClauses = clauses.filter((clause) => clauseLooksLikeCalendar(clause));
+    const schoolClauses = clauses.filter((clause) => clauseLooksLikeSchool(clause));
+    const familyStatusClauses = clauses.filter((clause) => clauseLooksLikeFamilyStatus(clause));
+
+    if (policy.cross_topic_companions.length === 0) {
+      return null;
+    }
+
+    const supplementalActions: SupplementalAction[] = [];
+    const groceryActions = groceryClauses
+      .map((clause) => this.buildGroceryActionFromContent(clause))
+      .filter((action): action is TopicAction => action !== null);
+
+    if (input.classification.topic === TopicKey.Grocery && groceryActions.length > 1) {
+      const [primaryGroceryAction, ...remainingGroceryActions] = groceryActions;
+      if (primaryGroceryAction) {
+        return {
+          is_response: true,
+          typed_action: primaryGroceryAction,
+          resolved_topic: TopicKey.Grocery,
+          resolved_intent:
+            primaryGroceryAction.type === "remove_items"
+              ? ClassifierIntent.Cancellation
+              : ClassifierIntent.Request,
+          additional_actions: remainingGroceryActions.map((action) => ({
+            is_response: true,
+            typed_action: action,
+            resolved_topic: TopicKey.Grocery,
+            resolved_intent:
+              action.type === "remove_items"
+                ? ClassifierIntent.Cancellation
+                : ClassifierIntent.Request,
+          })),
+        };
+      }
+    }
+
+    for (const action of groceryActions) {
+      supplementalActions.push({
+        is_response: true,
+        typed_action: action,
+        resolved_topic: TopicKey.Grocery,
+        resolved_intent:
+          action.type === "remove_items" ? ClassifierIntent.Cancellation : ClassifierIntent.Request,
+      });
+    }
+
+    const firstFinanceClause = financeClauses[0];
+    if (firstFinanceClause && supplementalActions.length > 0) {
+      const amount = extractAmount(firstFinanceClause);
+      if (amount !== null) {
+        return {
+          is_response: true,
+          typed_action: {
+            type: "log_expense",
+            description: stripConversationalLeadIns(firstFinanceClause).slice(0, 120),
+            amount,
+            logged_by: input.actor,
+            requires_confirmation: true,
+          },
+          resolved_topic: TopicKey.Finances,
+          resolved_intent: ClassifierIntent.Request,
+          additional_actions: supplementalActions,
+        };
+      }
+    }
+
+    if (input.classification.topic === TopicKey.Grocery && financeClauses.length > 0) {
+      const financeClause = financeClauses[0];
+      if (financeClause) {
+        const amount = extractAmount(financeClause);
+        if (amount !== null) {
+          return {
+            is_response: true,
+            typed_action: {
+              type: "log_expense",
+              description: stripConversationalLeadIns(financeClause).slice(0, 120),
+              amount,
+              logged_by: input.actor,
+              requires_confirmation: true,
+            },
+            resolved_topic: TopicKey.Finances,
+            resolved_intent: ClassifierIntent.Request,
+            additional_actions: supplementalActions,
+          };
+        }
+      }
+    }
+
+    if (
+      input.classification.topic === TopicKey.Calendar &&
+      policy.cross_topic_companions.includes(TopicKey.Grocery)
+    ) {
+      const primaryCalendarAction = calendarClauses
+        .map((clause) =>
+          this.buildCalendarActionFromContent(
+            clause,
+            input.queueItem.created_at,
+            input.classification.concerning,
+          ),
+        )
+        .find((action): action is TopicAction => action !== null);
+      if (primaryCalendarAction && supplementalActions.length > 0) {
+        return {
+          is_response: true,
+          typed_action: primaryCalendarAction,
+          resolved_topic: TopicKey.Calendar,
+          resolved_intent: ClassifierIntent.Request,
+          additional_actions: supplementalActions,
+        };
+      }
+    }
+
+    if (
+      input.classification.topic === TopicKey.FamilyStatus &&
+      policy.cross_topic_companions.includes(TopicKey.School)
+    ) {
+      const primaryStatusAction = familyStatusClauses
+        .map((clause) =>
+          this.buildFamilyStatusActionFromContent(clause, input.queueItem.created_at, input.actor),
+        )
+        .find((action): action is TopicAction => action !== null);
+      const schoolAction = schoolClauses
+        .map((clause) =>
+          this.buildSchoolActionFromContent(
+            clause,
+            input.queueItem.created_at,
+            input.classification.concerning[0],
+            input.actor,
+          ),
+        )
+        .find((action): action is TopicAction => action !== null);
+      if (primaryStatusAction && schoolAction) {
+        return {
+          is_response: true,
+          typed_action: primaryStatusAction,
+          resolved_topic: TopicKey.FamilyStatus,
+          resolved_intent: ClassifierIntent.Update,
+          additional_actions: [
+            {
+              is_response: true,
+              typed_action: schoolAction,
+              resolved_topic: TopicKey.School,
+              resolved_intent: ClassifierIntent.Request,
+            },
+          ],
+        };
+      }
+    }
+
+    if (
+      input.classification.topic === TopicKey.School &&
+      policy.cross_topic_companions.includes(TopicKey.FamilyStatus)
+    ) {
+      const primarySchoolAction = schoolClauses
+        .map((clause) =>
+          this.buildSchoolActionFromContent(
+            clause,
+            input.queueItem.created_at,
+            input.classification.concerning[0],
+            input.actor,
+          ),
+        )
+        .find((action): action is TopicAction => action !== null);
+      const familyStatusAction = familyStatusClauses
+        .map((clause) =>
+          this.buildFamilyStatusActionFromContent(clause, input.queueItem.created_at, input.actor),
+        )
+        .find((action): action is TopicAction => action !== null);
+      if (primarySchoolAction && familyStatusAction) {
+        return {
+          is_response: true,
+          typed_action: primarySchoolAction,
+          resolved_topic: TopicKey.School,
+          resolved_intent: ClassifierIntent.Request,
+          additional_actions: [
+            {
+              is_response: true,
+              typed_action: familyStatusAction,
+              resolved_topic: TopicKey.FamilyStatus,
+              resolved_intent: ClassifierIntent.Update,
+            },
+          ],
+        };
+      }
+    }
+
+    return null;
+  }
+
   private async resolveAction(
     queueItem: StackQueueItem,
     classification: StackClassificationResult,
     identity: IdentityResolutionResult,
     threadHistory: ThreadHistory | null,
     actionContent?: string,
+    activeClarificationSession?: PendingClarificationSession | null,
   ): Promise<DeterminedAction> {
     const content = stripConversationalLeadIns(
       actionContent ?? summarizeContent(queueItem.content),
     );
+    if (activeClarificationSession) {
+      return this.resolveActionFromClarification(queueItem, activeClarificationSession);
+    }
+    const mixedPlan = this.resolveMixedActionPlan({
+      queueItem,
+      classification,
+      actor: identity.source_entity_id,
+      content,
+    });
+    if (mixedPlan) {
+      return mixedPlan;
+    }
     const interpreted = await this.resolveActionViaInterpreter(
       queueItem,
       classification,
@@ -1757,6 +2404,14 @@ export class Worker {
         typed_action: { type: "query_status", entity: introspectionToken },
       };
     }
+    const overviewScope =
+      classification.intent === ClassifierIntent.Query ? detectOverviewScope(content) : null;
+    if (overviewScope) {
+      return {
+        is_response: true,
+        typed_action: { type: "query_status", entity: `__overview__:${overviewScope}` },
+      };
+    }
 
     const calendarChange =
       queueItem.source === QueueItemSource.DataIngest && classification.topic === TopicKey.Calendar
@@ -1794,7 +2449,22 @@ export class Worker {
           }
         }
         if (classification.intent === ClassifierIntent.Query) {
-          return { is_response: true, typed_action: { type: "query_events" } };
+          const dateWindow = buildQueryTimeWindow(content, queueItem.created_at);
+          return {
+            is_response: true,
+            typed_action: {
+              type: "query_events",
+              filters: {
+                concerning: humanConcerning,
+                date_range: dateWindow
+                  ? {
+                      start: dateWindow.start,
+                      end: dateWindow.end,
+                    }
+                  : undefined,
+              },
+            },
+          };
         }
         if (classification.intent === ClassifierIntent.Cancellation) {
           if (!hasReference) {
@@ -1818,6 +2488,11 @@ export class Worker {
                 queueItem,
                 ClarificationReason.MissingRequiredField,
                 "What should I move it to?",
+                {
+                  action_type: "reschedule_event",
+                  event_id: hasReference ? referenceId : null,
+                  base_date_hint: dateHint?.toISOString() ?? null,
+                },
               ),
             );
           }
@@ -1832,6 +2507,11 @@ export class Worker {
               queueItem,
               ClarificationReason.MissingRequiredField,
               "What date and time should I put on the calendar?",
+              {
+                action_type: "create_event",
+                concerning: humanConcerning,
+                base_date_hint: dateHint?.toISOString() ?? null,
+              },
             ),
           );
         }
@@ -1841,6 +2521,10 @@ export class Worker {
               queueItem,
               ClarificationReason.MissingRequiredField,
               "What date and time should I put on the calendar?",
+              {
+                action_type: "create_event",
+                concerning: humanConcerning,
+              },
             ),
           );
         }
@@ -1869,7 +2553,13 @@ export class Worker {
       }
       case TopicKey.Chores: {
         if (classification.intent === ClassifierIntent.Query) {
-          return { is_response: true, typed_action: { type: "query_chores" } };
+          return {
+            is_response: true,
+            typed_action: {
+              type: "query_chores",
+              assigned_to: childConcerning[0] ?? humanConcerning[0] ?? actor,
+            },
+          };
         }
         if (classification.intent === ClassifierIntent.Completion) {
           if (!hasReference) {
@@ -1921,6 +2611,11 @@ export class Worker {
               queueItem,
               ClarificationReason.MissingRequiredField,
               "What amount should I log?",
+              {
+                action_type: "log_expense",
+                description: content.slice(0, 120),
+                logged_by: actor,
+              },
             ),
           );
         }
@@ -1987,6 +2682,11 @@ export class Worker {
               queueItem,
               ClarificationReason.MissingRequiredField,
               "When is the appointment?",
+              {
+                action_type: "add_appointment",
+                entity: humanConcerning[0] ?? actor,
+                provider_type: this.inferHealthProvider(content),
+              },
             ),
           );
         }
@@ -2022,7 +2722,7 @@ export class Worker {
         if (classification.intent === ClassifierIntent.Query) {
           return {
             is_response: true,
-            typed_action: { type: "query_school", entity: childConcerning[0] },
+            typed_action: { type: "query_school", entity: childConcerning[0] ?? actor },
           };
         }
         if (!dateHint) {
@@ -2031,6 +2731,16 @@ export class Worker {
               queueItem,
               ClarificationReason.MissingRequiredField,
               "When is it due?",
+              {
+                action_type: "add_assignment",
+                entity: childConcerning[0],
+                parent_entity: actor,
+                title: content.slice(0, 120),
+                source:
+                  queueItem.source === QueueItemSource.EmailMonitor
+                    ? SchoolInputSource.EmailParsing
+                    : SchoolInputSource.Conversation,
+              },
             ),
           );
         }
@@ -2062,6 +2772,11 @@ export class Worker {
               queueItem,
               ClarificationReason.MissingRequiredField,
               "What dates should I use for the trip?",
+              {
+                action_type: "create_trip",
+                name: content.slice(0, 80),
+                travelers: humanConcerning,
+              },
             ),
           );
         }
@@ -2493,6 +3208,251 @@ export class Worker {
     return null;
   }
 
+  private getActiveClarificationSession(
+    queueItem: StackQueueItem,
+    threadHistory: ThreadHistory | null,
+  ): PendingClarificationSession | null {
+    const session = threadHistory?.pending_clarification ?? null;
+    if (!session) {
+      return null;
+    }
+    if (
+      queueItem.clarification_of &&
+      queueItem.clarification_of !== session.original_queue_item_id
+    ) {
+      return null;
+    }
+    if (session.source_thread !== queueItem.target_thread) {
+      return null;
+    }
+    return this.looksLikeClarificationReply(queueItem) ? session : null;
+  }
+
+  private looksLikeClarificationReply(queueItem: StackQueueItem): boolean {
+    if (queueItem.clarification_of) {
+      return true;
+    }
+    if (
+      queueItem.source === QueueItemSource.Reaction ||
+      queueItem.source === QueueItemSource.ForwardedMessage
+    ) {
+      return true;
+    }
+    const content = summarizeContent(queueItem.content).trim();
+    if (content.length === 0) {
+      return false;
+    }
+    if (/^\d+$/u.test(content) || /^[a-z]$/iu.test(content)) {
+      return true;
+    }
+    if (
+      /^(?:yes|yeah|yep|no|nope|nah|ok|okay|sure|tomorrow|today|tonight|morning|afternoon|evening)\b/iu.test(
+        content,
+      )
+    ) {
+      return true;
+    }
+    return content.split(/\s+/u).length <= 12;
+  }
+
+  private contextString(context: Record<string, unknown>, key: string): string | null {
+    const value = context[key];
+    return typeof value === "string" && value.trim().length > 0 ? value : null;
+  }
+
+  private contextStringArray(context: Record<string, unknown>, key: string): string[] {
+    const value = context[key];
+    return Array.isArray(value)
+      ? value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+      : [];
+  }
+
+  private contextDate(context: Record<string, unknown>, key: string): Date | null {
+    const value = context[key];
+    if (value instanceof Date) {
+      return value;
+    }
+    if (typeof value === "string" || typeof value === "number") {
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    return null;
+  }
+
+  private resolveActionFromClarification(
+    queueItem: StackQueueItem,
+    session: PendingClarificationSession,
+  ): DeterminedAction {
+    const content = stripConversationalLeadIns(summarizeContent(queueItem.content));
+    const context = session.context;
+    const actionType = this.contextString(context, "action_type");
+    if (!actionType) {
+      throw new ClarificationSignal(
+        buildClarification(queueItem, session.reason, session.message_to_participant, context),
+      );
+    }
+
+    switch (actionType) {
+      case "add_assignment": {
+        const dueDate = extractDateHint(content, queueItem.created_at);
+        if (!dueDate) {
+          throw new ClarificationSignal(
+            buildClarification(queueItem, session.reason, session.message_to_participant, context),
+          );
+        }
+        const entity = this.contextString(context, "entity") ?? session.source_concerning[0] ?? "";
+        const parentEntity =
+          this.contextString(context, "parent_entity") ?? session.source_entity_id;
+        const title = this.contextString(context, "title") ?? session.source_message;
+        const source =
+          this.contextString(context, "source") === SchoolInputSource.EmailParsing
+            ? SchoolInputSource.EmailParsing
+            : SchoolInputSource.Conversation;
+        return {
+          is_response: true,
+          typed_action: {
+            type: "add_assignment",
+            entity,
+            parent_entity: parentEntity,
+            title,
+            due_date: dueDate,
+            source,
+          },
+          resolved_topic: session.topic,
+          resolved_intent: session.intent,
+          resolved_from_clarification: true,
+        };
+      }
+      case "log_expense": {
+        const amount = extractAmount(content);
+        if (amount === null) {
+          throw new ClarificationSignal(
+            buildClarification(queueItem, session.reason, session.message_to_participant, context),
+          );
+        }
+        return {
+          is_response: true,
+          typed_action: {
+            type: "log_expense",
+            description: this.contextString(context, "description") ?? session.source_message,
+            amount,
+            logged_by: this.contextString(context, "logged_by") ?? session.source_entity_id,
+            requires_confirmation: true,
+          },
+          resolved_topic: session.topic,
+          resolved_intent: session.intent,
+          resolved_from_clarification: true,
+        };
+      }
+      case "add_appointment": {
+        const baseDate = this.contextDate(context, "base_date_hint") ?? queueItem.created_at;
+        const appointmentDate = extractDateHint(content, baseDate);
+        if (!appointmentDate) {
+          throw new ClarificationSignal(
+            buildClarification(queueItem, session.reason, session.message_to_participant, context),
+          );
+        }
+        const entity = this.contextString(context, "entity") ?? session.source_entity_id;
+        const providerTypeRaw =
+          this.contextString(context, "provider_type") ?? HealthProviderType.Primary;
+        const providerType = Object.values(HealthProviderType).includes(
+          providerTypeRaw as HealthProviderType,
+        )
+          ? (providerTypeRaw as HealthProviderType)
+          : HealthProviderType.Primary;
+        return {
+          is_response: true,
+          typed_action: {
+            type: "add_appointment",
+            entity,
+            provider_type: providerType,
+            date: appointmentDate,
+          },
+          resolved_topic: session.topic,
+          resolved_intent: session.intent,
+          resolved_from_clarification: true,
+        };
+      }
+      case "create_event": {
+        const baseDate = this.contextDate(context, "base_date_hint") ?? queueItem.created_at;
+        const eventDate = extractDateHint(content, baseDate);
+        if (!eventDate) {
+          throw new ClarificationSignal(
+            buildClarification(queueItem, session.reason, session.message_to_participant, context),
+          );
+        }
+        const title =
+          this.contextString(context, "title") ??
+          stripTemporalPhrases(session.source_message).replace(/\s+/gu, " ").trim() ??
+          session.source_message;
+        const concerning = this.contextStringArray(context, "concerning");
+        return {
+          is_response: true,
+          typed_action: {
+            type: "create_event",
+            title,
+            date_start: eventDate,
+            concerning: concerning.length > 0 ? concerning : session.source_concerning,
+          },
+          resolved_topic: session.topic,
+          resolved_intent: session.intent,
+          resolved_from_clarification: true,
+        };
+      }
+      case "create_trip": {
+        const tripDate = extractDateHint(content, queueItem.created_at);
+        if (!tripDate) {
+          throw new ClarificationSignal(
+            buildClarification(queueItem, session.reason, session.message_to_participant, context),
+          );
+        }
+        const name = this.contextString(context, "name") ?? session.source_message;
+        const travelers = this.contextStringArray(context, "travelers");
+        return {
+          is_response: true,
+          typed_action: {
+            type: "create_trip",
+            name,
+            dates: {
+              start: tripDate,
+              end: new Date(tripDate.getTime() + 24 * 60 * 60 * 1000),
+            },
+            travelers: travelers.length > 0 ? travelers : session.source_concerning,
+            source: TravelInputSource.Conversation,
+          },
+          resolved_topic: session.topic,
+          resolved_intent: session.intent,
+          resolved_from_clarification: true,
+        };
+      }
+      case "reschedule_event": {
+        const baseDate = this.contextDate(context, "base_date_hint") ?? queueItem.created_at;
+        const eventDate = extractDateHint(content, baseDate);
+        const eventId = this.contextString(context, "event_id");
+        if (!eventDate || !eventId) {
+          throw new ClarificationSignal(
+            buildClarification(queueItem, session.reason, session.message_to_participant, context),
+          );
+        }
+        return {
+          is_response: true,
+          typed_action: {
+            type: "reschedule_event",
+            event_id: eventId,
+            new_start: eventDate,
+          },
+          resolved_topic: session.topic,
+          resolved_intent: session.intent,
+          resolved_from_clarification: true,
+        };
+      }
+      default:
+        throw new ClarificationSignal(
+          buildClarification(queueItem, session.reason, session.message_to_participant, context),
+        );
+    }
+  }
+
   private inferCalendarTitleFromHistory(
     threadHistory: ThreadHistory | null,
     currentContent: string,
@@ -2580,11 +3540,15 @@ export class Worker {
     return null;
   }
 
-  private async applyStateMutation(queueItem: StackQueueItem, action: TopicAction): Promise<void> {
+  private async applyStateMutation(
+    queueItem: StackQueueItem,
+    action: TopicAction,
+  ): Promise<MutationSummary | null> {
     const state = await this.stateService.getSystemState();
     const now = this.now();
     const actor = queueItem.concerning[0] ?? getDefaultHumanEntityId();
     let mutated = false;
+    let summary: MutationSummary | null = null;
 
     switch (action.type) {
       case "create_event": {
@@ -2601,6 +3565,13 @@ export class Worker {
           created_at: now,
         });
         mutated = true;
+        summary = {
+          topic: TopicKey.Calendar,
+          action_type: action.type,
+          lines: [
+            `Calendar event recorded: ${action.title} on ${action.date_start.toLocaleString()}.`,
+          ],
+        };
         break;
       }
       case "reschedule_event": {
@@ -2675,6 +3646,8 @@ export class Worker {
         break;
       }
       case "add_items": {
+        const addedItems: string[] = [];
+        const skippedItems: string[] = [];
         const rebuiltList: typeof state.grocery.list = [];
         const rebuiltNormalized = new Set<string>();
         for (const entry of state.grocery.list) {
@@ -2706,6 +3679,7 @@ export class Worker {
             continue;
           }
           if (existing.has(normalized)) {
+            skippedItems.push(normalized);
             continue;
           }
           state.grocery.list.push({
@@ -2716,8 +3690,24 @@ export class Worker {
             added_at: now,
           });
           existing.add(normalized);
+          addedItems.push(normalized);
           mutated = true;
         }
+        const lines: string[] = [];
+        if (addedItems.length > 0) {
+          lines.push(`Added to the grocery list: ${joinNaturalLanguageList(addedItems)}.`);
+        }
+        if (skippedItems.length > 0) {
+          lines.push(`Already on the grocery list: ${joinNaturalLanguageList(skippedItems)}.`);
+        }
+        summary =
+          lines.length > 0
+            ? {
+                topic: TopicKey.Grocery,
+                action_type: action.type,
+                lines,
+              }
+            : null;
         break;
       }
       case "remove_items": {
@@ -2725,11 +3715,41 @@ export class Worker {
           .map((item) => canonicalizeGroceryItem(item))
           .filter((item) => item.length > 0);
         if (removals.length > 0) {
+          const matchedItems = new Map<string, number>();
           const before = state.grocery.list.length;
+          for (const removal of removals) {
+            const matchCount = state.grocery.list.filter(
+              (entry) => canonicalizeGroceryItem(entry.item) === removal,
+            ).length;
+            matchedItems.set(removal, matchCount);
+          }
           state.grocery.list = state.grocery.list.filter(
-            (entry) => !removals.some((removal) => groceryItemsMatch(entry.item, removal)),
+            (entry) => !removals.some((removal) => canonicalizeGroceryItem(entry.item) === removal),
           );
           mutated = state.grocery.list.length !== before;
+          const removedItems = [...matchedItems.entries()]
+            .filter(([, count]) => count > 0)
+            .map(([item, count]) => (count > 1 ? `${item} (${count})` : item));
+          const unmatchedItems = [...matchedItems.entries()]
+            .filter(([, count]) => count === 0)
+            .map(([item]) => item);
+          const lines: string[] = [];
+          if (removedItems.length > 0) {
+            lines.push(`Removed from the grocery list: ${joinNaturalLanguageList(removedItems)}.`);
+          }
+          if (unmatchedItems.length > 0) {
+            lines.push(
+              `No exact grocery match found for: ${joinNaturalLanguageList(unmatchedItems)}.`,
+            );
+          }
+          summary =
+            lines.length > 0
+              ? {
+                  topic: TopicKey.Grocery,
+                  action_type: action.type,
+                  lines,
+                }
+              : null;
         }
         break;
       }
@@ -2820,6 +3840,13 @@ export class Worker {
           parent_notified: false,
         });
         mutated = true;
+        summary = {
+          topic: TopicKey.School,
+          action_type: action.type,
+          lines: [
+            `School task recorded for ${action.entity}: ${action.title} due ${action.due_date.toLocaleDateString()}.`,
+          ],
+        };
         break;
       }
       case "create_trip": {
@@ -2978,6 +4005,11 @@ export class Worker {
           state.family_status.current.push(next);
         }
         mutated = true;
+        summary = {
+          topic: TopicKey.FamilyStatus,
+          action_type: action.type,
+          lines: [`Family status recorded: ${action.status}.`],
+        };
         break;
       }
       case "plan_meal": {
@@ -3009,6 +4041,7 @@ export class Worker {
     if (mutated) {
       await this.stateService.saveSystemState(state);
     }
+    return summary;
   }
 
   private async composeGroceryListMessage(
@@ -3028,100 +4061,217 @@ export class Worker {
     return `${prefix}\n${lines.join("\n")}`;
   }
 
-  private composeDigestMessage(state: Awaited<ReturnType<StateService["getSystemState"]>>): string {
+  private participantsForThread(threadId: string): string[] {
+    return runtimeSystemConfig.threads.find((thread) => thread.id === threadId)?.participants ?? [];
+  }
+
+  private overviewWindow(scope: OverviewScope, referenceAt: Date): QueryTimeWindow {
+    if (scope === "tonight") {
+      const start = new Date(referenceAt);
+      start.setHours(Math.max(start.getHours(), 17), 0, 0, 0);
+      return { start, end: endOfLocalDay(referenceAt), label: "tonight" };
+    }
+    if (scope === "this_week") {
+      const start = startOfLocalDay(referenceAt);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      return { start, end, label: "this week" };
+    }
+    return { start: startOfLocalDay(referenceAt), end: endOfLocalDay(referenceAt), label: "today" };
+  }
+
+  private composeOverviewMessage(
+    state: Awaited<ReturnType<StateService["getSystemState"]>>,
+    scope: OverviewScope,
+    threadId: string,
+    referenceAt: Date,
+  ): string {
+    const window = this.overviewWindow(scope, referenceAt);
+    const audience = new Set(this.participantsForThread(threadId));
     const sections: string[] = [];
-    const MAX_ITEMS_PER_SECTION = 3;
 
-    const overdueChores = state.chores.active.filter(
-      (chore) => chore.status === ChoreStatus.Overdue,
-    );
-    const pendingConfirmations = state.confirmations.pending;
-    const urgentLines: string[] = [];
-    for (const chore of overdueChores.slice(0, MAX_ITEMS_PER_SECTION)) {
-      urgentLines.push(`- Overdue chore: ${chore.task}`);
-    }
-    for (const conf of pendingConfirmations.slice(0, MAX_ITEMS_PER_SECTION)) {
-      urgentLines.push(`- Awaiting approval: ${conf.action}`);
-    }
-    if (urgentLines.length > 0) {
-      sections.push(`Urgent\n${urgentLines.join("\n")}`);
-    }
-
-    const todayLines: string[] = [];
-    for (const event of state.calendar.events.slice(0, MAX_ITEMS_PER_SECTION)) {
-      const time = event.time ?? "";
-      todayLines.push(`- ${event.title}${time ? ` at ${time}` : ""}`);
-    }
-    for (const meal of state.meals.planned.slice(0, 2)) {
-      todayLines.push(`- Meal: ${meal.description}`);
-    }
-    const dueChores = state.chores.active.filter((chore) => chore.status !== ChoreStatus.Overdue);
-    for (const chore of dueChores.slice(0, 2)) {
-      todayLines.push(`- Chore: ${chore.task}`);
-    }
-    if (todayLines.length > 0) {
-      sections.push(`Today\n${todayLines.join("\n")}`);
-    }
-
-    const pendingLines: string[] = [];
-    if (state.grocery.list.length > 0) {
-      pendingLines.push(`- ${state.grocery.list.length} grocery item(s) on the list`);
-    }
-    if (pendingConfirmations.length > MAX_ITEMS_PER_SECTION) {
-      pendingLines.push(
-        `- ${pendingConfirmations.length - MAX_ITEMS_PER_SECTION} more confirmation(s) pending`,
+    const relevantEvents = state.calendar.events
+      .filter((event) => event.status !== CalendarEventStatus.Cancelled)
+      .filter((event) =>
+        event.concerning.some((entity) => audience.size === 0 || audience.has(entity)),
+      )
+      .filter((event) =>
+        dateFallsWithinWindow(event.date_start ?? event.date ?? event.normalized_start, window),
+      )
+      .sort((left, right) => {
+        const leftDate =
+          left.date_start?.getTime() ??
+          left.date?.getTime() ??
+          left.normalized_start?.getTime() ??
+          0;
+        const rightDate =
+          right.date_start?.getTime() ??
+          right.date?.getTime() ??
+          right.normalized_start?.getTime() ??
+          0;
+        return leftDate - rightDate;
+      });
+    if (relevantEvents.length > 0) {
+      const lines = relevantEvents.slice(0, 4).map((event) => {
+        const at = event.date_start ?? event.date ?? event.normalized_start;
+        const timeLabel =
+          at instanceof Date
+            ? at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+            : "time TBD";
+        return `- ${timeLabel} - ${event.title}`;
+      });
+      const conflictDetected = relevantEvents.some((event, index) => {
+        const current = event.date_start ?? event.date ?? event.normalized_start;
+        const next = relevantEvents[index + 1]?.date_start ?? relevantEvents[index + 1]?.date;
+        return (
+          current instanceof Date && next instanceof Date && current.getTime() === next.getTime()
+        );
+      });
+      sections.push(
+        `Schedule\n${lines.join("\n")}${conflictDetected ? "\n- Potential conflict to resolve." : ""}`,
       );
     }
-    if (pendingLines.length > 0) {
-      sections.push(`Pending\n${pendingLines.join("\n")}`);
+
+    const dueChores = state.chores.active
+      .filter((chore) => audience.size === 0 || audience.has(chore.assigned_to))
+      .filter(
+        (chore) => dateFallsWithinWindow(chore.due, window) || chore.status === ChoreStatus.Overdue,
+      );
+    if (dueChores.length > 0) {
+      sections.push(
+        `Chores\n${dueChores
+          .slice(0, 4)
+          .map((chore) => `- ${chore.task}`)
+          .join("\n")}`,
+      );
     }
 
-    const winsLines: string[] = [];
-    for (const chore of state.chores.completed_recent.slice(0, MAX_ITEMS_PER_SECTION)) {
-      winsLines.push(`- Done: ${chore.task}`);
-    }
-    if (state.finances.expenses_recent.length > 0) {
-      winsLines.push(`- ${state.finances.expenses_recent.length} expense(s) logged`);
-    }
-    if (winsLines.length > 0) {
-      sections.push(`Wins\n${winsLines.join("\n")}`);
+    const schoolAssignments = state.school.students
+      .filter(
+        (student) =>
+          audience.size === 0 ||
+          audience.has(student.entity) ||
+          (student.parent_entity ? audience.has(student.parent_entity) : false),
+      )
+      .flatMap((student) =>
+        student.assignments.map((assignment) => ({
+          student: student.entity,
+          assignment,
+        })),
+      )
+      .filter(({ assignment }) => dateFallsWithinWindow(assignment.due_date, window));
+    if (schoolAssignments.length > 0) {
+      sections.push(
+        `School\n${schoolAssignments
+          .slice(0, 4)
+          .map(
+            ({ student, assignment }) =>
+              `- ${student}: ${assignment.title} due ${assignment.due_date.toLocaleDateString()}`,
+          )
+          .join("\n")}`,
+      );
     }
 
-    if (state.family_status.current.length > 0) {
-      const statusLines = state.family_status.current
-        .slice(0, MAX_ITEMS_PER_SECTION)
-        .map((entry) => `- ${entry.entity}: ${entry.status}`);
-      sections.push(`Status\n${statusLines.join("\n")}`);
+    const statusLines = state.family_status.current
+      .filter((entry) => audience.size === 0 || audience.has(entry.entity))
+      .map((entry) => `- ${entry.entity}: ${entry.status}`);
+    if (statusLines.length > 0) {
+      sections.push(`Status\n${statusLines.slice(0, 4).join("\n")}`);
     }
 
     if (sections.length === 0) {
-      return "All clear today. Nothing pending.";
+      return `All clear for ${window.label}. Nothing urgent right now.`;
     }
 
     return sections.join("\n\n");
   }
 
+  private composeDigestMessage(
+    state: Awaited<ReturnType<StateService["getSystemState"]>>,
+    threadId: string,
+    referenceAt: Date,
+  ): string {
+    return this.composeOverviewMessage(state, "today", threadId, referenceAt);
+  }
+
   private async composeStateBackedMessage(
     action: TopicAction,
     queueItem: StackQueueItem,
+    mutationSummaries: MutationSummary[] = [],
   ): Promise<string | null> {
     const state = await this.stateService.getSystemState();
     const rawSourceMessage = summarizeContent(queueItem.content).trim();
     const normalizedSource = rawSourceMessage.toLowerCase();
     const sourceSentence = sentenceCaseResponse(rawSourceMessage);
+    const summaryText = mutationSummaries.flatMap((summary) => summary.lines).join("\n");
+    const prependSummary = (body: string): string =>
+      summaryText.length > 0 ? `${summaryText}\n${body}` : body;
     const entityLabel = (entityId: string): string => {
       const configured = runtimeSystemConfig.entities.find((entry) => entry.id === entityId);
       return configured?.name ?? entityId;
     };
     switch (action.type) {
       case "query_events": {
+        const relevantEvents = state.calendar.events
+          .filter((event) => event.status !== CalendarEventStatus.Cancelled)
+          .filter((event) =>
+            action.filters?.concerning?.length
+              ? event.concerning.some((entity) => action.filters?.concerning?.includes(entity))
+              : true,
+          )
+          .filter((event) =>
+            action.filters?.date_range
+              ? dateFallsWithinWindow(event.date_start ?? event.date ?? event.normalized_start, {
+                  start: action.filters.date_range.start,
+                  end: action.filters.date_range.end,
+                  label: "query",
+                })
+              : true,
+          )
+          .sort((left, right) => {
+            const leftDate =
+              left.date_start?.getTime() ??
+              left.date?.getTime() ??
+              left.normalized_start?.getTime() ??
+              0;
+            const rightDate =
+              right.date_start?.getTime() ??
+              right.date?.getTime() ??
+              right.normalized_start?.getTime() ??
+              0;
+            return leftDate - rightDate;
+          });
+        const window = buildQueryTimeWindow(rawSourceMessage, queueItem.created_at);
         const weekdayReference = extractWeekdayReference(rawSourceMessage);
-        if (state.calendar.events.length === 0) {
+        if (relevantEvents.length === 0) {
+          if (window?.label === "today") {
+            return "No scheduled events for today. Your calendar is clear.";
+          }
+          if (window?.label === "tonight") {
+            return "No scheduled events for tonight. Your calendar is clear.";
+          }
           return weekdayReference
             ? `Schedule summary for ${weekdayReference}: no calendar events right now.`
             : "Schedule summary: no calendar events right now.";
         }
-        return `Schedule summary (calendar):\n${state.calendar.events
+        const heading =
+          window?.label === "today"
+            ? "Today's schedule:"
+            : window?.label === "tonight"
+              ? "Tonight's schedule:"
+              : "Schedule summary (calendar):";
+        const conflictDetected = relevantEvents.some((event, index) => {
+          const current = event.date_start ?? event.date ?? event.normalized_start;
+          const next =
+            relevantEvents[index + 1]?.date_start ??
+            relevantEvents[index + 1]?.date ??
+            relevantEvents[index + 1]?.normalized_start;
+          return (
+            current instanceof Date && next instanceof Date && current.getTime() === next.getTime()
+          );
+        });
+        return `${heading}\n${relevantEvents
           .slice(0, 8)
           .map((entry, i) => {
             const when =
@@ -3132,12 +4282,12 @@ export class Worker {
                   : "";
             return `${i + 1}. ${entry.title}${when}`;
           })
-          .join("\n")}`;
+          .join("\n")}${conflictDetected ? "\n\nPotential conflict to resolve." : ""}`;
       }
       case "create_event":
       case "cancel_event":
       case "reschedule_event": {
-        return `Schedule summary (calendar): ${sourceSentence}`;
+        return prependSummary(`Schedule summary (calendar): ${sourceSentence}`);
       }
       case "notify_calendar_change": {
         const when = action.starts_at ? ` on ${action.starts_at.toLocaleString()}` : "";
@@ -3149,8 +4299,11 @@ export class Worker {
         return `Calendar ${action.change_type}: ${action.title}${when}${location}${audience}.`;
       }
       case "query_chores": {
-        if (state.chores.active.length === 0) return "No active chores right now.";
-        return `Active chores task list:\n${state.chores.active
+        const activeChores = state.chores.active.filter((entry) =>
+          action.assigned_to ? entry.assigned_to === action.assigned_to : true,
+        );
+        if (activeChores.length === 0) return "No active chores right now.";
+        return `Active chores task list:\n${activeChores
           .slice(0, 8)
           .map((entry, i) => `${i + 1}. ${entry.task}`)
           .join("\n")}`;
@@ -3179,15 +4332,36 @@ export class Worker {
       case "query_list":
         return this.composeGroceryListMessage(action.section);
       case "add_items":
-        return this.composeGroceryListMessage(undefined, { prefix: "Added to grocery list:" });
+        return summaryText.length > 0
+          ? summaryText
+          : this.composeGroceryListMessage(undefined, { prefix: "Added to grocery list:" });
       case "remove_items":
-        return this.composeGroceryListMessage(undefined, { prefix: "Updated grocery list:" });
+        return summaryText.length > 0
+          ? summaryText
+          : this.composeGroceryListMessage(undefined, { prefix: "Updated grocery list:" });
       case "query_health": {
         const profiles = action.entity
           ? state.health.profiles.filter((entry) => entry.entity === action.entity)
           : state.health.profiles;
         if (profiles.length === 0) return "Health summary: no health records found right now.";
-        return `Health summary: ${profiles.length} profile(s), ${profiles.reduce((n, p) => n + p.upcoming_appointments.length, 0)} upcoming appointment(s).`;
+        const appointmentLines = profiles.flatMap((profile) =>
+          profile.upcoming_appointments.slice(0, 2).map((appointment) => {
+            const when =
+              appointment.date instanceof Date ? appointment.date.toLocaleString() : "date TBD";
+            return `- ${profile.entity}: appointment on ${when}`;
+          }),
+        );
+        if (appointmentLines.length > 0) {
+          return `Health summary:\n${appointmentLines.join("\n")}`;
+        }
+        const noteLines = profiles
+          .flatMap((profile) =>
+            profile.notes.slice(-1).map((note) => `- ${profile.entity}: ${note}`),
+          )
+          .slice(0, 4);
+        return noteLines.length > 0
+          ? `Health summary:\n${noteLines.join("\n")}`
+          : "Health summary: no upcoming appointments right now.";
       }
       case "add_appointment":
       case "log_visit": {
@@ -3220,8 +4394,30 @@ export class Worker {
         return `Logged for ${entityLabel(action.entity)}: ${action.activity}.${recentCount > 0 ? ` (${recentCount} recent care log entr${recentCount === 1 ? "y" : "ies"})` : ""}`;
       }
       case "query_school": {
-        const assignments = state.school.students.flatMap((student) => student.assignments);
+        const window = buildQueryTimeWindow(rawSourceMessage, queueItem.created_at);
+        const assignments = state.school.students
+          .filter((student) => (action.entity ? student.entity === action.entity : true))
+          .flatMap((student) =>
+            student.assignments
+              .filter((assignment) => (action.status ? assignment.status === action.status : true))
+              .filter((assignment) => dateFallsWithinWindow(assignment.due_date, window))
+              .map((assignment) => ({
+                student: student.entity,
+                assignment,
+              })),
+          );
+        const communications = state.school.communications
+          .filter((communication) =>
+            action.entity ? communication.student_entity === action.entity : true,
+          )
+          .filter((communication) => communication.action_needed);
         if (assignments.length === 0) {
+          if (communications.length > 0) {
+            return `School summary:\n${communications
+              .slice(0, 4)
+              .map((communication) => `- ${communication.student_entity}: ${communication.summary}`)
+              .join("\n")}`;
+          }
           const focus = extractSchoolFocus(rawSourceMessage);
           return focus && focus !== "school"
             ? `School summary: no school assignments or ${focus} items right now.`
@@ -3229,22 +4425,35 @@ export class Worker {
         }
         return `School summary:\n${assignments
           .slice(0, 8)
-          .map((assignment, i) => `${i + 1}. ${assignment.title}`)
+          .map(
+            ({ student, assignment }, i) =>
+              `${i + 1}. ${student}: ${assignment.title} due ${assignment.due_date.toLocaleDateString()}`,
+          )
           .join("\n")}`;
       }
       case "add_assignment": {
         const assignments = state.school.students.flatMap((student) => student.assignments);
         if (assignments.length === 0) return "School summary: no school assignments right now.";
-        return `School summary:\n${assignments
-          .slice(0, 8)
-          .map((assignment, i) => `${i + 1}. ${assignment.title}`)
-          .join("\n")}`;
+        return prependSummary(
+          `School summary:\n${assignments
+            .slice(0, 8)
+            .map((assignment, i) => `${i + 1}. ${assignment.title}`)
+            .join("\n")}`,
+        );
       }
       case "query_trips": {
         if (state.travel.trips.length === 0) return "Travel summary: no trips planned right now.";
         return `Travel summary:\n${state.travel.trips
           .slice(0, 8)
-          .map((trip, i) => `${i + 1}. ${trip.name} (${trip.status})`)
+          .map((trip, i) => {
+            const start =
+              trip.dates.start instanceof Date
+                ? trip.dates.start.toLocaleDateString()
+                : "start TBD";
+            const end =
+              trip.dates.end instanceof Date ? trip.dates.end.toLocaleDateString() : "end TBD";
+            return `${i + 1}. ${trip.name} (${trip.status}, ${start} - ${end})`;
+          })
           .join("\n")}`;
       }
       case "create_trip": {
@@ -3274,7 +4483,7 @@ export class Worker {
       }
       case "add_lead": {
         if (normalizedSource.includes("draft") && normalizedSource.includes("reply")) {
-          return `Leads draft reply: ${sourceSentence}`;
+          return `Leads warm client draft reply: ${sourceSentence}`;
         }
         if (state.business.leads.length === 0) return "No leads right now.";
         return `Leads:\n${state.business.leads
@@ -3326,7 +4535,18 @@ export class Worker {
       }
       case "query_status": {
         if (action.entity === "__digest__") {
-          return this.composeDigestMessage(state);
+          return this.composeDigestMessage(state, queueItem.target_thread, queueItem.created_at);
+        }
+        if (action.entity?.startsWith("__overview__:")) {
+          const scope = action.entity.slice("__overview__:".length);
+          if (scope === "today" || scope === "tonight" || scope === "this_week") {
+            return this.composeOverviewMessage(
+              state,
+              scope,
+              queueItem.target_thread,
+              queueItem.created_at,
+            );
+          }
         }
         if (action.entity === "__ingest__") {
           const processed = [
@@ -3339,7 +4559,7 @@ export class Worker {
           if (processed.length === 0) {
             return "I have not ingested anything recently.";
           }
-          return `Recently ingested:\n${processed
+          return `Here is what I processed recently:\n${processed
             .map((entry) => {
               const origin = entry.origin ?? "unknown";
               const topic = entry.topic_classified ?? "unclassified";
@@ -3360,7 +4580,7 @@ export class Worker {
           const pendingCount = state.queue.pending.filter(
             (entry) => entry.target_thread === threadId,
           ).length;
-          return `I recently messaged this thread about ${latest.topic}. Latest content: ${latest.content}${pendingCount > 0 ? ` I am also holding ${pendingCount} item(s) for later in this thread.` : ""}`;
+          return `I recently checked in with this thread about ${latest.topic}.${pendingCount > 0 ? ` I am also holding ${pendingCount} item(s) for later here.` : ""}`;
         }
         if (action.entity?.startsWith("__held__:")) {
           const threadId = action.entity.slice("__held__:".length);
@@ -3368,7 +4588,7 @@ export class Worker {
           if (heldItems.length === 0) {
             return "I am not holding anything for later in this thread.";
           }
-          return `Held for later:\n${heldItems
+          return `I am holding these for later:\n${heldItems
             .slice(0, 6)
             .map((entry) => {
               const holdUntil =
@@ -3387,10 +4607,12 @@ export class Worker {
       }
       case "update_status": {
         if (state.family_status.current.length === 0)
-          return `Family status recorded: ${sourceSentence}`;
-        return `Family status recorded:\n${state.family_status.current
-          .map((entry, i) => `${i + 1}. ${entry.entity}: ${entry.status}`)
-          .join("\n")}`;
+          return prependSummary(`Family status recorded: ${sourceSentence}`);
+        return prependSummary(
+          `Family status recorded:\n${state.family_status.current
+            .map((entry, i) => `${i + 1}. ${entry.entity}: ${entry.status}`)
+            .join("\n")}`,
+        );
       }
       case "query_plans": {
         if (state.meals.planned.length === 0) return "Meal list: no meal plans right now.";
@@ -3408,7 +4630,14 @@ export class Worker {
       }
       case "query_maintenance": {
         if (state.maintenance.items.length === 0) return "No maintenance items right now.";
-        return `Maintenance record summary: ${state.maintenance.items.length} tracked item(s).`;
+        return `Maintenance record summary:\n${state.maintenance.items
+          .slice(0, 6)
+          .map((item, i) => {
+            const due =
+              item.next_due instanceof Date ? item.next_due.toLocaleDateString() : "due date TBD";
+            return `${i + 1}. ${item.task} (${due})`;
+          })
+          .join("\n")}`;
       }
       case "add_asset": {
         if (state.maintenance.assets.length === 0)
@@ -3429,6 +4658,7 @@ export class Worker {
     identity: IdentityResolutionResult,
     action: TopicAction,
     targetThread: string,
+    prefaceLines: string[] = [],
   ): Promise<
     | { kind: "none"; metadata: Record<string, unknown>; resolution?: undefined }
     | {
@@ -3487,12 +4717,14 @@ export class Worker {
       requesterPrivateThread !== targetThread
         ? `Approval needed: please confirm ${actionSummary}. Reply yes or no here or in your private thread.`
         : `Approval needed: please confirm ${actionSummary}. Reply yes or no.`;
+    const combinedPrompt =
+      prefaceLines.length > 0 ? `${prefaceLines.join("\n")}\n${prompt}` : prompt;
     await this.persistSystemDispatch({
       queue_item: queueItem,
       classification,
       identity,
       target_thread: targetThread,
-      content: prompt,
+      content: combinedPrompt,
       reason: "confirmation prompt",
     });
     return {
@@ -4022,6 +5254,7 @@ export class Worker {
       active_topic_context: topic,
       last_activity: queueItem.created_at,
       recent_messages: recent.slice(-HISTORY_LIMIT),
+      pending_clarification: history?.pending_clarification ?? null,
     });
   }
 
@@ -4043,6 +5276,31 @@ export class Worker {
       active_topic_context: topic,
       last_activity: this.now(),
       recent_messages: recent.slice(-HISTORY_LIMIT),
+      pending_clarification: history?.pending_clarification ?? null,
+    });
+  }
+
+  private async savePendingClarificationSession(
+    threadId: string,
+    session: PendingClarificationSession,
+  ): Promise<void> {
+    const history = await this.stateService.getThreadHistory(threadId);
+    await this.stateService.saveThreadHistory(threadId, {
+      active_topic_context: history?.active_topic_context ?? session.topic,
+      last_activity: history?.last_activity ?? session.requested_at,
+      recent_messages: history?.recent_messages ?? [],
+      pending_clarification: session,
+    });
+  }
+
+  private async clearPendingClarificationSession(threadId: string): Promise<void> {
+    const history = await this.stateService.getThreadHistory(threadId);
+    if (!history?.pending_clarification) {
+      return;
+    }
+    await this.stateService.saveThreadHistory(threadId, {
+      ...history,
+      pending_clarification: null,
     });
   }
 
@@ -4242,6 +5500,19 @@ export class Worker {
       target_thread: targetThread,
       content: clarification.message_to_participant,
       reason: "clarification prompt",
+    });
+    await this.savePendingClarificationSession(targetThread, {
+      original_queue_item_id: clarification.original_queue_item_id,
+      topic: classification.topic,
+      intent: classification.intent,
+      reason: clarification.reason,
+      message_to_participant: clarification.message_to_participant,
+      requested_at: this.now(),
+      source_thread: targetThread,
+      source_entity_id: identity.source_entity_id,
+      source_concerning: queueItem.concerning,
+      source_message: summarizeContent(queueItem.content),
+      context: clarification.context,
     });
     return { clarification, routing_target: targetThread };
   }

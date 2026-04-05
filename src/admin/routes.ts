@@ -210,7 +210,11 @@ function toPendingQueueMetadata(item: PendingQueueItem) {
     created_at: item.created_at,
     hold_until: item.hold_until ?? null,
     status: item.status ?? null,
-    content_kind: typeof item.content === "string" ? "text" : "structured",
+    content_kind: typeof item.content === "string" ? ("text" as const) : ("structured" as const),
+    content_preview:
+      typeof item.content === "string"
+        ? item.content
+        : `From: ${item.content.from}\nSubject: ${item.content.subject}`,
   };
 }
 
@@ -234,6 +238,7 @@ function toDispatchMetadata(
     included_in: item.included_in ?? null,
     response_received: item.response_received ?? null,
     escalation_step: item.escalation_step ?? null,
+    content: item.content,
   };
 }
 
