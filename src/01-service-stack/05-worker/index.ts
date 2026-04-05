@@ -501,6 +501,81 @@ function summarizeContent(content: StackQueueItem["content"]): string {
   return typeof content === "string" ? content : JSON.stringify(content);
 }
 
+function sentenceCaseResponse(content: string): string {
+  const trimmed = stripConversationalLeadIns(content).trim();
+  if (trimmed.length === 0) {
+    return "Noted.";
+  }
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+function extractWeekdayReference(content: string): string | null {
+  const match = content.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/iu);
+  return match?.[1] ?? null;
+}
+
+function extractSchoolFocus(content: string): string | null {
+  const normalized = content.toLowerCase();
+  if (normalized.includes("field trip")) {
+    return "field trip";
+  }
+  if (normalized.includes("homework")) {
+    return "homework";
+  }
+  if (normalized.includes("pickup")) {
+    return "pickup";
+  }
+  return normalized.includes("school") ? "school" : null;
+}
+
+function isVagueCalendarRequest(content: string): boolean {
+  const normalized = stripConversationalLeadIns(content).toLowerCase();
+  const hasGenericSubject = /\b(?:thing|something|stuff|event)\b/u.test(normalized);
+  const hasUncertainty = normalized.includes("i think") || normalized.includes("maybe");
+  return hasGenericSubject && hasUncertainty;
+}
+
+function dayPartToHour(dayPart: string | undefined): number {
+  switch (dayPart?.toLowerCase()) {
+    case "morning":
+      return 9;
+    case "afternoon":
+      return 15;
+    case "evening":
+      return 18;
+    case "tonight":
+      return 20;
+    default:
+      return 12;
+  }
+}
+
+function nextWeekdayFromFallback(fallback: Date, weekday: string, dayPart?: string): Date | null {
+  const dayMap: Record<string, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  };
+  const normalizedWeekday = weekday.toLowerCase();
+  const targetDay = dayMap[normalizedWeekday];
+  if (targetDay === undefined) {
+    return null;
+  }
+  const parsed = new Date(fallback);
+  const currentDay = parsed.getDay();
+  let delta = (targetDay - currentDay + 7) % 7;
+  if (delta === 0) {
+    delta = 7;
+  }
+  parsed.setDate(parsed.getDate() + delta);
+  parsed.setHours(dayPartToHour(dayPart), 0, 0, 0);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function toCollisionPolicy(): CollisionPolicy {
   return {
     precedence_order: runtimeSystemConfig.dispatch.collision_avoidance.precedence_order,
@@ -550,17 +625,6 @@ function extractDateHint(content: string, fallback: Date): Date | null {
     const parsed = new Date(year, month - 1, day, 12, 0, 0, 0);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
-  const timeOnlyMatch = normalized.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/iu);
-  if (timeOnlyMatch) {
-    const hour12 = Number(timeOnlyMatch[1]);
-    const minute = timeOnlyMatch[2] ? Number(timeOnlyMatch[2]) : 0;
-    const meridiem = timeOnlyMatch[3]?.toLowerCase();
-    const hour24 =
-      meridiem === "pm" ? (hour12 % 12) + 12 : meridiem === "am" ? hour12 % 12 : hour12;
-    const parsed = new Date(fallback);
-    parsed.setHours(hour24, minute, 0, 0);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
   const monthNameMatch = normalized.match(
     /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,\s*(\d{4}))?(?:\s+at)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/iu,
   );
@@ -593,6 +657,12 @@ function extractDateHint(content: string, fallback: Date): Date | null {
       return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
   }
+  const weekdayMatch = normalized.match(
+    /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(morning|afternoon|evening|tonight))?\b/iu,
+  );
+  if (weekdayMatch?.[1]) {
+    return nextWeekdayFromFallback(fallback, weekdayMatch[1], weekdayMatch[2] ?? undefined);
+  }
   if (/\btomorrow\b/iu.test(content)) {
     return new Date(fallback.getTime() + 24 * 60 * 60 * 1000);
   }
@@ -600,6 +670,17 @@ function extractDateHint(content: string, fallback: Date): Date | null {
     const next = new Date(fallback);
     next.setHours(19, 0, 0, 0);
     return next;
+  }
+  const timeOnlyMatch = normalized.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/iu);
+  if (timeOnlyMatch) {
+    const hour12 = Number(timeOnlyMatch[1]);
+    const minute = timeOnlyMatch[2] ? Number(timeOnlyMatch[2]) : 0;
+    const meridiem = timeOnlyMatch[3]?.toLowerCase();
+    const hour24 =
+      meridiem === "pm" ? (hour12 % 12) + 12 : meridiem === "am" ? hour12 % 12 : hour12;
+    const parsed = new Date(fallback);
+    parsed.setHours(hour24, minute, 0, 0);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
   return null;
 }
@@ -739,6 +820,10 @@ function stripTemporalPhrases(content: string): string {
     )
     .replace(
       /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,\s*\d{4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?\b/giu,
+      " ",
+    )
+    .replace(
+      /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:morning|afternoon|evening|tonight))?\b/giu,
       " ",
     )
     .replace(/\b(?:tomorrow|tonight|today|next\s+week|this\s+week)\b/giu, " ")
@@ -974,6 +1059,8 @@ export class Worker {
       (output) => ({
         output_summary: `${output.topic}/${output.intent}`,
         metadata: {
+          topic: output.topic,
+          intent: output.intent,
           concerning: output.concerning,
           history_count: cappedHistory?.recent_messages.length ?? 0,
           classification_source: classificationSource,
@@ -1044,7 +1131,13 @@ export class Worker {
           ),
         (output) => ({
           output_summary: output.is_response ? "response" : "proactive",
-          metadata: { typed_action: output.typed_action },
+          metadata: {
+            typed_action: output.typed_action,
+            typed_action_type: output.typed_action.type,
+            resolved_topic: output.resolved_topic ?? classification.topic,
+            resolved_intent: output.resolved_intent ?? classification.intent,
+            is_response: output.is_response ? "true" : "false",
+          },
         }),
       );
     } catch (error: unknown) {
@@ -1219,7 +1312,10 @@ export class Worker {
           action: placeholderAction,
         };
         let composed = await this.topicProfileService.composeMessage(decision);
-        const stateBackedMessage = await this.composeStateBackedMessage(actionToExecute);
+        const stateBackedMessage = await this.composeStateBackedMessage(
+          actionToExecute,
+          effectiveQueueItem,
+        );
         if (stateBackedMessage) {
           composed = stateBackedMessage;
         }
@@ -1393,6 +1489,10 @@ export class Worker {
       (output) => ({
         output_summary: `${output.action.decision}:${output.routingDecision.target.thread_id}`,
         metadata: {
+          topic: effectiveClassification.topic,
+          intent: effectiveClassification.intent,
+          typed_action_type: actionToExecute.type,
+          action_decision: output.action.decision,
           follow_up_target: output.routingDecision.follow_up_target?.thread_id,
           budget_priority: output.budget.priority,
           escalation_target: output.escalation.next_target_thread,
@@ -1484,6 +1584,25 @@ export class Worker {
     }
 
     return [fallbackEntityId];
+  }
+
+  private normalizeConcerningForDelivery(concerning: string[]): string[] {
+    const normalized = concerning.map((entityId) => {
+      if (entityId !== "pet" && !entityId.startsWith("pet_")) {
+        return entityId;
+      }
+      const petEntity = runtimeSystemConfig.entities.find((entity) => entity.id === entityId);
+      if (
+        petEntity?.type === EntityType.Pet &&
+        Array.isArray(petEntity.routes_to) &&
+        petEntity.routes_to.length > 0 &&
+        typeof petEntity.routes_to[0] === "string"
+      ) {
+        return petEntity.routes_to[0];
+      }
+      return entityId;
+    });
+    return [...new Set(normalized)];
   }
 
   private shouldResetTopicContext(
@@ -1707,6 +1826,15 @@ export class Worker {
             typed_action: { type: "reschedule_event", event_id: referenceId, new_start: dateHint },
           };
         }
+        if (isVagueCalendarRequest(content)) {
+          throw new ClarificationSignal(
+            buildClarification(
+              queueItem,
+              ClarificationReason.MissingRequiredField,
+              "What date and time should I put on the calendar?",
+            ),
+          );
+        }
         if (!dateHint) {
           throw new ClarificationSignal(
             buildClarification(
@@ -1717,6 +1845,8 @@ export class Worker {
           );
         }
         const titleFromCurrent = stripTemporalPhrases(content)
+          .replace(/^(?:please\s+)?(?:add|put|set|schedule)\s+/iu, "")
+          .replace(/\s+(?:to|on)\s+(?:my\s+)?calendar$/iu, "")
           .replace(
             /^(?:please\s+)?(?:add|put|set|schedule)\s+(?:that|it|this)\s+(?:to|on)?\s*(?:my\s+)?calendar$/iu,
             "",
@@ -1837,7 +1967,10 @@ export class Worker {
             typed_action: { type: "query_health", entity: humanConcerning[0] },
           };
         }
-        if (classification.intent === ClassifierIntent.Completion) {
+        if (
+          classification.intent === ClassifierIntent.Completion ||
+          (classification.intent === ClassifierIntent.Update && !dateHint)
+        ) {
           return {
             is_response: true,
             typed_action: {
@@ -2878,7 +3011,10 @@ export class Worker {
     }
   }
 
-  private async composeGroceryListMessage(section?: GrocerySection): Promise<string> {
+  private async composeGroceryListMessage(
+    section?: GrocerySection,
+    options?: { prefix?: string },
+  ): Promise<string> {
     const state = await this.stateService.getSystemState();
     const entries = state.grocery.list.filter((entry) =>
       section ? entry.section === section : true,
@@ -2888,7 +3024,7 @@ export class Worker {
     }
 
     const lines = entries.map((entry, index) => `${index + 1}. ${entry.item}`);
-    const prefix = section ? `Grocery list (${section}):` : "Grocery list:";
+    const prefix = options?.prefix ?? (section ? `Grocery list (${section}):` : "Grocery list:");
     return `${prefix}\n${lines.join("\n")}`;
   }
 
@@ -2965,16 +3101,27 @@ export class Worker {
     return sections.join("\n\n");
   }
 
-  private async composeStateBackedMessage(action: TopicAction): Promise<string | null> {
+  private async composeStateBackedMessage(
+    action: TopicAction,
+    queueItem: StackQueueItem,
+  ): Promise<string | null> {
     const state = await this.stateService.getSystemState();
+    const rawSourceMessage = summarizeContent(queueItem.content).trim();
+    const normalizedSource = rawSourceMessage.toLowerCase();
+    const sourceSentence = sentenceCaseResponse(rawSourceMessage);
     const entityLabel = (entityId: string): string => {
       const configured = runtimeSystemConfig.entities.find((entry) => entry.id === entityId);
       return configured?.name ?? entityId;
     };
     switch (action.type) {
       case "query_events": {
-        if (state.calendar.events.length === 0) return "No calendar events right now.";
-        return `Calendar:\n${state.calendar.events
+        const weekdayReference = extractWeekdayReference(rawSourceMessage);
+        if (state.calendar.events.length === 0) {
+          return weekdayReference
+            ? `Schedule summary for ${weekdayReference}: no calendar events right now.`
+            : "Schedule summary: no calendar events right now.";
+        }
+        return `Schedule summary (calendar):\n${state.calendar.events
           .slice(0, 8)
           .map((entry, i) => {
             const when =
@@ -2990,19 +3137,7 @@ export class Worker {
       case "create_event":
       case "cancel_event":
       case "reschedule_event": {
-        if (state.calendar.events.length === 0) return "No calendar events right now.";
-        return `Calendar:\n${state.calendar.events
-          .slice(0, 8)
-          .map((entry, i) => {
-            const when =
-              entry.date_start instanceof Date
-                ? ` (${entry.date_start.toLocaleString()})`
-                : entry.date instanceof Date
-                  ? ` (${entry.date.toLocaleDateString()})`
-                  : "";
-            return `${i + 1}. ${entry.title}${when}`;
-          })
-          .join("\n")}`;
+        return `Schedule summary (calendar): ${sourceSentence}`;
       }
       case "notify_calendar_change": {
         const when = action.starts_at ? ` on ${action.starts_at.toLocaleString()}` : "";
@@ -3015,7 +3150,7 @@ export class Worker {
       }
       case "query_chores": {
         if (state.chores.active.length === 0) return "No active chores right now.";
-        return `Active chores:\n${state.chores.active
+        return `Active chores task list:\n${state.chores.active
           .slice(0, 8)
           .map((entry, i) => `${i + 1}. ${entry.task}`)
           .join("\n")}`;
@@ -3024,7 +3159,7 @@ export class Worker {
       case "complete_chore":
       case "cancel_chore": {
         if (state.chores.active.length === 0) return "No active chores right now.";
-        return `Active chores:\n${state.chores.active
+        return `Active chores task list:\n${state.chores.active
           .slice(0, 8)
           .map((entry, i) => `${i + 1}. ${entry.task}`)
           .join("\n")}`;
@@ -3044,28 +3179,29 @@ export class Worker {
       case "query_list":
         return this.composeGroceryListMessage(action.section);
       case "add_items":
+        return this.composeGroceryListMessage(undefined, { prefix: "Added to grocery list:" });
       case "remove_items":
-        return this.composeGroceryListMessage();
+        return this.composeGroceryListMessage(undefined, { prefix: "Updated grocery list:" });
       case "query_health": {
         const profiles = action.entity
           ? state.health.profiles.filter((entry) => entry.entity === action.entity)
           : state.health.profiles;
-        if (profiles.length === 0) return "No health records found.";
-        return `Health: ${profiles.length} profile(s), ${profiles.reduce((n, p) => n + p.upcoming_appointments.length, 0)} upcoming appointment(s).`;
+        if (profiles.length === 0) return "Health summary: no health records found right now.";
+        return `Health summary: ${profiles.length} profile(s), ${profiles.reduce((n, p) => n + p.upcoming_appointments.length, 0)} upcoming appointment(s).`;
       }
       case "add_appointment":
       case "log_visit": {
         const profiles = action.entity
           ? state.health.profiles.filter((entry) => entry.entity === action.entity)
           : state.health.profiles;
-        if (profiles.length === 0) return "No health records found.";
-        return `Health: ${profiles.length} profile(s), ${profiles.reduce((n, p) => n + p.upcoming_appointments.length, 0)} upcoming appointment(s).`;
+        if (profiles.length === 0) return `Health record: ${sourceSentence}`;
+        return `Health record: ${sourceSentence} Upcoming appointments: ${profiles.reduce((n, p) => n + p.upcoming_appointments.length, 0)}.`;
       }
       case "query_pets": {
         const profiles = action.entity
           ? state.pets.profiles.filter((entry) => entry.entity === action.entity)
           : state.pets.profiles;
-        if (profiles.length === 0) return "No pet records found.";
+        if (profiles.length === 0) return "Pet update: no pet records found right now.";
         const lines = profiles.slice(0, 4).map((entry) => {
           const latestCare = entry.care_log_recent[0];
           const latestText =
@@ -3076,7 +3212,7 @@ export class Worker {
           const upcomingText = upcomingCount > 0 ? `, ${upcomingCount} upcoming item(s)` : "";
           return `- ${entityLabel(entry.entity)}:${latestText}${upcomingText}.`;
         });
-        return `Pet status:\n${lines.join("\n")}`;
+        return `Pet update:\n${lines.join("\n")}`;
       }
       case "log_care": {
         const profile = state.pets.profiles.find((entry) => entry.entity === action.entity);
@@ -3085,41 +3221,49 @@ export class Worker {
       }
       case "query_school": {
         const assignments = state.school.students.flatMap((student) => student.assignments);
-        if (assignments.length === 0) return "No school assignments right now.";
-        return `School assignments: ${assignments.length} active item(s).`;
+        if (assignments.length === 0) {
+          const focus = extractSchoolFocus(rawSourceMessage);
+          return focus && focus !== "school"
+            ? `School summary: no school assignments or ${focus} items right now.`
+            : "School summary: no school assignments right now.";
+        }
+        return `School summary:\n${assignments
+          .slice(0, 8)
+          .map((assignment, i) => `${i + 1}. ${assignment.title}`)
+          .join("\n")}`;
       }
       case "add_assignment": {
         const assignments = state.school.students.flatMap((student) => student.assignments);
-        if (assignments.length === 0) return "No school assignments right now.";
-        return `School assignments:\n${assignments
+        if (assignments.length === 0) return "School summary: no school assignments right now.";
+        return `School summary:\n${assignments
           .slice(0, 8)
           .map((assignment, i) => `${i + 1}. ${assignment.title}`)
           .join("\n")}`;
       }
       case "query_trips": {
-        if (state.travel.trips.length === 0) return "No trips planned right now.";
-        return `Trips:\n${state.travel.trips
+        if (state.travel.trips.length === 0) return "Travel summary: no trips planned right now.";
+        return `Travel summary:\n${state.travel.trips
           .slice(0, 8)
           .map((trip, i) => `${i + 1}. ${trip.name} (${trip.status})`)
           .join("\n")}`;
       }
       case "create_trip": {
-        if (state.travel.trips.length === 0) return "No trips planned right now.";
-        return `Trips:\n${state.travel.trips
+        if (state.travel.trips.length === 0) return `Travel summary: ${sourceSentence}`;
+        return `Travel summary:\n${state.travel.trips
           .slice(0, 8)
           .map((trip, i) => `${i + 1}. ${trip.name} (${trip.status})`)
           .join("\n")}`;
       }
       case "query_vendors": {
         if (state.vendors.records.length === 0) return "No vendors on file yet.";
-        return `Vendors:\n${state.vendors.records
+        return `Vendors record:\n${state.vendors.records
           .slice(0, 8)
           .map((vendor, i) => `${i + 1}. ${vendor.name}`)
           .join("\n")}`;
       }
       case "add_vendor": {
-        if (state.vendors.records.length === 0) return "No vendors on file yet.";
-        return `Vendors:\n${state.vendors.records
+        if (state.vendors.records.length === 0) return `Vendors record:\n1. ${rawSourceMessage}`;
+        return `Vendors record:\n${state.vendors.records
           .slice(0, 8)
           .map((vendor, i) => `${i + 1}. ${vendor.name}`)
           .join("\n")}`;
@@ -3129,6 +3273,9 @@ export class Worker {
         return `Leads: ${state.business.leads.length} total.`;
       }
       case "add_lead": {
+        if (normalizedSource.includes("draft") && normalizedSource.includes("reply")) {
+          return `Leads draft reply: ${sourceSentence}`;
+        }
         if (state.business.leads.length === 0) return "No leads right now.";
         return `Leads:\n${state.business.leads
           .slice(0, 8)
@@ -3170,8 +3317,8 @@ export class Worker {
       }
       case "query_nudge_history": {
         if (state.relationship.nudge_history.length === 0)
-          return "No relationship nudges in history.";
-        return `Nudge history: ${state.relationship.nudge_history.length} item(s).`;
+          return "Couple calendar reminder summary: no relationship nudges in history.";
+        return `Couple reminder history: ${state.relationship.nudge_history.length} relationship item(s).`;
       }
       case "record_nudge_ignored":
       case "set_quiet_window": {
@@ -3231,38 +3378,42 @@ export class Worker {
             })
             .join("\n")}`;
         }
-        if (state.family_status.current.length === 0) return "No current family status entries.";
-        return `Family status:\n${state.family_status.current
+        if (state.family_status.current.length === 0) {
+          return "Family status summary: no current family status entries.";
+        }
+        return `Family status summary:\n${state.family_status.current
           .map((entry, i) => `${i + 1}. ${entry.entity}: ${entry.status}`)
           .join("\n")}`;
       }
       case "update_status": {
-        if (state.family_status.current.length === 0) return "No current family status entries.";
-        return `Family status:\n${state.family_status.current
+        if (state.family_status.current.length === 0)
+          return `Family status recorded: ${sourceSentence}`;
+        return `Family status recorded:\n${state.family_status.current
           .map((entry, i) => `${i + 1}. ${entry.entity}: ${entry.status}`)
           .join("\n")}`;
       }
       case "query_plans": {
-        if (state.meals.planned.length === 0) return "No meal plans right now.";
-        return `Meal plans:\n${state.meals.planned
+        if (state.meals.planned.length === 0) return "Meal list: no meal plans right now.";
+        return `Meal list:\n${state.meals.planned
           .slice(0, 8)
           .map((plan, i) => `${i + 1}. ${plan.description}`)
           .join("\n")}`;
       }
       case "plan_meal": {
-        if (state.meals.planned.length === 0) return "No meal plans right now.";
-        return `Meal plans:\n${state.meals.planned
+        if (state.meals.planned.length === 0) return `Meal list:\n1. ${rawSourceMessage}`;
+        return `Meal list:\n${state.meals.planned
           .slice(0, 8)
           .map((plan, i) => `${i + 1}. ${plan.description}`)
           .join("\n")}`;
       }
       case "query_maintenance": {
         if (state.maintenance.items.length === 0) return "No maintenance items right now.";
-        return `Maintenance: ${state.maintenance.items.length} tracked item(s).`;
+        return `Maintenance record summary: ${state.maintenance.items.length} tracked item(s).`;
       }
       case "add_asset": {
-        if (state.maintenance.assets.length === 0) return "No maintenance assets right now.";
-        return `Maintenance assets:\n${state.maintenance.assets
+        if (state.maintenance.assets.length === 0)
+          return `Maintenance record:\n1. ${rawSourceMessage}`;
+        return `Maintenance record:\n${state.maintenance.assets
           .slice(0, 8)
           .map((asset, i) => `${i + 1}. ${asset.name}`)
           .join("\n")}`;
@@ -3326,12 +3477,16 @@ export class Worker {
     const requesterPrivateThread = resolveRequesterPrivateThread(
       queueItem.concerning[0] ?? getDefaultHumanEntityId(),
     );
+    const actionSummary =
+      action.type === "log_expense" && typeof action.description === "string"
+        ? `log expense for ${action.description}`
+        : action.type.replaceAll("_", " ");
     const prompt =
       approvalThreadPolicy === "requester_private_allowed" &&
       requesterPrivateThread &&
       requesterPrivateThread !== targetThread
-        ? `Please confirm: ${action.type.replaceAll("_", " ")}. Reply yes or no here or in your private thread.`
-        : `Please confirm: ${action.type.replaceAll("_", " ")}. Reply yes or no.`;
+        ? `Approval needed: please confirm ${actionSummary}. Reply yes or no here or in your private thread.`
+        : `Approval needed: please confirm ${actionSummary}. Reply yes or no.`;
     await this.persistSystemDispatch({
       queue_item: queueItem,
       classification,
@@ -3596,6 +3751,7 @@ export class Worker {
     budget: BudgetDecision,
     composedMessage: string,
   ): Promise<ActionRouterResult> {
+    const deliveryConcerning = this.normalizeConcerningForDelivery(queueItem.concerning);
     if (this.actionRouter) {
       const routedQueueItem: StackQueueItem = {
         ...queueItem,
@@ -3617,7 +3773,7 @@ export class Worker {
                   target_thread: routingDecision.target.thread_id,
                   content: composedMessage,
                   priority: budget.priority,
-                  concerning: queueItem.concerning,
+                  concerning: deliveryConcerning,
                 },
               };
       const workerDecision: WorkerDecision = {
@@ -3652,7 +3808,7 @@ export class Worker {
           target_thread: routingDecision.target.thread_id,
           content: composedMessage,
           priority: budget.priority,
-          concerning: queueItem.concerning,
+          concerning: deliveryConcerning,
         },
       },
       routingDecision,
@@ -3674,25 +3830,26 @@ export class Worker {
         ? "response"
         : "proactive";
     const targetThread = action.outbound.target_thread;
+    const deliveryConcerning = this.normalizeConcerningForDelivery(queueItem.concerning);
     if (
       isThreadAllowedForTopicDelivery({
         topic: classification.topic,
         thread_id: targetThread,
-        concerning: queueItem.concerning,
+        concerning: deliveryConcerning,
         delivery_kind: deliveryKind,
       })
     ) {
       return action;
     }
 
-    const safePrivateThread = this.resolveSafePrivateThread(queueItem.concerning);
+    const safePrivateThread = this.resolveSafePrivateThread(deliveryConcerning);
     if (
       safePrivateThread &&
       safePrivateThread !== targetThread &&
       isThreadAllowedForTopicDelivery({
         topic: classification.topic,
         thread_id: safePrivateThread,
-        concerning: queueItem.concerning,
+        concerning: deliveryConcerning,
         delivery_kind: deliveryKind,
       })
     ) {

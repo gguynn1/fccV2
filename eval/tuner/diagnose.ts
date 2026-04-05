@@ -22,7 +22,9 @@ export function diagnoseScenarioFailures(
     failing_dimensions: [...new Set(failingDimensions)],
     summary: canFixWithPrompt
       ? "The failing dimensions are limited to message composition, so a prompt candidate can be proposed."
-      : "The failure touches classification, routing, priority, or confirmation behavior and needs code-level investigation.",
+      : forcedScope === "structural"
+        ? "The scenario is structurally scoped, so any remaining failure should be investigated in runner, runtime, or scaffold assumptions before proposing prompt-only changes."
+        : "The failure touches classification, routing, priority, or confirmation behavior and needs code-level investigation.",
   };
 }
 

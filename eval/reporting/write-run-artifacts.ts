@@ -19,6 +19,14 @@ function formatLogLines(state: EvalRunState, scenarioId: string): string {
   return lines.length > 0 ? lines.join("\n") : "- No logs captured.";
 }
 
+function formatPreflightLines(state: EvalRunState, scenarioId: string): string {
+  const lines = state.logs
+    .filter((log) => log.scenario_id === scenarioId && log.phase === "preflight")
+    .map((log) => `- ${log.message}`);
+
+  return lines.length > 0 ? lines.join("\n") : "- None";
+}
+
 function quoteForPrompt(value: string): string {
   return value.replaceAll('"""', '\\"\\"\\"');
 }
@@ -48,6 +56,7 @@ function buildInsights(state: EvalRunState): {
   topFailureFieldsLine: string;
   fixabilityLine: string;
   multiTurnDriftLine: string;
+  preflightLine: string;
 } {
   const allTopics = new Set<string>(Object.values(TopicKey));
   const expectedTopics = new Set<string>();
@@ -90,6 +99,10 @@ function buildInsights(state: EvalRunState): {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
     .map(([field, count]) => `${field} (${count})`);
+  const preflightLogs = state.logs.filter((log) => log.phase === "preflight");
+  const preflightScenarioCount = new Set(
+    preflightLogs.map((log) => log.scenario_id).filter((value): value is string => Boolean(value)),
+  ).size;
 
   return {
     topicCoverageLine: `${expectedTopics.size}/${allTopics.size} topics represented in scenario expectations.`,
@@ -107,6 +120,10 @@ function buildInsights(state: EvalRunState): {
     topFailureFieldsLine:
       topFailureFields.length > 0 ? topFailureFields.join(", ") : "No failing fields in this run.",
     fixabilityLine: `Prompt-fixable failures: ${promptFixableFailures}; structural failures: ${structuralFailures}.`,
+    preflightLine:
+      preflightLogs.length > 0
+        ? `${preflightLogs.length} preflight warning(s) across ${preflightScenarioCount} scenario(s); generated scaffold assumptions were normalized or structurally flagged before evaluation.`
+        : "No generated-scenario preflight warnings were recorded in this run.",
     multiTurnDriftLine:
       laterTurnStructuralFailures > 0
         ? `${laterTurnStructuralFailures} structural failure(s) occurred on later participant turns; inspect worker-replay context preservation before assuming runtime config is wrong.`
@@ -169,6 +186,7 @@ function buildAgentPrompt(state: EvalRunState): string {
       const suggestionLine = scenario.tuner?.candidate
         ? `- Prompt suggestion is embedded in this run artifact under the detailed results section.`
         : "- No embedded prompt suggestion was generated.";
+      const preflightLines = formatPreflightLines(state, scenario.id);
       const laterTurnStructuralFailures = scenario.failures.filter(
         (failure) =>
           typeof failure.turn_index === "number" &&
@@ -185,6 +203,9 @@ function buildAgentPrompt(state: EvalRunState): string {
 - Final status: \`${scenario.status}\`
 - Category: \`${scenario.category}\`
 ${suggestionLine}
+
+Preflight warnings:
+${preflightLines}
 
 Failures:
 ${failureLines}
@@ -279,6 +300,7 @@ Coverage insights:
 - categories: ${insights.categoryCoverageLine}
 - top failing dimensions: ${insights.topFailureFieldsLine}
 - ${insights.fixabilityLine}
+- ${insights.preflightLine}
 - ${insights.multiTurnDriftLine}
 
 Your task:
@@ -319,6 +341,7 @@ function buildMarkdown(state: EvalRunState): string {
               )
               .join("\n")
           : "- None";
+      const preflightLines = formatPreflightLines(state, scenario.id);
 
       return `## ${scenario.title}
 
@@ -346,6 +369,9 @@ ${scenario.tuner.candidate.body}
 
 ### Failures
 ${failureLines}
+
+### Preflight Warnings
+${preflightLines}
 
 ### Logs
 ${formatLogLines(state, scenario.id)}
@@ -379,6 +405,7 @@ ${formatLogLines(state, scenario.id)}
 - Category distribution: ${insights.categoryCoverageLine}
 - Top failing dimensions: ${insights.topFailureFieldsLine}
 - ${insights.fixabilityLine}
+- ${insights.preflightLine}
 - ${insights.multiTurnDriftLine}
 
 ## Pasteable Prompt

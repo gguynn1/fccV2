@@ -88,7 +88,7 @@ const scenarioTemplates: ScenarioTemplate[] = [
       { message: "Add eggs and yogurt to the list", tone_markers: ["added", "grocery"] },
       { message: "We need ground beef and bread", tone_markers: ["added", "grocery"] },
       {
-        message: "Actually, add cereal and bananas to the grocery list on 6/3",
+        message: "Add cereal and bananas to the grocery list on 6/3",
         tone_markers: ["added", "grocery"],
       },
     ],
@@ -106,9 +106,9 @@ const scenarioTemplates: ScenarioTemplate[] = [
     confirmation_required: true,
     format_markers: ["confirm"],
     variants: [
-      { message: "Pay the water bill on Monday morning", tone_markers: ["approval", "bill"] },
-      { message: "Pay the electric bill tomorrow", tone_markers: ["approval", "bill"] },
-      { message: "Pay the internet bill this Friday", tone_markers: ["approval", "bill"] },
+      { message: "Pay the $50 water bill on Monday morning", tone_markers: ["approval", "bill"] },
+      { message: "Pay the $75 electric bill tomorrow", tone_markers: ["approval", "bill"] },
+      { message: "Pay the $60 internet bill this Friday", tone_markers: ["approval", "bill"] },
     ],
   },
   {
@@ -147,7 +147,7 @@ const scenarioTemplates: ScenarioTemplate[] = [
     origin_thread: "participant_1_private",
     target_thread: "participant_1_private",
     concerning: ["participant_1"],
-    priority: "DispatchPriority.Batched",
+    priority: "DispatchPriority.Immediate",
     confirmation_required: false,
     format_markers: ["record"],
     variants: [
@@ -164,12 +164,12 @@ const scenarioTemplates: ScenarioTemplate[] = [
   },
   {
     suffix: "school-query",
-    title: "School queries route to the child's private thread",
+    title: "School queries stay in the requesting family thread",
     category: "classification",
     topic: "TopicKey.School",
     intent: "ClassifierIntent.Query",
     origin_thread: "family",
-    target_thread: "participant_3_private",
+    target_thread: "family",
     concerning: ["participant_3"],
     priority: "DispatchPriority.Immediate",
     confirmation_required: false,
@@ -230,14 +230,14 @@ const scenarioTemplates: ScenarioTemplate[] = [
   },
   {
     suffix: "chores-request",
-    title: "Chore assignments route to the assignee's thread",
+    title: "Chore assignments keep the immediate reply visible in the family thread",
     category: "pipeline",
     topic: "TopicKey.Chores",
     intent: "ClassifierIntent.Request",
     origin_thread: "family",
-    target_thread: "participant_3_private",
+    target_thread: "family",
     concerning: ["participant_3"],
-    priority: "DispatchPriority.Batched",
+    priority: "DispatchPriority.Immediate",
     confirmation_required: false,
     format_markers: ["task"],
     variants: [
@@ -320,23 +320,23 @@ const scenarioTemplates: ScenarioTemplate[] = [
   },
   {
     suffix: "maintenance-update",
-    title: "Maintenance records stay in the owner's private thread",
+    title: "Maintenance requests stay in the owner's private thread",
     category: "routing",
     topic: "TopicKey.Maintenance",
-    intent: "ClassifierIntent.Update",
+    intent: "ClassifierIntent.Request",
     origin_thread: "participant_1_private",
     target_thread: "participant_1_private",
     concerning: ["participant_1"],
-    priority: "DispatchPriority.Batched",
+    priority: "DispatchPriority.Immediate",
     confirmation_required: false,
     format_markers: ["record"],
     variants: [
       {
-        message: "The oil change is due next Tuesday",
+        message: "Schedule the oil change for next Tuesday",
         tone_markers: ["maintenance", "oil change"],
       },
       {
-        message: "Replace the furnace air filter this weekend",
+        message: "Schedule the furnace air filter replacement this weekend",
         tone_markers: ["maintenance", "air filter"],
       },
       {
@@ -364,7 +364,7 @@ const scenarioTemplates: ScenarioTemplate[] = [
         tone_markers: ["approval", "bill"],
       },
       {
-        message: "Add milk to the grocery list and pay the electric bill Friday",
+        message: "Add milk to the grocery list and pay the $80 electric bill Friday",
         tone_markers: ["approval", "bill"],
       },
       {
@@ -387,7 +387,7 @@ const scenarioTemplates: ScenarioTemplate[] = [
     format_markers: ["summary"],
     variants: [
       {
-        message: "Actually, add a recital to my calendar on 6/3 at 6pm",
+        message: "Add a recital to my calendar on 6/3 at 6pm",
         tone_markers: ["schedule", "6/3"],
       },
       {
@@ -441,7 +441,7 @@ const scenarioTemplates: ScenarioTemplate[] = [
     format_markers: ["status"],
     variants: [
       {
-        message: "Actually, running late from school pickup and home around 6",
+        message: "Just a heads up, running late from school pickup and home around 6",
         tone_markers: ["status", "recorded"],
       },
       {
@@ -500,7 +500,12 @@ function buildScenarioSetFile(slug: string): string {
       confirmation_required: ${String(template.confirmation_required)},
       tone_markers: [${toneMarkersLiteral}],
       format_markers: [${formatMarkersLiteral}],
-${mustNotLine}    },${notesLine}
+${mustNotLine}    },
+    simulation: {
+      parity_assertion: {
+        against_simulator: false,
+      },
+    },${notesLine}
   }`;
   });
 
